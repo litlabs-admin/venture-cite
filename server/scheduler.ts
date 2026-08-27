@@ -768,6 +768,39 @@ function cronCrashGuard(jobName: string, fn: () => Promise<unknown>): () => void
 }
 
 export function initScheduler(): void {
+  // ─── Keep brand activation moving without a browser open ──────────────────
+  //
+  // Activation is sliced (kickoff runs on a ~50s budget) because the pipeline
+  // was built for a serverless function ceiling. That leaves any run whose
+  // step outlasts the budget - a fact scrape is routinely ~2 minutes - parked
+  // until something drives the next slice. The client-driven advance covers a
+  // user sitting on the page, but a user who closes the tab mid-run would
+  // otherwise see progress freeze until they came back, which is exactly the
+  // behaviour reported.
+  //
+  // This tick is what makes activation a BACKGROUND job. Minutely, because the
+  // whole point is that a new signup finishes on its own within a few minutes;
+  // hourly (the cadence of the sweeps below) would have a user staring at a
+  // half-built dashboard for most of an hour.
+  //
+  // Cheap when idle: resumeInFlightAutopilots selects only brands in a
+  // non-terminal state, and migration 0121 seeded historical strandings past
+  // the retry cap so this cannot stampede old data. runOnboardingAutopilot
+  // takes a per-brand lock, so a tick landing while the user's own page is
+  // driving the same brand is a no-op rather than duplicated paid work.
+  const AUTOPILOT_RESUME_CRON = process.env.AUTOPILOT_RESUME_CRON || "* * * * *";
+  if (cron.validate(AUTOPILOT_RESUME_CRON)) {
+    cron.schedule(
+      AUTOPILOT_RESUME_CRON,
+      cronCrashGuard("resume-in-flight-autopilots", async () => {
+        const { resumeInFlightAutopilots } = await import("./lib/onboardingAutopilot");
+        // Finish inside the minute so ticks cannot pile up on each other.
+        await resumeInFlightAutopilots(Date.now() + 45_000);
+      }),
+    );
+    logger.info({ cron: AUTOPILOT_RESUME_CRON }, "autopilot resume tick scheduled");
+  }
+
   const CONTENT_COST_OUTBOX_CRON = process.env.CONTENT_COST_OUTBOX_CRON || "*/5 * * * *";
   if (cron.validate(CONTENT_COST_OUTBOX_CRON)) {
     cron.schedule(

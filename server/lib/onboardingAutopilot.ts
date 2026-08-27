@@ -11,6 +11,7 @@ import { cronStepBudget } from "./factAgent/v2/vercelBudget";
 import type { Brand } from "@shared/schema";
 
 import { captureAndFlush } from "./sentryReport";
+import { withDynamicAdvisoryLock, dynamicLockNamespaces } from "./advisoryLock";
 
 /** How many times the recovery sweep will restart a brand that is 'idle' or
  *  'failed' before giving up. Onboarding costs real provider spend, so this is
@@ -36,7 +37,38 @@ async function setAutopilot(brandId: string, patch: Partial<Brand>): Promise<voi
   }
 }
 
+/**
+ * Drive one brand's activation forward, holding a per-brand lock.
+ *
+ * Every entry point funnels through here - the onboarding kickoff, the
+ * client-driven advance endpoint, the boot resume, and the cron tick - and any
+ * two of them can fire at the same moment (a user reopening the dashboard
+ * while the minutely tick runs is the ordinary case, not the edge case).
+ * Without a lock they run overlapping slices for the same brand and repeat
+ * paid work: a second prompt generation, a second citation run across six
+ * engines. The lock lives HERE rather than at one call site so no future
+ * caller can forget it.
+ *
+ * A busy lock is a no-op, not a queue: someone else is already driving this
+ * brand, and the caller's job is done.
+ */
 export async function runOnboardingAutopilot(
+  brandId: string,
+  userId: string,
+  options: { deadlineMs?: number } = {},
+): Promise<void> {
+  const outcome = await withDynamicAdvisoryLock(
+    dynamicLockNamespaces.onboardingAutopilotSlice,
+    brandId,
+    "onboarding-autopilot",
+    () => runOnboardingAutopilotUnlocked(brandId, userId, options),
+  );
+  if (!outcome.ran) {
+    logger.info({ brandId }, "onboardingAutopilot: another slice is already running - skipping");
+  }
+}
+
+async function runOnboardingAutopilotUnlocked(
   brandId: string,
   userId: string,
   options: { deadlineMs?: number } = {},
@@ -70,7 +102,11 @@ export async function runOnboardingAutopilot(
     // Writing 'pending' here means the very first thing autopilot does is make
     // itself findable. Every later exit path - deadline, throw, process death
     // - now leaves a row the sweep can see and resume.
-    if (status === null || status === "idle" || status === "failed") {
+    // Only 'idle' (and a null status) needs claiming. A 'failed' run is
+    // ALREADY visible to the recovery sweep, and rewriting it to 'pending'
+    // discarded the one thing that says how far it got - sending a run that
+    // had finished its citations back to the prompt phase.
+    if (status === null || status === "idle") {
       await setAutopilot(brandId, {
         autopilotStatus: "pending",
         autopilotStartedAt: new Date(),
@@ -177,15 +213,40 @@ export async function runOnboardingAutopilot(
       // against the pre-correction profile - the exact thing the
       // write-back exists to prevent.
       const freshBrand = (await storage.getBrandById(brandId)) ?? brand;
-      const result = await generateBrandPrompts(freshBrand);
-      const promptsGenerated = result.saved.length;
-      if (promptsGenerated === 0) {
-        throw new Error(result.error || "Prompt generation produced no prompts");
-      }
 
-      await setAutopilot(brandId, {
-        autopilotProgress: { promptsGenerated },
-      } as never);
+      // Already generated on a previous slice? Skip, do not regenerate.
+      //
+      // Without this, any resume that re-entered this phase called
+      // generateBrandPrompts against a brand that already had its set. The
+      // generator dedupes, so it saved 0 and this threw "produced no prompts"
+      // - marking a brand FAILED for the sin of already being done. The sweep
+      // then retried it, failed the same way, and burned the whole retry
+      // budget. Observed exactly that on a real brand whose citation run had
+      // already succeeded with all 60 rankings written.
+      //
+      // Same shape as the Phase 0 guard above, which skips the scrape when a
+      // completed scrape run already exists.
+      const existingTracked = await storage.getBrandPromptsByBrandId(brandId, {
+        status: "tracked",
+      });
+      // Hoisted: the citation phase below reports this count either way.
+      let promptsGenerated = existingTracked.length;
+      if (existingTracked.length > 0) {
+        logger.info(
+          { brandId, existing: existingTracked.length },
+          "onboardingAutopilot: prompts already generated - skipping generation",
+        );
+      } else {
+        const result = await generateBrandPrompts(freshBrand);
+        promptsGenerated = result.saved.length;
+        if (promptsGenerated === 0) {
+          throw new Error(result.error || "Prompt generation produced no prompts");
+        }
+
+        await setAutopilot(brandId, {
+          autopilotProgress: { promptsGenerated },
+        } as never);
+      }
 
       await setAutopilot(brandId, {
         autopilotStatus: "running_citations",
@@ -199,6 +260,30 @@ export async function runOnboardingAutopilot(
     // and the next /advance call (or cron drain) resumes via the
     // citation_runs table's existing-rankings filter.
     if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) return;
+
+    // Resume an in-flight run rather than starting a second one.
+    //
+    // citation_runs carries a partial unique index allowing ONE active run per
+    // brand. runBrandPrompts always inserts a new run, so once a slice ended
+    // with a run still 'running' - which is the normal outcome of a budgeted
+    // slice - every subsequent resume hit a unique violation and marked the
+    // brand FAILED. Observed on a real brand: one 'succeeded' run, one stuck
+    // 'running', and an insert error as the autopilot_error. The bug was
+    // invisible while nothing resumed frequently; making activation actually
+    // run in the background is what surfaced it.
+    const activeRuns = await storage.getActiveCitationRuns(brandId);
+    if (activeRuns.length > 0) {
+      const { advanceCitationRun } = await import("../citationChecker");
+      const runId = activeRuns[0].id;
+      logger.info({ brandId, runId }, "onboardingAutopilot: advancing existing citation run");
+      const slice = await advanceCitationRun(
+        runId,
+        options.deadlineMs ?? Date.now() + cronStepBudget(0.8),
+      );
+      // Not finished within this slice - stay in 'running_citations' and let
+      // the next tick continue. Nothing to fail here.
+      if (!slice?.done) return;
+    }
 
     const citationResult = await runBrandPrompts(brandId, undefined, {
       triggeredBy: "auto_onboarding",

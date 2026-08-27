@@ -34,7 +34,6 @@ import { storage } from "../storage";
 import { withBrandQuota, isUsageLimitError } from "../lib/usageLimit";
 import type { Tier } from "../lib/llmPricing";
 import { runOnboardingAutopilot } from "../lib/onboardingAutopilot";
-import { withDynamicAdvisoryLock, dynamicLockNamespaces } from "../lib/advisoryLock";
 
 /** Per-slice budget for a client-driven autopilot advance. Deliberately under
  *  a typical 60s function ceiling with room for the response to flush - the
@@ -611,16 +610,12 @@ export function setupOnboardingRoutes(app: Express) {
           return res.json({ success: true, data: { status, advanced: false } });
         }
 
-        const outcome = await withDynamicAdvisoryLock(
-          dynamicLockNamespaces.onboardingAutopilotSlice,
-          brand.id,
-          "onboarding-autopilot-advance",
-          async () => {
-            await runOnboardingAutopilot(brand.id, user.id, {
-              deadlineMs: Date.now() + AUTOPILOT_SLICE_BUDGET_MS,
-            });
-          },
-        );
+        // No lock here: runOnboardingAutopilot takes the per-brand lock itself,
+        // so every entry point is covered and nesting the same key would make
+        // this call skip its own inner acquisition.
+        await runOnboardingAutopilot(brand.id, user.id, {
+          deadlineMs: Date.now() + AUTOPILOT_SLICE_BUDGET_MS,
+        });
 
         const after = await storage.getBrandByIdForUser(brand.id, user.id);
         res.json({
@@ -630,7 +625,7 @@ export function setupOnboardingRoutes(app: Express) {
             step: after?.autopilotStep ?? brand.autopilotStep ?? 0,
             progress: after?.autopilotProgress ?? {},
             error: after?.autopilotError ?? null,
-            advanced: outcome.ran,
+            advanced: true,
           },
         });
       } catch (err) {

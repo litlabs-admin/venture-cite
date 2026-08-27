@@ -23,7 +23,19 @@ const storageStubs = vi.hoisted(() => ({
 }));
 
 vi.mock("../../server/storage", () => ({ storage: storageStubs }));
-vi.mock("../../server/db", () => ({ db: { execute: vi.fn() }, pool: {} }));
+vi.mock("../../server/db", () => ({ db: { execute: vi.fn() }, pool: { query: vi.fn() } }));
+
+// The per-brand lock is exercised by its own integration path; here it must
+// simply not swallow the body, or every assertion below tests nothing.
+vi.mock("../../server/lib/advisoryLock", () => ({
+  dynamicLockNamespaces: { onboardingAutopilotSlice: 920003 },
+  withDynamicAdvisoryLock: async (
+    _ns: number,
+    _id: string,
+    _label: string,
+    fn: () => Promise<unknown>,
+  ) => ({ ran: true, result: await fn() }),
+}));
 vi.mock("../../server/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -102,15 +114,22 @@ describe("onboarding autopilot claims the run before doing work", () => {
     expect(storageStubs.markAutopilotAttempt).toHaveBeenCalledWith("brand-1");
   });
 
-  it("claims a brand that previously failed, so a transient error is retryable", async () => {
+  it("does NOT rewrite a failed run to pending", async () => {
+    // A 'failed' run is already visible to the recovery sweep, so it does not
+    // need claiming - and rewriting it to 'pending' destroyed the only record
+    // of how far it got. In production that sent a brand whose citation run
+    // had already succeeded back to the prompt phase, where generation found
+    // the prompts already existed, saved none, threw "produced no prompts",
+    // and failed again - burning the entire retry budget in a loop.
     storageStubs.getBrandById.mockResolvedValue({
       id: "brand-1",
       name: "Acme",
       website: "https://acme.example.com",
       autopilotStatus: "failed",
+      autopilotStep: 2,
     });
     await runOnboardingAutopilot("brand-1", "user-1", { deadlineMs: Date.now() - 1 });
-    expect(statusesWritten()[0]).toBe("pending");
+    expect(statusesWritten()).not.toContain("pending");
   });
 
   it("does not re-claim a brand that is already mid-pipeline", async () => {
