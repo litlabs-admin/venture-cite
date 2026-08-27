@@ -2127,43 +2127,40 @@ export class DatabaseStorage implements IStorage {
   // from migration 0027, so a retried citation run updates rather than
   // duplicating.
   async createCompetitorGeoRanking(row: InsertCompetitorGeoRanking): Promise<CompetitorGeoRanking> {
-    const r = row as any;
-    const result = await db.execute<{ id: string }>(sql`
-      INSERT INTO competitor_geo_rankings (
-        competitor_id, run_id, brand_prompt_id, ai_platform,
-        is_cited, rank, relevance_score, citation_context, citing_outlet_url, sentiment
-      ) VALUES (
-        ${r.competitorId},
-        ${r.runId},
-        ${r.brandPromptId},
-        ${r.aiPlatform},
-        ${r.isCited ?? 0},
-        ${r.rank ?? null},
-        ${r.relevanceScore ?? null},
-        ${r.citationContext ?? null},
-        ${r.citingOutletUrl ?? null},
-        ${r.sentiment ?? null}
-      )
-      ON CONFLICT (competitor_id, run_id, brand_prompt_id, ai_platform)
-      DO UPDATE SET
-        is_cited = EXCLUDED.is_cited,
-        rank = COALESCE(EXCLUDED.rank, competitor_geo_rankings.rank),
-        relevance_score = COALESCE(EXCLUDED.relevance_score, competitor_geo_rankings.relevance_score),
-        citation_context = COALESCE(EXCLUDED.citation_context, competitor_geo_rankings.citation_context),
-        citing_outlet_url = COALESCE(EXCLUDED.citing_outlet_url, competitor_geo_rankings.citing_outlet_url),
-        sentiment = COALESCE(EXCLUDED.sentiment, competitor_geo_rankings.sentiment),
-        checked_at = now()
-      RETURNING id;
-    `);
-    const id = (result as any).rows?.[0]?.id;
-    if (!id) throw new Error("createCompetitorGeoRanking upsert returned no id");
-    const [selected] = await db
-      .select()
-      .from(schema.competitorGeoRankings)
-      .where(eq(schema.competitorGeoRankings.id, id))
-      .limit(1);
-    if (!selected) throw new Error("createCompetitorGeoRanking: row not found");
-    return selected;
+    const [result] = await db
+      .insert(schema.competitorGeoRankings)
+      .values({
+        competitorId: row.competitorId,
+        runId: row.runId,
+        brandPromptId: row.brandPromptId,
+        aiPlatform: row.aiPlatform,
+        isCited: row.isCited ?? 0,
+        rank: row.rank ?? null,
+        relevanceScore: row.relevanceScore ?? null,
+        citationContext: row.citationContext ?? null,
+        citingOutletUrl: row.citingOutletUrl ?? null,
+        sentiment: row.sentiment ?? null,
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.competitorGeoRankings.competitorId,
+          schema.competitorGeoRankings.runId,
+          schema.competitorGeoRankings.brandPromptId,
+          schema.competitorGeoRankings.aiPlatform,
+        ],
+        set: {
+          isCited: sql`EXCLUDED.is_cited`,
+          rank: sql`COALESCE(EXCLUDED.rank, ${schema.competitorGeoRankings.rank})`,
+          relevanceScore: sql`COALESCE(EXCLUDED.relevance_score, ${schema.competitorGeoRankings.relevanceScore})`,
+          citationContext: sql`COALESCE(EXCLUDED.citation_context, ${schema.competitorGeoRankings.citationContext})`,
+          citingOutletUrl: sql`COALESCE(EXCLUDED.citing_outlet_url, ${schema.competitorGeoRankings.citingOutletUrl})`,
+          sentiment: sql`COALESCE(EXCLUDED.sentiment, ${schema.competitorGeoRankings.sentiment})`,
+          checkedAt: sql`now()`,
+        },
+      })
+      .returning();
+    if (!result) throw new Error("createCompetitorGeoRanking upsert returned no row");
+    return result;
   }
 
   async getCompetitorGeoRankings(
