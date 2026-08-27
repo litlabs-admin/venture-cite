@@ -6,6 +6,7 @@ import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
 import { renderCompetitorBlock } from "./brandGenerationContext";
 import { makeBrandNameFilter } from "./brandNameFilter";
 import { checkPromptShape, restoreProperNouns } from "./promptShape";
+import { TRACKED_PROMPTS_CAP } from "@shared/constants";
 import type { Brand, BrandFactSheet } from "@shared/schema";
 
 import { safeParseJson } from "./safeParseJson";
@@ -340,16 +341,36 @@ export async function generateBrandPrompts(
     return { saved: [], error: "AI returned no usable prompts" };
   }
 
+  // Never persist more TRACKED prompts than the product actually allows.
+  //
+  // TARGET_PROMPTS (15) is an over-generation target: asking for more than we
+  // keep gives the shape/dedup filters something to discard. But the SAVE loop
+  // wrote every survivor as `tracked`, so a clean generation produced up to 15
+  // tracked prompts against a cap of 10. The cap was enforced only in the
+  // route a human uses to add one by hand (routes/prompts.ts), never here -
+  // the same one-rule-two-places split that let the pricing page offer a plan
+  // checkout would refuse. Observed on a real brand: 12 tracked.
+  //
+  // Trimmed at persist time rather than by lowering TARGET_PROMPTS, so the
+  // filters keep their headroom.
+  const toPersist = clean.slice(0, TRACKED_PROMPTS_CAP);
+  if (clean.length > toPersist.length) {
+    logger.info(
+      { brandId: brand.id, generated: clean.length, kept: toPersist.length },
+      "promptGenerator: trimmed generation to the tracked-prompt cap",
+    );
+  }
+
   // Archive existing prompts (soft delete) and create a new generation.
   await storage.archiveBrandPrompts(brand.id);
   const generation = await storage.createPromptGeneration(brand.id);
 
   const saved = [];
-  for (let i = 0; i < clean.length; i += 1) {
-    const rawStage = (clean[i].funnelStage || "").toString().toUpperCase();
+  for (let i = 0; i < toPersist.length; i += 1) {
+    const rawStage = (toPersist[i].funnelStage || "").toString().toUpperCase();
     const funnelStage =
       rawStage === "TOFU" || rawStage === "MOFU" || rawStage === "BOFU" ? rawStage : null;
-    const category = clean[i].category?.toString().trim().slice(0, 64) || null;
+    const category = toPersist[i].category?.toString().trim().slice(0, 64) || null;
     const row = await storage.createBrandPrompt({
       brandId: brand.id,
       generationId: generation.id,
@@ -359,10 +380,10 @@ export async function generateBrandPrompts(
       // then puts tracked competitor names (and "24/7") back to their real
       // written form, since lowercasing mangles them.
       prompt: restoreProperNouns(
-        clean[i].prompt.trim().toLowerCase(),
+        toPersist[i].prompt.trim().toLowerCase(),
         chosenCompetitors.map((c) => c.name),
       ),
-      rationale: clean[i].rationale?.trim() || null,
+      rationale: toPersist[i].rationale?.trim() || null,
       orderIndex: i,
       isActive: 1,
       status: "tracked",
