@@ -27,9 +27,9 @@ JSON reports, the append-only ledger). This file is tracked, so it survives a
 | **2a** | **Migration runner: `no-transaction` pragma**  | **B, before 2** | terra/max  | **COMMITTED** — `1c90f2d`, pragma verified                                                         |
 | 2      | Composite indexes (`0117`)                     | B               | luna/low   | **MERGED & VERIFIED** — 5 indexes, mirror regenerated, all gates green                             |
 | 3      | Batch competitor insert                        | A               | luna/high  | **MERGED & VERIFIED** — batched, per-row fallback preserved, `IStorage` corrected                  |
-| 4      | Metrics aggregate → SQL                        | A               | terra/high | not started (batched with 5, 6)                                                                    |
-| 5      | Citation trend → SQL                           | A               | terra/high | not started (batched with 4, 6)                                                                    |
-| 6      | Gap-matrix N+1                                 | A               | terra/high | not started (batched with 4, 5)                                                                    |
+| 4      | Metrics aggregate → SQL                        | A               | terra/high | **MERGED & VERIFIED** — SQL aggregate, grain preserved, float8 cast proven load-bearing            |
+| 5      | Citation trend → SQL                           | A               | terra/high | **MERGED & VERIFIED** — date_trunc equivalence verified, zero-fill retained                        |
+| 6      | Gap-matrix N+1                                 | A               | terra/high | **MERGED & VERIFIED** — one query for six competitors, degrade-to-empty preserved                  |
 | 7      | Advisory locks → xact scope                    | D               | terra/max  | not started                                                                                        |
 | 8      | Retention + FK indexes + RLS policies (`0118`) | C               | luna/high  | **MERGED & VERIFIED** — api_costs prune, 3 FK indexes, 2 RLS initplans (verified on real Postgres) |
 | **8b** | **CHECK constraints on 4 status columns**      | C               | terra/max  | **not started** — split from Task 8 per R-09                                                       |
@@ -129,6 +129,8 @@ Status: **OPEN** · **FIXING** · **FIXED** · **DEFERRED** · **PARKED**
 | F-53 | Process | **I deleted the workspace.** Junctioning the shared `node_modules` into each lane worktree, then running `git worktree remove --force`, followed the junctions and deleted the real `node_modules` (641 packages). No source lost; `npm ci` restored it. Verified afterwards that `rmdir` on a junction unlinks safely while leaving the target intact | **FIXED** — correct order is unlink first, then remove the worktree. Better: per-lane `npm ci` |
 | P-1a | Evidence | **Task 2's composite index is justified, measured on production.** Today's plan for the hot aggregate uses the single-column `geo_rankings_brand_prompt_id_idx` and applies `checked_at` as a **Filter**, reporting `Rows Removed by Filter: 16` per loop across 85 loops — roughly 23 rows fetched to keep 7. The composite `(brand_prompt_id, checked_at desc)` turns that Filter into an Index Cond, removing ~70% of the heap fetches on that path. Production execution time for this shape: **537 ms** | **VERIFIED** — read-only `EXPLAIN ANALYZE` on production |
 | P-2a | Evidence | **The SQL aggregate returns 15 rows where the JS path returned 4,950** for the same filter at production scale — a ~330x reduction in rows shipped to Node. Measured locally against 21,600 seeded rows | **VERIFIED** |
+
+| P-3a | Evidence | **The `::float8` cast is load-bearing, proven on real Postgres.** `avg(relevance_score)` on an `integer` column returns `numeric`, which node-postgres yields as a **string**: `typeof` is `"string"` and `.toFixed(2)` throws `n.toFixed is not a function`. With the cast the driver yields a `number` and `.toFixed(2)` returns `68.62`. Without it, `recordCurrentMetrics` would throw after **every citation run** — and the mocked unit tests could never have caught it | **VERIFIED** |
 
 ### Tooling
 
