@@ -429,11 +429,15 @@ export function setupCronRoutes(app: Express): void {
         const schemaCleanup = await cronDb.execute(
           sql`DELETE FROM schema_audits WHERE fetched_at < now() - interval '30 days'`,
         );
+        const apiCostsCleanup = await cronDb.execute(
+          sql`DELETE FROM api_costs WHERE created_at < now() - interval '180 days'`,
+        );
         logger.info(
           {
             signalsByAge: (ninetyDays as { rowCount?: number }).rowCount ?? 0,
             signalsByCap: (perBrandCap as { rowCount?: number }).rowCount ?? 0,
             schemaAuditsByAge: (schemaCleanup as { rowCount?: number }).rowCount ?? 0,
+            apiCostsByAge: (apiCostsCleanup as { rowCount?: number }).rowCount ?? 0,
           },
           "signals-retention-prune: rows deleted",
         );
