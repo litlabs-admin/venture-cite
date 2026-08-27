@@ -3871,27 +3871,6 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  // --- cross-instance concurrency ---
-
-  async tryAcquireScrapeLock(brandId: string): Promise<boolean> {
-    // pg_try_advisory_lock takes a bigint key; derive from hashtext()
-    // so collisions across features are unlikely. Lock is session-scoped.
-    // node-postgres returns { rows: [...] }, not a bare array - indexing
-    // result[0] gives undefined and silently treats every call as contended,
-    // which leaves runs stuck at status='pending' forever.
-    const result = await db.execute(
-      sql`SELECT pg_try_advisory_lock(hashtext('fact-scrape:' || ${brandId})::bigint) AS got`,
-    );
-    const row = (result as unknown as { rows?: Array<{ got: boolean }> }).rows?.[0];
-    return row?.got === true;
-  }
-
-  async releaseScrapeLock(brandId: string): Promise<void> {
-    await db.execute(
-      sql`SELECT pg_advisory_unlock(hashtext('fact-scrape:' || ${brandId})::bigint)`,
-    );
-  }
-
   async createMetricsSnapshot(snapshot: InsertMetricsHistory): Promise<MetricsHistory> {
     const result = await db.insert(schema.metricsHistory).values(snapshot).returning();
     return result[0];

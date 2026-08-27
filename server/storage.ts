@@ -690,14 +690,6 @@ export interface IStorage {
     limit: number,
   ): Promise<BrandFactSheet[]>;
 
-  // --- cross-instance concurrency ---
-  /** PG advisory lock keyed by hashtext('fact-scrape:' || brand_id). Returns
-   *  true if the caller now holds the lock, false otherwise. The lock is
-   *  transaction-scoped - must be held for the entire run. */
-  tryAcquireScrapeLock(brandId: string): Promise<boolean>;
-  /** Best-effort release (no-op if not held). */
-  releaseScrapeLock(brandId: string): Promise<void>;
-
   // Metrics History methods
   createMetricsSnapshot(snapshot: InsertMetricsHistory): Promise<MetricsHistory>;
   getMetricsHistory(brandId: string, metricType?: string, days?: number): Promise<MetricsHistory[]>;
