@@ -39,16 +39,24 @@ export const app = express();
 app.set("trust proxy", 1);
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const connectSrc = ["'self'", "api.stripe.com"];
+// Calendly's inline widget loads a script from assets.calendly.com, which
+// then injects an iframe from calendly.com and fetches its own assets. All
+// three need allowing or the Enterprise "Book a call" embed renders as an
+// empty 700px box with a CSP violation in the console - and nothing else in
+// the UI would say why. Scoped to the exact hosts; no wildcards.
+const CALENDLY_SCRIPT = "https://assets.calendly.com";
+const CALENDLY_FRAME = "https://calendly.com";
+
+const connectSrc = ["'self'", "api.stripe.com", CALENDLY_SCRIPT, CALENDLY_FRAME];
 if (supabaseUrl) connectSrc.push(supabaseUrl);
 
-const imgSrc = ["'self'", "data:", "blob:"];
+const imgSrc = ["'self'", "data:", "blob:", CALENDLY_SCRIPT, CALENDLY_FRAME];
 if (supabaseUrl) imgSrc.push(supabaseUrl);
 
 const isProd = process.env.NODE_ENV === "production";
 const scriptSrc = isProd
-  ? ["'self'", "js.stripe.com"]
-  : ["'self'", "'unsafe-inline'", "js.stripe.com"];
+  ? ["'self'", "js.stripe.com", CALENDLY_SCRIPT]
+  : ["'self'", "'unsafe-inline'", "js.stripe.com", CALENDLY_SCRIPT];
 
 app.use(
   helmet({
@@ -56,7 +64,7 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc,
-        frameSrc: ["js.stripe.com"],
+        frameSrc: ["js.stripe.com", CALENDLY_FRAME],
         connectSrc,
         imgSrc,
         // 'unsafe-inline' is required because Radix UI and framer-motion

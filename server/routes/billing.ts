@@ -80,9 +80,31 @@ function isCatalogPrice(price: import("stripe").Stripe.Price, requestedPriceId: 
   const tier = product.metadata.tier?.trim().toLowerCase();
   if (!isSellableTier(tier) || price.unit_amount !== PLAN_PRICE_CENTS[tier]) return false;
 
-  return approvedCatalog().some(
-    (entry) =>
-      entry.tier === tier && entry.priceId === requestedPriceId && entry.productId === product.id,
+  // The env pin is per-tier and OPTIONAL.
+  //
+  // It used to be mandatory for every tier, so with STRIPE_PRO_PRODUCT_ID /
+  // STRIPE_PRO_PRICE_ID (and the Agency pair) unset, approvedCatalog() was
+  // empty, .some() was false, and EVERY checkout was rejected with
+  // "Invalid or inactive price" - which the pricing page reports as "Failed to
+  // start checkout". The page had no way to know: it derives its priceId from
+  // the live Stripe catalog (tier + amount), while this endpoint additionally
+  // demanded an env match. Two different rules, so a plan could render as
+  // purchasable and be refused a click later.
+  //
+  // Everything above this line is already a real allow-list: an ACTIVE price
+  // on an ACTIVE product, USD, monthly, carrying a `tier` we sell, at EXACTLY
+  // the amount we publish for that tier. An arbitrary price ID from another
+  // integration cannot pass it.
+  //
+  // So: if a pin exists FOR THIS TIER, enforce it strictly - that is what
+  // disambiguates duplicate products in the catalog. If no pin is configured
+  // for this tier, fall back to the checks above rather than refusing to sell
+  // anything at all.
+  const pinsForTier = approvedCatalog().filter((entry) => entry.tier === tier);
+  if (pinsForTier.length === 0) return true;
+
+  return pinsForTier.some(
+    (entry) => entry.priceId === requestedPriceId && entry.productId === product.id,
   );
 }
 
@@ -275,6 +297,30 @@ export function setupBillingRoutes(app: Express): void {
         }
 
         if (!isCatalogPrice(price, priceId)) {
+          // The client is told nothing specific on purpose. But "Failed to
+          // start checkout" with no server-side reason cost real debugging
+          // time once already, so record WHICH condition failed. The common
+          // cause is a catalog whose amount does not match what the pricing
+          // page publishes for that tier - e.g. Stripe carrying Pro at $79
+          // while PLAN_PRICE_CENTS says 9900.
+          const rejectedProduct = price.product;
+          logger.warn(
+            {
+              priceId,
+              active: price.active,
+              currency: price.currency,
+              interval: price.recurring?.interval,
+              intervalCount: price.recurring?.interval_count,
+              unitAmount: price.unit_amount,
+              tier:
+                typeof rejectedProduct === "string" || "deleted" in rejectedProduct
+                  ? null
+                  : rejectedProduct.metadata.tier,
+              expectedAmounts: PLAN_PRICE_CENTS,
+              envPinsConfigured: approvedCatalog().map((entry) => entry.tier),
+            },
+            "stripe.checkout: price rejected by catalog gate",
+          );
           return res.status(400).json({ success: false, error: "Invalid or inactive price" });
         }
 

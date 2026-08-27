@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CalendlyInline } from "@/components/CalendlyInline";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -138,6 +139,10 @@ export default function Pricing() {
   const onATrialablePlan = !signedIn || !PAYING_TIERS.includes(resolveTier(user!));
   const [betaCode, setBetaCode] = useState("");
   const [inquiryOpen, setInquiryOpen] = useState(false);
+  // "Book a call" now opens the scheduler by default. The written enquiry form
+  // is kept, not replaced: it is a working lead path with a server handler
+  // behind it, and some buyers would rather describe a scope than pick a slot.
+  const [enterpriseMode, setEnterpriseMode] = useState<"call" | "message">("call");
   const [inquiry, setInquiry] = useState({ name: "", email: "", company: "", message: "" });
   // Stripe redirects back with a plain `?success=true` / `?canceled=true`
   // query string. TanStack's default search parser JSON-parses primitive
@@ -508,66 +513,95 @@ export default function Pricing() {
             page so the visitor never loses the pricing context they were
             reading, and rather than a mailto so the lead reaches us even if
             they have no mail client configured. */}
-        <Dialog open={inquiryOpen} onOpenChange={setInquiryOpen}>
-          <DialogContent>
+        <Dialog
+          open={inquiryOpen}
+          onOpenChange={(open) => {
+            setInquiryOpen(open);
+            // Always reopen on the scheduler, not on whatever the last visit
+            // switched to.
+            if (open) setEnterpriseMode("call");
+          }}
+        >
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Talk to us about Enterprise</DialogTitle>
+              <DialogTitle>
+                {enterpriseMode === "call" ? "Book a call" : "Talk to us about Enterprise"}
+              </DialogTitle>
               <DialogDescription>
-                Tell us what you need and we&apos;ll come back with a scope and a price. Managed
-                content, outreach and custom integrations are all on the table.
+                {enterpriseMode === "call"
+                  ? "Pick a time that suits you and we'll walk through what Enterprise would look like for your team."
+                  : "Tell us what you need and we'll come back with a scope and a price. Managed content, outreach and custom integrations are all on the table."}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <Input
-                placeholder="Your name"
-                value={inquiry.name}
-                maxLength={120}
-                onChange={(e) => setInquiry({ ...inquiry, name: e.target.value })}
-                data-testid="input-inquiry-name"
-              />
-              <Input
-                type="email"
-                placeholder="Work email"
-                value={inquiry.email}
-                maxLength={200}
-                onChange={(e) => setInquiry({ ...inquiry, email: e.target.value })}
-                data-testid="input-inquiry-email"
-              />
-              <Input
-                placeholder="Company (optional)"
-                value={inquiry.company}
-                maxLength={200}
-                onChange={(e) => setInquiry({ ...inquiry, company: e.target.value })}
-                data-testid="input-inquiry-company"
-              />
-              <Textarea
-                placeholder="What are you trying to achieve? (optional)"
-                rows={4}
-                value={inquiry.message}
-                maxLength={2000}
-                onChange={(e) => setInquiry({ ...inquiry, message: e.target.value })}
-                data-testid="input-inquiry-message"
-              />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setInquiryOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                // Mirrors the server's own rule so the visitor is told before
-                // the round-trip, not after it.
-                disabled={
-                  !inquiry.name.trim() || !inquiry.email.trim() || enterpriseInquiry.isPending
-                }
-                onClick={() => enterpriseInquiry.mutate()}
-                data-testid="button-send-inquiry"
-              >
-                {enterpriseInquiry.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : null}
-                Send enquiry
-              </Button>
-            </DialogFooter>
+
+            {enterpriseMode === "call" ? (
+              <div className="space-y-3">
+                <CalendlyInline url="https://calendly.com/venturepr/new-meeting" />
+                <button
+                  type="button"
+                  className="text-caption text-vc-secondary underline hover:text-vc-primary"
+                  onClick={() => setEnterpriseMode("message")}
+                  data-testid="button-enterprise-message-instead"
+                >
+                  Prefer to write instead? Send us a message.
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Input
+                  placeholder="Your name"
+                  value={inquiry.name}
+                  maxLength={120}
+                  onChange={(e) => setInquiry({ ...inquiry, name: e.target.value })}
+                  data-testid="input-inquiry-name"
+                />
+                <Input
+                  type="email"
+                  placeholder="Work email"
+                  value={inquiry.email}
+                  maxLength={200}
+                  onChange={(e) => setInquiry({ ...inquiry, email: e.target.value })}
+                  data-testid="input-inquiry-email"
+                />
+                <Input
+                  placeholder="Company (optional)"
+                  value={inquiry.company}
+                  maxLength={200}
+                  onChange={(e) => setInquiry({ ...inquiry, company: e.target.value })}
+                  data-testid="input-inquiry-company"
+                />
+                <Textarea
+                  placeholder="What are you trying to achieve? (optional)"
+                  rows={4}
+                  value={inquiry.message}
+                  maxLength={2000}
+                  onChange={(e) => setInquiry({ ...inquiry, message: e.target.value })}
+                  data-testid="input-inquiry-message"
+                />
+              </div>
+            )}
+
+            {enterpriseMode === "message" && (
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEnterpriseMode("call")}>
+                  Back
+                </Button>
+                <Button
+                  // Mirrors the server's own rule so the visitor is told before
+                  // the round-trip, not after it.
+                  disabled={
+                    !inquiry.name.trim() || !inquiry.email.trim() || enterpriseInquiry.isPending
+                  }
+                  onClick={() => enterpriseInquiry.mutate()}
+                  data-testid="button-send-inquiry"
+                >
+                  {enterpriseInquiry.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
+                  Send enquiry
+                </Button>
+              </DialogFooter>
+            )}
           </DialogContent>
         </Dialog>
 
