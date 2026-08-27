@@ -2276,6 +2276,25 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(schema.competitorGeoRankings.checkedAt));
   }
 
+  // Scoped by explicit runIds, not by a time window - see the interface
+  // comment. Indexed by cgr_brand_prompt_idx on brand_prompt_id.
+  async getCompetitorGeoRankingsByPromptRuns(
+    brandPromptId: string,
+    runIds: string[],
+  ): Promise<CompetitorGeoRanking[]> {
+    if (runIds.length === 0) return [];
+    return await db
+      .select()
+      .from(schema.competitorGeoRankings)
+      .where(
+        and(
+          eq(schema.competitorGeoRankings.brandPromptId, brandPromptId),
+          inArray(schema.competitorGeoRankings.runId, runIds),
+        ),
+      )
+      .orderBy(desc(schema.competitorGeoRankings.checkedAt));
+  }
+
   // Upsert on (competitor_id, ai_platform, run_id). If the same run
   // ingests the same (competitor, platform) twice (retry, retry storm),
   // we update citation_count instead of inserting a duplicate snapshot.

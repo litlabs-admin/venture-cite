@@ -4,7 +4,7 @@ import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import { safeParseJson } from "./safeParseJson";
 import { buildPromptScoreHistory, resolvePoints } from "./promptScoreHistory";
-import { extractDomain } from "./brandMatcher";
+import { extractDomain, matchEntity, type TrackedEntity } from "./brandMatcher";
 import { AI_PLATFORMS_ACTIVE } from "@shared/constants";
 import type { Brand, BrandPrompt } from "@shared/schema";
 
@@ -102,9 +102,83 @@ export async function diagnosePrompt(brand: Brand, prompt: BrandPrompt): Promise
   }
   const latest = Array.from(latestByPlatform.values());
 
+  // ── Tracked rivals ────────────────────────────────────────────────────────
+  // Tracked competitors are NOT in geo_rankings. citationChecker writes them
+  // to competitor_geo_rankings, one row per competitor per prompt per engine.
+  // Reading only the mentioned_brands blob (as this used to) made every
+  // tracked rival invisible here, so the verdict said "no rival was named" on
+  // prompts whose rivals were being tracked the whole time.
+  //
+  // Each competitor row is paired against OUR row from the same
+  // (runId, aiPlatform). That exact key is what keeps the numbers honest: a
+  // rival cited in last week's run must never be counted against our absence
+  // in this one. Brand rows whose runId is null (legacy, ON DELETE SET NULL)
+  // have no safe key to pair on, so they contribute no tracked rivals rather
+  // than being matched by a fuzzy timestamp guess.
+  const brandRowByRunPlatform = new Map<string, (typeof latest)[number]>();
+  for (const r of latest) {
+    if (!r.runId) continue;
+    brandRowByRunPlatform.set(`${r.runId}::${r.aiPlatform}`, r);
+  }
+  const runIds = Array.from(new Set(latest.map((r) => r.runId).filter((id): id is string => !!id)));
+
+  const [competitorRows, trackedCompetitors] = runIds.length
+    ? await Promise.all([
+        storage.getCompetitorGeoRankingsByPromptRuns(prompt.id, runIds),
+        storage.getCompetitors(brand.id),
+      ])
+    : [[], []];
+
+  const competitorById = new Map(trackedCompetitors.map((c) => [c.id, c]));
+
   const rivalMap = new Map<string, RivalStanding>();
   const sourceMap = new Map<string, SourceStanding>();
   let lastCheckedAt: Date | null = null;
+
+  // One competitor can only count once per (runId, platform) even if the table
+  // somehow holds a duplicate - the upsert should prevent it, but a double
+  // count here would silently overstate a rival's reach.
+  const countedRival = new Set<string>();
+  for (const cr of competitorRows) {
+    if (cr.isCited !== 1) continue;
+    const paired = brandRowByRunPlatform.get(`${cr.runId}::${cr.aiPlatform}`);
+    // No brand row for this (run, platform): the competitor row belongs to a
+    // run or engine we are not analysing here.
+    if (!paired) continue;
+    // Unknown id means the user deleted or ignored that competitor. Omitting
+    // it beats rendering a bare UUID.
+    const competitor = competitorById.get(cr.competitorId);
+    if (!competitor) continue;
+
+    const dedupeKey = `${cr.competitorId}::${cr.runId}::${cr.aiPlatform}`;
+    if (countedRival.has(dedupeKey)) continue;
+    countedRival.add(dedupeKey);
+
+    const name = competitor.name.trim();
+    const cur = rivalMap.get(name) ?? {
+      name,
+      timesNamed: 0,
+      bestRank: null,
+      namedWhileWeWereAbsent: 0,
+    };
+    cur.timesNamed += 1;
+    if (paired.isCited !== 1) cur.namedWhileWeWereAbsent += 1;
+    if (typeof cr.rank === "number" && cr.rank > 0) {
+      cur.bestRank = cur.bestRank === null ? cr.rank : Math.min(cur.bestRank, cr.rank);
+    }
+    rivalMap.set(name, cur);
+  }
+
+  // A tracked competitor is also named in the analyzer blob, often under a
+  // different surface form ("Rival One" vs "Rival One Inc."). Match blob names
+  // against tracked variants so one rival does not appear twice under two
+  // spellings; the authoritative row above already counted it.
+  const trackedMatchers: TrackedEntity[] = trackedCompetitors.map((c) => ({
+    id: c.id,
+    name: c.name,
+    nameVariations: c.nameVariations ?? [],
+  }));
+  const isTrackedName = (name: string) => trackedMatchers.some((e) => matchEntity(name, e).matched);
 
   for (const r of latest) {
     if (!lastCheckedAt || r.checkedAt > lastCheckedAt) lastCheckedAt = r.checkedAt;
@@ -119,6 +193,8 @@ export async function diagnosePrompt(brand: Brand, prompt: BrandPrompt): Promise
       if (!name || b?.cited !== true) continue;
       // Our own brand is not its own rival.
       if (name.toLowerCase() === brand.name.trim().toLowerCase()) continue;
+      // Counted from its own authoritative row above.
+      if (isTrackedName(name)) continue;
       const cur = rivalMap.get(name) ?? {
         name,
         timesNamed: 0,
@@ -206,7 +282,13 @@ export async function diagnosePrompt(brand: Brand, prompt: BrandPrompt): Promise
               `, named in ${r.namedWhileWeWereAbsent} answers that did NOT mention us`,
           )
           .join("\n")
-      : "(no rival was named in any answer)";
+      : runIds.length
+        ? "(no rival was named in any answer)"
+        : // No runId on any brand row, so tracked-competitor rows could not be
+          // paired to these responses. "We could not check" and "nobody beat
+          // us" are opposite findings; the model must not state the second
+          // when only the first is true.
+          "(tracked-rival data is unavailable for these responses - do NOT conclude that no rival was named)";
 
     const sourceLines = sources.length
       ? sources

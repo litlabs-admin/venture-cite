@@ -439,6 +439,17 @@ export interface IStorage {
     competitorIds: string[],
     opts: { since: Date },
   ): Promise<CompetitorGeoRanking[]>;
+  /**
+   * Tracked-competitor rows for ONE prompt, restricted to an explicit set of
+   * citation runs. Scoped by runId rather than by a time window on purpose:
+   * the per-question diagnosis pairs each competitor row against the brand's
+   * own row from the SAME run, and a `since`-style window would let a rival
+   * from an older run be scored against our absence in the current one.
+   */
+  getCompetitorGeoRankingsByPromptRuns(
+    brandPromptId: string,
+    runIds: string[],
+  ): Promise<CompetitorGeoRanking[]>;
 
   // Competitor Citation Snapshot methods
   createCompetitorCitationSnapshot(
