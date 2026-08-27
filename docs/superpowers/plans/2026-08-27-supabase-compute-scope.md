@@ -1,157 +1,168 @@
 # Scope — moving compute to Supabase
 
-**Status:** scoping only. No code changed. Every number below is measured or read from the
-repo, not recalled.
+**Status:** scoping only. No code changed.
+
+> **Supersedes the first draft of this file.** That draft argued against Edge Functions on
+> the grounds that measured job durations (244s, 25+ min) exceed the platform ceiling. That
+> argument is wrong, and it had already been retracted by the boundary analysis before this
+> file was written. Those durations are **not units of work** — they are serial loops.
+> Verified: `server/lib/factAgent/v2/reverifyFact.ts:348` is `for (const row of stale)`.
+> The 244s is 20 sequential facts, each one fetch plus one LLM call. Split the loop and no
+> unit approaches any ceiling. The corrected version is below.
 
 ## The question
 
-"Shift the backend to Supabase" is three independent moves, not one. They have very
-different value and very different risk, and only one is worth doing soon. Scoping them
-together is what makes the answer look hard.
+"Shift the backend to Supabase" is three moves. The first draft treated them as independent
+and ranked them. They are not independent: **the decomposition work gates the migration**,
+and it is worth doing on its own merits even if nothing ever leaves Render.
 
-| Move                                      | Verdict                                          | Size                         |
-| ----------------------------------------- | ------------------------------------------------ | ---------------------------- |
-| **A — scheduling → `pg_cron` + `pg_net`** | **Do it.** Fixes a live correctness bug          | ~1 migration + 1 config flip |
-| **B — job compute → Edge Functions**      | **Don't.** Measured durations exceed the ceiling | large, negative return       |
-| **C — data access → PostgREST**           | **Blocked.** Not by effort, by grant coverage    | gated behind F-10            |
+| Move                                      | Verdict                                                  |
+| ----------------------------------------- | -------------------------------------------------------- |
+| **A — scheduling → `pg_cron` + `pg_net`** | **Do first.** Fixes a live correctness bug, small        |
+| **B — job compute → Edge Functions**      | **Viable.** Gated on decomposition + one CPU measurement |
+| **C — data access → PostgREST**           | **Last.** Gated on policy coverage (F-10)                |
 
 ---
 
 ## Current state (verified)
 
-- Deploy target is **Render free tier** (`render.yaml`), a long-lived Node server. The
-  Vercel migration was **reversed** — but `api/_bundle.js` is still on disk, contradicting
-  render.yaml's claim that it was "verified absent 2026-07-31". Stale doc; harmless, worth
-  deleting.
+- Deploy target is **Render free tier** (`render.yaml`), a long-lived Node server. The Vercel
+  migration was reversed — though `api/_bundle.js` is still on disk, contradicting
+  render.yaml's claim it was "verified absent 2026-07-31". Stale doc, worth deleting.
 - Scheduled work is owned by **in-process `node-cron`** (`server/scheduler.ts`), gated by
   `resolveSchedulerMode()` in `server/lib/schedulerMode.ts`.
-- All scheduled work already funnels through **one authenticated HTTP endpoint**,
-  `POST /api/cron/daily-orchestrator` (`server/routes/cron.ts:315`), which runs **29 steps**
-  against a wall-clock budget and authenticates with `CRON_SECRET`.
-- Supabase side: `pg_cron` 1.6.4 and `pg_net` 0.20.0 are **available, not installed**.
-  `supabase_vault` 0.3.1 **is** installed.
-- Supabase is currently used for **Auth and Storage only** — zero `.from()` / `.rpc()` calls
-  in `server/`.
+- All scheduled work funnels through **one authenticated endpoint**,
+  `POST /api/cron/daily-orchestrator` (`server/routes/cron.ts:315`) — 29 steps, wall-clock
+  budget, `CRON_SECRET`.
+- `pg_cron` 1.6.4 and `pg_net` 0.20.0 are **available, not installed**. `supabase_vault`
+  0.3.1 **is** installed.
+- Supabase serves **Auth and Storage only** — zero `.from()` / `.rpc()` calls in `server/`.
 
 ---
 
-## Move A — scheduling to `pg_cron` + `pg_net` ✅ recommended
+## The constraint that actually decides Move B
 
-### Why this is not a nice-to-have
+Not wall clock. **CPU: 2 seconds per request**, and it explicitly excludes async I/O.
 
-Render's free plan **spins the service down after ~15 minutes with no inbound HTTP traffic**
-(documented in `render.yaml`). The scheduler runs _inside that process_. When the service is
-asleep, `node-cron` does not fire — and nothing records that it didn't.
+That inverts the intuition. An LLM call that blocks for 25 seconds costs ~nothing against the
+budget. What costs budget is synchronous text processing — and this codebase has a lot of it.
 
-The weekly report is scheduled `0 8 * * 0`. If nothing hits the service early Sunday morning,
-that job silently does not run. Same for `account-purge` (`0 3 * * *`) and `brand-purge`
-(`30 3 * * *`) — both scheduled when a low-traffic service is almost certainly asleep.
+`computeSignals` (`server/routes/geoSignals.ts:168`) is the clearest case: it runs
+`countContentWords` and `detectHeadings` across the **entire** document. It slices to 8,000
+characters only for the embedding call — the scoring work sees the whole thing. That file
+carries 13 regex sites, and the function backs three endpoints.
 
-This is a correctness bug, and it is invisible: no error, no alert, just work that never
-happened.
+**This is unmeasured, and it is the one thing that decides what can be a function at all.**
+It is step 2 below for that reason.
+
+---
+
+## Move A — scheduling to `pg_cron` + `pg_net` ✅ do first
+
+### Why it is not a nice-to-have
+
+Render's free plan **spins the service down after ~15 minutes without inbound HTTP traffic**
+(documented in `render.yaml`). The scheduler runs _inside that process_. Asleep, `node-cron`
+does not fire — and nothing records that it didn't.
+
+The weekly report is `0 8 * * 0`. Account-purge is `0 3 * * *`, brand-purge `30 3 * * *` —
+all scheduled when a low-traffic service is almost certainly asleep. Silent: no error, no
+alert, just work that never happened.
 
 ### Why it is small
 
-The hard part is already built. The orchestrator is one authenticated endpoint with a budget
-and per-step caps. `pg_cron` + `pg_net` do not need to understand any of it — they only have
-to call it on a schedule, from something that is always on. Postgres is always on.
+The orchestrator is already one authenticated endpoint with a budget. `pg_cron` + `pg_net`
+only have to call it on a schedule from something always on. Postgres is always on, and the
+inbound request also wakes Render.
 
-`schedulerMode.ts` already models this exact cutover and **refuses a half-configured state**:
+`schedulerMode.ts` already models this cutover and **refuses a half-configured state** —
 setting one of `DISABLE_IN_PROCESS_SCHEDULER` / `EXTERNAL_CRON_ORCHESTRATOR_ENABLED` without
-the other throws at boot. The seam was built for this and has never been used.
+the other throws at boot. The seam exists and has never been used.
 
-Side benefit: the inbound request wakes the Render service, so spin-down stops mattering for
-scheduled work.
-
-### Shape
-
-1. Enable `pg_cron` and `pg_net`.
-2. Store `CRON_SECRET` in `supabase_vault` — never inline in the cron command.
-3. One `cron.schedule` calling `net.http_post` against the orchestrator, hourly.
-4. Flip `DISABLE_IN_PROCESS_SCHEDULER=true` **and** `EXTERNAL_CRON_ORCHESTRATOR_ENABLED=true`
-   together.
-
-### What must be proven before the flip
+### Must be true before the flip
 
 - **Two steps are in-process only.** `STEP_CAPS_MS` names them: `tour-events-cleanup` and
   `detect-fact-scrape-failure`, with the comment _"Keep that scheduler active until an
   external trigger covers these steps. Otherwise tour_events grows without bound and the
-  failure alert stops."_ **These must be added to the orchestrator before cutover, or the
-  flip trades one silent gap for another.**
-- `pg_net` is fire-and-forget: it does not retry, and its response lands in
-  `net._http_response`. Failures must be surfaced, or this reintroduces exactly the silence
-  it was meant to fix.
-- One real end-to-end authenticated call, verified in `net._http_response`.
-
-### Honest cost
-
-Two schedulers exist during the transition, and mutual exclusion is enforced at boot rather
-than at runtime — so a misconfigured deploy fails loudly instead of double-running. That is
-the right failure mode, but it makes the flip a deploy-time event needing both variables set
-together.
+  failure alert stops."_ Port them first, or the flip trades one silent gap for another.
+- `pg_net` is fire-and-forget: no retry, response lands in `net._http_response`. Surface
+  failures, or this reintroduces the silence it was meant to fix.
+- One real authenticated call, verified in `net._http_response`.
+- `CRON_SECRET` in `supabase_vault`, never inline in the cron command.
 
 ---
 
-## Move B — job compute to Edge Functions ❌ not recommended
+## Move B — job compute to Edge Functions ✅ viable, gated
 
-The measured durations rule this out. From `server/routes/cron.ts:62`, against the production
-database:
+### The prize is fan-out, not the migration
 
-| Step                        | Cap | **Actual**                   |
-| --------------------------- | --- | ---------------------------- |
-| `fact-reverification-batch` | 30s | **244s** — 8× over           |
-| `v2-fact-sheet-refresh`     | 50s | **82s** for a _single_ brand |
-| `auto-citation`             | 30s | **25+ min** observed         |
+No heavy job parallelises across brands. Every sweep is `for (const x of xs)` with a deadline
+check between iterations, which is why one slow unit starves everything behind it. Queue the
+units and wall clock stops being the sum and becomes the slowest single unit.
 
-Against Edge Functions' ceiling — 400s wall clock paid, 150s free, and a **2s CPU budget per
-request** — `auto-citation` does not fit under any plan, and `fact-reverification-batch`
-already exceeds the free ceiling.
+| Job                         | Shape today                                           | Unit to queue       |
+| --------------------------- | ----------------------------------------------------- | ------------------- |
+| `fact-reverification-batch` | 20 stale facts, strictly serial — verified at :348    | one fact            |
+| `auto-citation`             | ~15 prompts × 6 platforms per brand, then next brand  | one prompt×platform |
+| `v2-fact-sheet-refresh`     | 10 pages, then Wikidata → search → enrich → aggregate | one page + fan-in   |
+| `brand-activation`          | brands serial, 5 sub-jobs serial within each          | one brand×sub-job   |
 
-Two further blockers:
+**This is worth doing even if nothing leaves Render.** It fixes the starvation that caused
+244s against a 30s cap, in place.
 
-- **Runtime.** Edge Functions are Deno. The server depends on `pg`, `express`, `node-cron`,
-  `@sentry/node`, `stripe`, `resend`, `openai`, and uses `node:async_hooks`. Deno's Node
-  compat covers some of this, but not the in-process scheduler, and the 57,467 lines of
-  `server/` assume a Node server.
-- **The per-step caps are advisory.** A step that checks its clock only between work items
-  sails past its cap — precisely why 244s happened against 30s. Moving to a platform with a
-  _hard_ kill turns a soft overrun into a mid-job termination, and these jobs spend money on
-  LLM calls before they die.
+### One number to design around
 
-The deadline plumbing (79 references across 13 files) is real and was built for Vercel's
-ceiling. It bounds work _between_ items; it does not make any single item short. Edge
-Functions need the second property.
+A full sweep is 45 brands × 90 prompt-platform pairs ≈ **4,050 units**. Function-to-function
+fan-out is ~5,000 calls/min shared across a request chain — dispatching by nested invocation
+lands on the limit. **pgmq is the right dispatcher**: enqueue, let workers pull at whatever
+rate providers tolerate, keep the existing Postgres concurrency slots as throttle.
 
-**Conclusion:** a large rewrite that makes reliability worse. The one thing people usually
-want from it — "scheduled work that actually runs" — is delivered by Move A at a fraction of
-the cost.
+### Genuinely open
+
+- **CPU headroom is unmeasured** (see above). Measure before porting.
+- **Cold start** against Drizzle + schema + OpenAI SDK, versus a 20MB bundle limit. Several
+  modules construct clients eagerly at import; those need lazy init.
+- **400s is the paid figure.** Free is 150s — changes granularity, not approach.
+- **Memory:** `runFullScrape` holds 10 pages of extracted text in a 256MB isolate. Fails as
+  OOM, not timeout, so worth checking.
+- npm packages and Node built-ins are GA on the runtime, so `pg`, Drizzle and `node:crypto`
+  port. Only multithreaded natives don't. **The first draft's claim that the Deno runtime
+  blocks these was wrong.**
+
+### What stays on Node regardless
+
+TanStack Start renders every page through Nitro, and `/api/*` reaches Express via an srvx
+fetch bridge. Edge Functions cannot host Nitro SSR. **A Node host remains — but as a
+renderer, not an API server.**
 
 ---
 
-## Move C — data access to PostgREST ⛔ blocked, not scheduled
+## Move C — data access to PostgREST ⛔ last
 
-Blocked by grant coverage, already quantified in Task 9 / F-10:
-
-- **12 of 72** public tables carry any grant to the restricted roles; **60 have none**.
-- RLS policies cover the four route files going through `requestData` /
-  `contentRequestData`. Everything else runs as the owner by design.
-- Migration 0120 has just **revoked** `anon`/`authenticated` grants precisely because nothing
+- **12 of 72** public tables carry grants to the restricted roles; **60 have none**.
+- RLS covers the four route files using `requestData` / `contentRequestData`. Everything else
+  runs as owner by design — so RLS is inert outside those four files.
+- Migration 0120 has just **revoked** `anon`/`authenticated` grants, precisely because nothing
   should reach the Data API today.
+- The 4 orphaned `public.users` rows must be reconciled first, and `public.users.id` is
+  `varchar`, so any policy needs `auth.uid()::text = user_id`.
 
-Exposing tables to PostgREST before policy coverage exists would hand the Data API tables no
-policy protects. The path forward is unchanged and unglamorous: grow the restricted path
-route-by-route (`prompts.ts` and `dashboard.ts` first — they handle the most user-scoped
-data), adding grants and policies per module. PostgREST is worth asking about once coverage
-approaches complete.
+Grow the restricted path route-by-route (`prompts.ts`, `dashboard.ts` first). PostgREST
+becomes worth asking about once coverage approaches complete.
 
 ---
 
-## Recommendation
+## Order
 
-Do **Move A** as its own small branch, with the two in-process-only steps ported first. Treat
-**B** as closed unless the job shapes change fundamentally. Treat **C** as gated behind the
-F-10 route-by-route work, which has its own value independent of PostgREST.
-
-The framing worth keeping: Supabase is your database and your auth. The useful question is
-not "how much of the backend can move in", but "what is Postgres better at than a sleeping
-Node process". Scheduling is the clear answer.
+1. **Move A** — pg_cron + pg_net, after porting the two in-process-only steps. Fixes the
+   sleep bug now.
+2. **Measure CPU** on `computeSignals`, `re-detect-all`, the HTML extractors, the listicle
+   parser. This decides what can be a function.
+3. **Queue one job end to end** — `fact-reverification-batch`: 20 independent units, no
+   ordering requirement, already runs last because it overruns. Drivable by the existing Node
+   worker before any Edge Function exists.
+4. **Move the in-memory limiters into Postgres** — circuit breakers, per-origin concurrency,
+   auth rate limits, checkout mutex, following the `rate_limit_buckets` pattern. Correct
+   today regardless; prerequisite for more than one worker.
+5. **Port workers to Edge Functions**, pinned to `ap-southeast-1`, invoked by pg_cron + pg_net.
+6. **Move C**, once policy coverage justifies it.
