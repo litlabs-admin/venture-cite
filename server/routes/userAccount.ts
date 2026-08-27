@@ -219,6 +219,24 @@ export function setupUserAccountRoutes(app: Express) {
           .set({ deletedAt: now, deletionScheduledFor: scheduledFor })
           .where(eq(users.id, user.id));
 
+        // Revoke every session after the soft delete succeeds. The application
+        // gate rejects deleted users, but their refresh tokens must not remain
+        // valid while the grace period is active. This must stay non-fatal: the
+        // account is already deleted even when Supabase Auth is unavailable.
+        try {
+          const bearer = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+          if (bearer) {
+            const { error: revokeError } = await supabaseAdmin.auth.admin.signOut(bearer, "global");
+            if (revokeError) throw revokeError;
+          }
+        } catch (revokeErr) {
+          logger.warn(
+            { err: revokeErr, userId: user.id },
+            "Failed to revoke sessions after account deletion",
+          );
+          captureAndFlush(revokeErr, { tags: { source: "user-delete-session-revocation" } });
+        }
+
         await logAudit(req, {
           action: "user.delete.scheduled",
           entityType: "user",

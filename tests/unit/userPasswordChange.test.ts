@@ -16,23 +16,29 @@ const stubs = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   updateUserById: vi.fn(),
   signOut: vi.fn(),
+  captureAndFlush: vi.fn(),
   user: undefined as { id: string; email: string | null } | undefined,
 }));
 
 vi.mock("../../server/db", () => {
-  const chain: any = {
-    set: () => chain,
-    where: () => Promise.resolve(undefined),
-    from: () => chain,
+  const selectChain: any = {
+    from: () => selectChain,
+    where: () => selectChain,
     limit: () => Promise.resolve([]),
+  };
+  const updateChain: any = {
+    set: () => updateChain,
+    where: () => Promise.resolve(undefined),
+  };
+  const insertChain: any = {
     values: () => ({ returning: async () => [] }),
   };
   return {
     db: {
-      select: () => chain,
-      update: () => chain,
-      insert: () => chain,
-      delete: () => chain,
+      select: () => selectChain,
+      update: () => updateChain,
+      insert: () => insertChain,
+      delete: () => updateChain,
     },
     pool: {},
   };
@@ -63,7 +69,7 @@ vi.mock("../../server/lib/logger", () => ({
 }));
 
 vi.mock("../../server/lib/sentryReport", () => ({
-  captureAndFlush: vi.fn(),
+  captureAndFlush: stubs.captureAndFlush,
 }));
 
 vi.mock("../../server/lib/audit", () => ({
@@ -89,6 +95,10 @@ const { setupUserAccountRoutes } = await import("../../server/routes/userAccount
 function buildApp(): express.Express {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
+  app.use((req, _res, next) => {
+    (req as unknown as { user?: typeof stubs.user }).user = stubs.user;
+    next();
+  });
   setupUserAccountRoutes(app);
   return app;
 }
@@ -108,6 +118,7 @@ async function call(
         "content-type": "application/json",
         authorization: "Bearer test-jwt-token",
       },
+      socket: { remoteAddress: "127.0.0.1" },
       body: body ?? {},
     } as unknown as express.Request;
     let statusCode = 200;
@@ -147,6 +158,7 @@ beforeEach(() => {
   stubs.signInWithPassword.mockReset();
   stubs.updateUserById.mockReset();
   stubs.signOut.mockReset();
+  stubs.captureAndFlush.mockReset();
   stubs.signOut.mockResolvedValue({ data: null, error: null });
   stubs.user = { id: USER_ID, email: "u@example.com" };
 });
@@ -217,5 +229,46 @@ describe("POST /api/user/password", () => {
     expect(status).toBe(400);
     expect(stubs.signInWithPassword).not.toHaveBeenCalled();
     expect(stubs.updateUserById).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/user/delete", () => {
+  it("revokes all sessions after scheduling account deletion", async () => {
+    stubs.signInWithPassword.mockResolvedValue({
+      data: { user: { id: USER_ID } },
+      error: null,
+    });
+    const app = buildApp();
+
+    const { status, body } = await call(app, "POST", "/api/user/delete", {
+      password: "oldpassword",
+      confirm: "DELETE",
+    });
+
+    expect(status).toBe(200);
+    expect(body?.success).toBe(true);
+    expect(stubs.signOut).toHaveBeenCalledWith("test-jwt-token", "global");
+  });
+
+  it("returns success when global session revocation fails", async () => {
+    stubs.signInWithPassword.mockResolvedValue({
+      data: { user: { id: USER_ID } },
+      error: null,
+    });
+    const revokeError = new Error("revoke boom");
+    stubs.signOut.mockRejectedValue(revokeError);
+    const app = buildApp();
+
+    const { status, body } = await call(app, "POST", "/api/user/delete", {
+      password: "oldpassword",
+      confirm: "DELETE",
+    });
+
+    expect(status).toBe(200);
+    expect(body?.success).toBe(true);
+    expect(stubs.signOut).toHaveBeenCalledWith("test-jwt-token", "global");
+    expect(stubs.captureAndFlush).toHaveBeenCalledWith(revokeError, {
+      tags: { source: "user-delete-session-revocation" },
+    });
   });
 });
