@@ -1437,7 +1437,10 @@ export const faqItems = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
   },
-  (table) => [index("faq_items_brand_id_idx").on(table.brandId)],
+  (table) => [
+    index("faq_items_brand_id_idx").on(table.brandId),
+    index("faq_items_article_id_idx").on(table.articleId),
+  ],
 );
 
 // Brand mention tracking across platforms
@@ -1660,7 +1663,10 @@ export const brandFactSheet = pgTable(
     lastVerificationAt: timestamp("last_verification_at"),
     verificationStatus: text("verification_status").notNull().default("never"),
   },
-  (table) => [index("brand_fact_sheet_brand_id_idx").on(table.brandId)],
+  (table) => [
+    index("brand_fact_sheet_brand_id_idx").on(table.brandId),
+    index("brand_fact_sheet_run_id_idx").on(table.runId),
+  ],
 );
 
 // Metrics History - Track metrics snapshots over time for trend analysis
@@ -2498,6 +2504,7 @@ export const brandPerceptionProbes = pgTable(
   (table) => [
     index("brand_perception_probes_run_id_idx").on(table.runId),
     index("brand_perception_probes_run_status_idx").on(table.runId, table.status),
+    index("brand_perception_probes_brand_id_idx").on(table.brandId),
     unique("brand_perception_probes_unique_cell").on(table.runId, table.platform, table.axis),
   ],
 );
