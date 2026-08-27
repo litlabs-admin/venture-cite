@@ -1,16 +1,20 @@
-import OpenAI from "openai";
 import { storage } from "../storage";
 import { MODELS } from "./modelConfig";
-import { attachAiLogger } from "./aiLogger";
+import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import type { Brand, BrandPrompt } from "@shared/schema";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  timeout: LLM_CALL_TIMEOUT_MS,
-  maxRetries: 1,
-});
-attachAiLogger(openai);
+// This module used to hold its own `new OpenAI({ apiKey: OPENAI_API_KEY })`
+// client pointed at api.openai.com, while sending it
+// MODELS.brandPromptGeneration - which is "openai/gpt-5.6-luna", an OpenRouter
+// ROUTING SLUG that does not exist on OpenAI's own API. Every suggestion call
+// therefore threw, generateSuggestedPrompts() swallowed it into
+// `{ saved: [], error }`, and the feature read as "does nothing".
+//
+// modelConfig.ts says so directly: "This is an OpenRouter slug, so these three
+// calls use getOpenrouterClient(), not the direct OpenAI client."
+// promptGenerator.ts - the sibling that users report as working - follows that
+// rule. This one now does too.
 
 import { safeParseJson } from "./safeParseJson";
 import { makeBrandNameFilter } from "./brandNameFilter";
@@ -126,7 +130,9 @@ async function callSuggestionLLM(
       ? `\n\nPreviously rejected (too similar to tracked) - avoid these shapes too:\n${avoidList.map((p) => `- ${p}`).join("\n")}`
       : "";
 
-  const completion = await openai.chat.completions.create(
+  const client = getOpenrouterClient();
+  if (!client) throw new Error("OPENROUTER_API_KEY not configured");
+  const completion = await client.chat.completions.create(
     {
       model: MODELS.brandPromptGeneration,
       response_format: SUGGESTION_RESPONSE_FORMAT,

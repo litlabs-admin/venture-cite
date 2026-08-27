@@ -1,5 +1,6 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryFunction, MutationCache } from "@tanstack/react-query";
 import { getAccessToken } from "./authStore";
+import { toast } from "@/hooks/use-toast";
 
 export class ApiError extends Error {
   status: number;
@@ -114,7 +115,36 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
     return await res.json();
   };
 
+// A failed mutation used to be COMPLETELY silent: no global handler here, and
+// most hooks wire only `onSuccess`. So a 502 from the server looked exactly
+// like a button that does nothing - the spinner stopped and no message
+// appeared. That is how the broken "Suggest prompts" call went unnoticed: the
+// feature was reported as "not working at all" when it was in fact erroring
+// loudly on the server and silently on the client.
+//
+// This surfaces any otherwise-unhandled mutation error. It DEFERS to a
+// mutation that declares its own `onError` (React Query runs both), so the
+// hooks that already show a tailored message keep it and do not double-toast.
+const mutationCache = new MutationCache({
+  onError: (error, _vars, _ctx, mutation) => {
+    if (mutation.options.onError) return;
+    const status =
+      error && typeof error === "object" && "status" in error
+        ? Number((error as { status?: number }).status)
+        : undefined;
+    // 401 is session loss, handled by the auth layer redirecting to /login.
+    // A toast here would just add noise on top of a navigation.
+    if (status === 401) return;
+    toast({
+      variant: "destructive",
+      title: "Something went wrong",
+      description: error instanceof Error ? error.message : "Please try again.",
+    });
+  },
+});
+
 export const queryClient = new QueryClient({
+  mutationCache,
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),

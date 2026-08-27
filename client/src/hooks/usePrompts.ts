@@ -561,7 +561,16 @@ export function useGeneratePrompts(brandId: string | null | undefined) {
     },
     onSuccess: (data) => {
       if (data.success) {
+        // Paint immediately from the response - generation is synchronous and
+        // returns the saved rows, so there is no reason to make the user wait
+        // on a refetch.
         queryClient.setQueryData(promptKeys.list(brandId), { success: true, data: data.data });
+        // ...but the tables actually render `listAll` (tracked + archived), a
+        // DIFFERENT cache entry. Writing only `list` left the page showing its
+        // pre-generation (empty) state until a manual reload - the whole
+        // "I have to refresh to see my prompts" bug. Every sibling mutation
+        // uses this helper; this one skipped it.
+        invalidatePromptSet(brandId);
       }
     },
   });
@@ -798,7 +807,11 @@ export function useBackfillPrompts(brandId: string | null | undefined) {
       if (data.success) {
         invalidateRunOutputs(brandId);
         queryClient.invalidateQueries({ queryKey: ["/api/listicles"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/wikipedia-mentions"] });
+        // Was ["/api/wikipedia-mentions"], which matches nothing: invalidation
+        // is prefix-based and the real query registers under ["/api/wikipedia",
+        // brandId] (geo-tools.tsx:320). The call silently no-op'd, so the
+        // Wikipedia panel kept showing pre-backfill data until a manual reload.
+        queryClient.invalidateQueries({ queryKey: ["/api/wikipedia"] });
       }
     },
   });
