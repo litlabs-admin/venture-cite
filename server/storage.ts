@@ -410,6 +410,13 @@ export interface IStorage {
   // Per-run, per-prompt competitor citation detail. It uses a symmetric
   // with geo_rankings for the brand).
   createCompetitorGeoRanking(row: InsertCompetitorGeoRanking): Promise<CompetitorGeoRanking>;
+  /**
+   * Batched form of createCompetitorGeoRanking. One statement per response
+   * instead of one per competitor - citationChecker writes these inside the
+   * per-prompt by per-platform loop, which produced 84,892 single-row inserts.
+   * Same conflict target and same COALESCE-preserving update semantics.
+   */
+  createCompetitorGeoRankings(rows: InsertCompetitorGeoRanking[]): Promise<CompetitorGeoRanking[]>;
   getCompetitorGeoRankings(
     competitorId: string,
     opts?: { runId?: string; since?: Date },

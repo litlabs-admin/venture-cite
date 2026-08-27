@@ -63,10 +63,6 @@ export const DEFAULT_CITATION_PLATFORMS = [
 // NEW competitor IDs beyond the cap are dropped.
 const COMPETITOR_DETECTIONS_CAP = 5000;
 
-type CompetitorGeoRankingBatchStorage = {
-  createCompetitorGeoRankings(rows: InsertCompetitorGeoRanking[]): Promise<unknown>;
-};
-
 export function addCompetitorDetection(
   map: Map<string, Map<string, number>>,
   competitorId: string,
@@ -986,9 +982,7 @@ export async function runBrandPrompts(
       if (competitorGeoRankingRows.length > 0) {
         const rows = competitorGeoRankingRows.map(({ row }) => row);
         try {
-          await (
-            storage as typeof storage & CompetitorGeoRankingBatchStorage
-          ).createCompetitorGeoRankings(rows);
+          await storage.createCompetitorGeoRankings(rows);
         } catch (err) {
           logger.warn(
             { err },
