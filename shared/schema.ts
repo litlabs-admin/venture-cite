@@ -1138,6 +1138,14 @@ export const geoRankings = pgTable(
     index("geo_rankings_brand_id_idx").on(table.brandId),
     index("geo_rankings_run_id_idx").on(table.runId),
     index("geo_rankings_ai_platform_idx").on(table.aiPlatform),
+    index("geo_rankings_brand_prompt_id_checked_at_idx").on(
+      table.brandPromptId,
+      table.checkedAt.desc(),
+    ),
+    index("geo_rankings_article_id_checked_at_idx").on(table.articleId, table.checkedAt.desc()),
+    index("geo_rankings_bp_cited_checked_at_idx")
+      .on(table.brandPromptId, table.checkedAt.desc())
+      .where(sql`is_cited = 1`),
   ],
 );
 
@@ -1273,6 +1281,10 @@ export const competitorGeoRankings = pgTable(
     index("cgr_competitor_idx").on(table.competitorId),
     index("cgr_run_idx").on(table.runId),
     index("cgr_brand_prompt_idx").on(table.brandPromptId),
+    index("cgr_competitor_id_checked_at_idx").on(table.competitorId, table.checkedAt.desc()),
+    index("cgr_competitor_cited_checked_at_idx")
+      .on(table.competitorId, table.checkedAt.desc())
+      .where(sql`is_cited = 1`),
   ],
 );
 
