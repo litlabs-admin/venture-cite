@@ -1,0 +1,61 @@
+# Line-ending determinism.
+#
+# Why this file exists: `core.autocrlf=true` was set with no .gitattributes, so
+# every text file was checked out with CRLF on Windows and LF on Linux. That is
+# invisible until something asserts on exact file content -
+# tests/unit/requestRlsMigrationShape.test.ts compares a migration's bytes against
+# a string literal containing "\n" and fails on Windows while passing in CI.
+#
+# It also made every agent-authored file emit "LF will be replaced by CRLF",
+# which would have turned parallel worktree merges into whole-file conflicts.
+#
+# `eol=lf` overrides core.autocrlf, so these rules hold regardless of each
+# developer's local git config.
+
+# Default: git decides what is text, and all text is LF in the working tree.
+* text=auto eol=lf
+
+# ── Source ───────────────────────────────────────────────────────────────
+*.ts     text eol=lf
+*.tsx    text eol=lf
+*.js     text eol=lf
+*.jsx    text eol=lf
+*.mjs    text eol=lf
+*.cjs    text eol=lf
+*.json   text eol=lf
+*.css    text eol=lf
+*.html   text eol=lf
+*.md     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.toml   text eol=lf
+*.sql    text eol=lf
+*.sh     text eol=lf
+*.env    text eol=lf
+
+# ── Windows scripts must keep CRLF or cmd.exe mis-parses them ────────────
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+
+# ── Binary: never touch, never diff as text ──────────────────────────────
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.webp   binary
+*.avif   binary
+*.ico    binary
+*.pdf    binary
+*.zip    binary
+*.gz     binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.otf    binary
+*.eot    binary
+*.mp4    binary
+*.webm   binary
+
+# ── Generated: keep out of diffs and language stats ──────────────────────
+package-lock.json  text eol=lf -diff linguist-generated
+skills-lock.json   text eol=lf -diff linguist-generated
