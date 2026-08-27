@@ -367,7 +367,14 @@ describe("missing anchors do not delay the tour additively", () => {
     }));
 
     anchor("test.present");
-    const started = Date.now();
+    // Logical time, not wall-clock. The property under test is "N dead anchors
+    // cost ONE timeout, not N" - which only discriminates inside a window of
+    // roughly one timeout, so a real-clock measurement is inherently sensitive
+    // to CPU contention. Measured on a loaded full-suite run this test failed
+    // while passing in isolation. Advancing fake timers by exactly one timeout
+    // tests the same property deterministically: concurrent resolution drops
+    // all five here, sequential resolution would have dropped one.
+    vi.useFakeTimers();
     runTour({
       config: {
         ...tourWithMissingTailStep,
@@ -382,17 +389,16 @@ describe("missing anchors do not delay the tour additively", () => {
       onComplete: vi.fn(),
     });
 
-    // Poll until the panel paints rather than assuming a fixed delay.
-    while (!document.querySelector(".shepherd-content") && Date.now() - started < 3000) {
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    const elapsed = Date.now() - started;
+    // Advance by ONE timeout plus a small margin. Sequential resolution would
+    // have dropped a single dead anchor by now; concurrent resolution drops all
+    // five, because they share one deadline.
+    await vi.advanceTimersByTimeAsync(TIMEOUT + 20);
+    vi.useRealTimers();
+    // Let the panel paint on the real clock now that the waits have resolved.
+    await new Promise((r) => setTimeout(r, 0));
 
     expect(document.querySelector(".shepherd-content")).toBeTruthy();
     expect(droppedStepIds()).toHaveLength(5);
-    // Sequential would be 5 × 120ms = 600ms floor. Concurrent is one timeout
-    // plus overhead. The midpoint keeps this stable on a loaded CI box.
-    expect(elapsed).toBeLessThan(TIMEOUT * 3);
   });
 });
 
