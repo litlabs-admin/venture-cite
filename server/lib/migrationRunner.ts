@@ -32,6 +32,12 @@ type ApplicationMigrationLedgerRow = {
 
 export type MigrationLedgerMode = "reconcile-supabase" | "application-only";
 
+export function isNoTransactionMigration(sqlText: string): boolean {
+  return /^[^\S\r\n\u2028\u2029]*-- migrate:no-transaction[^\S\r\n\u2028\u2029]*\r?$/m.test(
+    sqlText,
+  );
+}
+
 async function seedCustomOrmPreviewLedger(
   lockClient: PoolClient,
   migrationFiles: readonly MigrationFile[],
@@ -232,6 +238,28 @@ export async function applyMigrations(
           [migration.filename, migration.checksum],
         );
         logger.warn({ filename: migration.filename }, "applyMigrations: recorded legacy checksum");
+        continue;
+      }
+
+      // A no-transaction migration can partially apply before it fails.
+      // It has no ledger row, and a rerun replays the whole file.
+      // Every statement must use IF NOT EXISTS, IF EXISTS, or ON CONFLICT DO NOTHING.
+      if (isNoTransactionMigration(migration.sqlText)) {
+        const client = await pool.connect();
+        try {
+          await client.query(migration.sqlText);
+          await client.query(
+            `INSERT INTO public.schema_migrations (filename, checksum) VALUES ($1, $2)
+               ON CONFLICT (filename) DO NOTHING`,
+            [migration.filename, migration.checksum],
+          );
+          logger.info({ filename: migration.filename }, "applyMigrations: applied");
+        } catch (err) {
+          logger.error({ err, filename: migration.filename }, "applyMigrations: failed");
+          throw err;
+        } finally {
+          client.release();
+        }
         continue;
       }
 
