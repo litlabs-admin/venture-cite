@@ -106,6 +106,7 @@ async function runOnboardingAutopilotUnlocked(
     // ALREADY visible to the recovery sweep, and rewriting it to 'pending'
     // discarded the one thing that says how far it got - sending a run that
     // had finished its citations back to the prompt phase.
+    const isRetry = status === null || status === "idle" || status === "failed";
     if (status === null || status === "idle") {
       await setAutopilot(brandId, {
         autopilotStatus: "pending",
@@ -113,7 +114,21 @@ async function runOnboardingAutopilotUnlocked(
         autopilotError: null,
       } as never);
     }
-    await storage.markAutopilotAttempt(brandId);
+
+    // Count RETRIES, not slices.
+    //
+    // This used to bump on every invocation. But a healthy run is invoked
+    // constantly - the client advance, the minutely tick, the boot resume -
+    // so a brand that was progressing perfectly well burned its whole retry
+    // budget just by making progress. Seen in production: attempts=20 against
+    // a cap of 5 on a brand that had never failed. The counter then means the
+    // opposite of what the sweep needs: the moment such a brand DID stall, the
+    // sweep would refuse to touch it.
+    //
+    // Only a genuine restart-from-a-dead-state counts.
+    if (isRetry) {
+      await storage.markAutopilotAttempt(brandId);
+    }
 
     // Phase 0: the FactSheet kernel must exist BEFORE prompt generation
     // so prompts are grounded in real, verified facts (industry, ICP,
@@ -343,10 +358,14 @@ async function runOnboardingAutopilotUnlocked(
     // read the same ledger.
     await populateBrandDashboard(brandId, { deadlineMs: Date.now() + 120_000 });
 
+    // Clear the retry budget on success, so a brand that needed two attempts
+    // this time starts fresh if it is ever re-activated later.
     await setAutopilot(brandId, {
       autopilotStatus: "completed",
       autopilotStep: 3,
       autopilotCompletedAt: new Date(),
+      autopilotAttempts: 0,
+      autopilotError: null,
     } as never);
 
     logger.info({ brandId, userId }, "onboardingAutopilot: complete");
