@@ -137,6 +137,14 @@ export interface IStorage {
   getBrandById(id: string): Promise<Brand | undefined>;
   getBrandByIdForUser(id: string, userId: string): Promise<Brand | undefined>;
   updateBrand(id: string, brand: Partial<InsertBrand>): Promise<Brand | undefined>;
+  /**
+   * Atomically record that the onboarding autopilot just tried this brand:
+   * bump the attempt counter and stamp the time. Drives the recovery sweep's
+   * attempt cap and backoff. Kept off updateBrand() because it must be a
+   * read-free increment - two concurrent resumes (cron tick racing a boot
+   * resume) would otherwise read-modify-write the same count and lose one.
+   */
+  markAutopilotAttempt(brandId: string): Promise<void>;
   // Optimistic-lock variant. The caller passes the version that it
   // last read; returns undefined if the row's version no longer matches
   // (someone else wrote in between) - caller surfaces 409 Conflict.

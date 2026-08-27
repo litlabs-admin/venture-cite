@@ -295,6 +295,13 @@ export const brands = pgTable(
     autopilotCompletedAt: timestamp("autopilot_completed_at"),
     autopilotError: text("autopilot_error"),
     autopilotProgress: jsonb("autopilot_progress"),
+    // Bounded retry state for the recovery sweep. 'idle' (autopilot never
+    // wrote a status) and 'failed' (transient provider 429 / deadline abort)
+    // are retryable, but only a fixed number of times - onboarding a brand
+    // costs real provider spend, so a genuinely broken brand must stop, not
+    // retry forever. See migration 0121.
+    autopilotAttempts: integer("autopilot_attempts").default(0).notNull(),
+    autopilotLastAttemptAt: timestamp("autopilot_last_attempt_at", { withTimezone: true }),
     autoCitationSchedule: text("auto_citation_schedule").default("off").notNull(), // off | weekly | biweekly | monthly
     autoCitationDay: integer("auto_citation_day").default(0).notNull(), // 0=Sun, 1=Mon, ... 6=Sat
     // UTC hour for the scheduled run and its active toggle.

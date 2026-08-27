@@ -12,6 +12,22 @@ import type { Brand } from "@shared/schema";
 
 import { captureAndFlush } from "./sentryReport";
 
+/** How many times the recovery sweep will restart a brand that is 'idle' or
+ *  'failed' before giving up. Onboarding costs real provider spend, so this is
+ *  deliberately small - the goal is to survive a transient 429 or a killed
+ *  serverless function, not to grind indefinitely on a brand that is broken
+ *  (bad website, permanently revoked API key). At the cap the brand keeps its
+ *  'failed' status and the existing manual retry button remains the escape
+ *  hatch. Kept in sync with migration 0121, which seeds pre-existing rows here
+ *  so they are not swept. */
+export const AUTOPILOT_MAX_ATTEMPTS = 5;
+
+/** Wait between retries of a stranded brand. Long enough that a provider quota
+ *  window ("429 exceeded your current quota") has a chance to reset before we
+ *  spend on another attempt - retrying a quota error immediately just burns
+ *  the retry budget against the same wall. */
+export const AUTOPILOT_RETRY_BACKOFF_MINUTES = 60;
+
 async function setAutopilot(brandId: string, patch: Partial<Brand>): Promise<void> {
   try {
     await storage.updateBrand(brandId, patch as any);
@@ -39,6 +55,29 @@ export async function runOnboardingAutopilot(
     const status = brand.autopilotStatus ?? null;
 
     logger.info({ brandId, userId, status }, "onboardingAutopilot: starting/resuming");
+
+    // Claim the run BEFORE any work, and before the deadline check below.
+    //
+    // This used to happen only inside the Phase 0 branch, after two awaits and
+    // an early `return` on an exhausted deadline. A kickoff that arrived late,
+    // or whose serverless function was killed after the response was already
+    // sent (it is launched detached via waitUntil), therefore returned having
+    // written NOTHING - leaving the brand at its creation-default 'idle'.
+    // 'idle' was not in the recovery sweep's status list, so the brand became
+    // permanently invisible to it: never resumed, never retried, dashboard
+    // empty forever. That accounted for 24 of 39 brands in production.
+    //
+    // Writing 'pending' here means the very first thing autopilot does is make
+    // itself findable. Every later exit path - deadline, throw, process death
+    // - now leaves a row the sweep can see and resume.
+    if (status === null || status === "idle" || status === "failed") {
+      await setAutopilot(brandId, {
+        autopilotStatus: "pending",
+        autopilotStartedAt: new Date(),
+        autopilotError: null,
+      } as never);
+    }
+    await storage.markAutopilotAttempt(brandId);
 
     // Phase 0: the FactSheet kernel must exist BEFORE prompt generation
     // so prompts are grounded in real, verified facts (industry, ICP,
@@ -244,10 +283,32 @@ export async function runOnboardingAutopilot(
 // next cron tick picks up whichever autopilots didn't finish today.
 export async function resumeInFlightAutopilots(deadlineMs?: number): Promise<void> {
   try {
+    // In-flight states resume unconditionally: they are mid-pipeline and the
+    // work is already paid for.
+    //
+    // 'idle' and 'failed' are ALSO swept now, but bounded. They were excluded
+    // before, which is why a brand whose kickoff never landed, or which hit a
+    // transient provider 429, stayed dead forever with an empty dashboard.
+    // They are gated on an attempt cap and a backoff because unlike the
+    // in-flight states, retrying these re-runs work that costs real provider
+    // spend - so a genuinely broken brand has to stop trying.
+    //
+    // Migration 0121 seeded pre-existing brands at the cap, so this does not
+    // stampede historical strandings on first deploy.
     const rows = await db.execute<{ id: string; user_id: string | null }>(sql`
       SELECT id, user_id FROM brands
-      WHERE autopilot_status IN ('pending', 'scraping_facts', 'generating_prompts', 'running_citations')
-        AND deleted_at IS NULL
+      WHERE deleted_at IS NULL
+        AND (
+          autopilot_status IN ('pending', 'scraping_facts', 'generating_prompts', 'running_citations')
+          OR (
+            autopilot_status IN ('idle', 'failed')
+            AND autopilot_attempts < ${AUTOPILOT_MAX_ATTEMPTS}
+            AND (
+              autopilot_last_attempt_at IS NULL
+              OR autopilot_last_attempt_at < now() - ${sql.raw(`interval '${AUTOPILOT_RETRY_BACKOFF_MINUTES} minutes'`)}
+            )
+          )
+        )
     `);
     const list = (rows as { rows?: Array<{ id: string; user_id: string | null }> }).rows ?? [];
     let resumedCount = 0;

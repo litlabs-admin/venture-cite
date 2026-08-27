@@ -298,6 +298,18 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async markAutopilotAttempt(brandId: string): Promise<void> {
+    // Increment in SQL, not read-modify-write: the cron sweep and a boot-time
+    // resume can touch the same brand concurrently, and a lost increment would
+    // let a broken brand retry past its cap.
+    await db.execute(sql`
+      UPDATE brands
+      SET autopilot_attempts = autopilot_attempts + 1,
+          autopilot_last_attempt_at = now()
+      WHERE id = ${brandId}
+    `);
+  }
+
   async updateBrand(id: string, brandUpdate: Partial<InsertBrand>): Promise<Brand | undefined> {
     const result = await db
       .update(schema.brands)
