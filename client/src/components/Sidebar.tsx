@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import SidebarOnboarding from "@/components/SidebarOnboarding";
+import SidebarNeedHelp from "@/components/SidebarNeedHelp";
 import { ThemeMenuItems, QuickThemeToggle } from "@/components/ThemeMenuItems";
 import { BrandLogo } from "@/components/BrandLogo";
 
@@ -183,7 +184,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Bottom: user */}
       <div className="shrink-0 space-y-1 border-t border-vc-default px-2 py-3">
-        <div className="px-1 pt-1">
+        <div className="space-y-2 px-1 pt-1">
+          <SidebarNeedHelp onNavigate={onNavigate} />
           <SidebarOnboarding onNavigate={onNavigate} />
         </div>
 

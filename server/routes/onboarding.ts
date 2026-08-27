@@ -34,6 +34,12 @@ import { storage } from "../storage";
 import { withBrandQuota, isUsageLimitError } from "../lib/usageLimit";
 import type { Tier } from "../lib/llmPricing";
 import { runOnboardingAutopilot } from "../lib/onboardingAutopilot";
+import { withDynamicAdvisoryLock, dynamicLockNamespaces } from "../lib/advisoryLock";
+
+/** Per-slice budget for a client-driven autopilot advance. Deliberately under
+ *  a typical 60s function ceiling with room for the response to flush - the
+ *  client simply polls again for the next slice. */
+const AUTOPILOT_SLICE_BUDGET_MS = 40_000;
 import { waitUntil } from "@vercel/functions";
 
 import { captureAndFlush } from "../lib/sentryReport";
@@ -560,6 +566,75 @@ export function setupOnboardingRoutes(app: Express) {
           return res.status(err.status).json({ success: false, error: err.message });
         }
         return sendError(res, err, "Failed to retry autopilot");
+      }
+    }),
+  );
+
+  // ─── Drive the activation pipeline forward ────────────────────────────────
+  //
+  // The status route above is READ-ONLY, and for a long time it was the only
+  // thing the client called while a brand was activating. That left the
+  // pipeline with a kickoff and no client-driven advance: the confirm handler
+  // starts autopilot with a ~50s budget, and anything that outlasts that
+  // budget (a fact scrape routinely takes ~2 minutes) parks the brand
+  // mid-pipeline waiting for a cron tick. Where no cron is actually invoking
+  // /api/cron/daily-orchestrator, that tick never comes and the brand simply
+  // stops - fact sheet written, no prompts, no citations, an empty dashboard,
+  // and a UI cheerfully polling a status that will never change.
+  //
+  // Citation runs and perception probes already solve this the other way
+  // round: the CLIENT drives the run one slice at a time and cron is only a
+  // backstop for an abandoned tab. This gives autopilot the same shape.
+  //
+  // Idempotent and lock-guarded: terminal runs no-op without taking the lock,
+  // and a busy lock returns current status rather than queueing a second
+  // slice, so several open tabs cannot repeat paid work.
+  app.post(
+    "/api/onboarding/autopilot-advance/:brandId",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await storage.getBrandByIdForUser(req.params.brandId, user.id);
+        if (!brand) {
+          return res.status(404).json({ success: false, error: "Brand not found" });
+        }
+
+        const status = brand.autopilotStatus ?? "idle";
+        const inFlight =
+          status === "pending" ||
+          status === "scraping_facts" ||
+          status === "generating_prompts" ||
+          status === "running_citations";
+
+        // Nothing to do. Cheap path - no lock, no work.
+        if (!inFlight) {
+          return res.json({ success: true, data: { status, advanced: false } });
+        }
+
+        const outcome = await withDynamicAdvisoryLock(
+          dynamicLockNamespaces.onboardingAutopilotSlice,
+          brand.id,
+          "onboarding-autopilot-advance",
+          async () => {
+            await runOnboardingAutopilot(brand.id, user.id, {
+              deadlineMs: Date.now() + AUTOPILOT_SLICE_BUDGET_MS,
+            });
+          },
+        );
+
+        const after = await storage.getBrandByIdForUser(brand.id, user.id);
+        res.json({
+          success: true,
+          data: {
+            status: after?.autopilotStatus ?? status,
+            step: after?.autopilotStep ?? brand.autopilotStep ?? 0,
+            progress: after?.autopilotProgress ?? {},
+            error: after?.autopilotError ?? null,
+            advanced: outcome.ran,
+          },
+        });
+      } catch (err) {
+        sendError(res, err, "Failed to advance activation");
       }
     }),
   );

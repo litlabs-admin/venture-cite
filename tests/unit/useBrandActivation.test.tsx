@@ -87,11 +87,16 @@ describe("useBrandActivation", () => {
     expect(apiRequestMock).not.toHaveBeenCalled();
   });
 
-  it("calls the same endpoint welcome.tsx already polls", async () => {
-    // A path typo here is a silent 404 that shows up only as a banner that
-    // never appears.
+  it("ADVANCES the run rather than only reading its status", async () => {
+    // The whole point. Polling the read-only status route left the pipeline
+    // parked mid-run whenever no cron was driving it: the brand got its fact
+    // sheet and stopped, while the UI polled a status that could never change.
+    // A GET here would silently reintroduce that.
     await renderFor("running_citations");
-    expect(apiRequestMock).toHaveBeenCalledWith("GET", `/api/onboarding/autopilot-status/${BRAND}`);
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "POST",
+      `/api/onboarding/autopilot-advance/${BRAND}`,
+    );
   });
 
   it("labels every in-flight phase with distinct human copy", () => {

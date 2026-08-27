@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CalendlyInline } from "@/components/CalendlyInline";
+import { CALENDLY_BOOKING_URL } from "@/lib/calendly";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -536,7 +537,7 @@ export default function Pricing() {
 
             {enterpriseMode === "call" ? (
               <div className="space-y-3">
-                <CalendlyInline url="https://calendly.com/venturepr/new-meeting" />
+                <CalendlyInline url={CALENDLY_BOOKING_URL} />
                 <button
                   type="button"
                   className="text-caption text-vc-secondary underline hover:text-vc-primary"

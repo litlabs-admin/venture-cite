@@ -46,6 +46,11 @@ export const dynamicLockNamespaces = {
   // manual re-scrape, the cron, and first-run activation can't all scrape
   // the same brand at once.
   fullBrandScrape: 920002,
+  // Per-brand lock around one onboarding-autopilot slice. The client polls to
+  // drive the run forward, and several tabs (or a cron tick landing at the
+  // same moment) would otherwise run overlapping slices for one brand and
+  // repeat paid work - a second prompt generation, a second citation run.
+  onboardingAutopilotSlice: 920003,
 } as const;
 
 export type DynamicLockNamespace =

@@ -69,7 +69,21 @@ export function useBrandActivation(brandId: string | null | undefined) {
   const query = useQuery<{ success: boolean; data: BrandActivation }>({
     queryKey: ["/api/onboarding/autopilot-status", brandId],
     queryFn: async () => {
-      const r = await apiRequest("GET", `/api/onboarding/autopilot-status/${brandId}`);
+      // ADVANCE, don't just read.
+      //
+      // The status route is read-only, and polling it was all the client ever
+      // did. The confirm handler kicks autopilot off with a ~50s budget, so
+      // anything longer (a fact scrape is routinely ~2 minutes) parks the
+      // brand mid-pipeline for a cron tick - and where no cron is actually
+      // running, that tick never arrives. The brand stops with a fact sheet
+      // and nothing else while the UI politely polls a status that cannot
+      // change. Citation runs and perception probes already let the client
+      // drive the work a slice at a time; this does the same.
+      //
+      // The endpoint is idempotent: terminal runs no-op without taking the
+      // lock, and a busy lock returns current status instead of starting a
+      // second slice, so extra tabs cannot repeat paid work.
+      const r = await apiRequest("POST", `/api/onboarding/autopilot-advance/${brandId}`);
       return (await r.json()) as { success: boolean; data: BrandActivation };
     },
     enabled: !!brandId,
