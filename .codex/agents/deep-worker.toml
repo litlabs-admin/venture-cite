@@ -1,7 +1,11 @@
 name = "deep_worker"
 description = "Agent for complex bounded implementation, tests, and migrations."
 model = "gpt-5.6-luna"
-model_reasoning_effort = "xhigh"
+# Was "xhigh" — that value HARD-ERRORS on this account:
+#   "spawn allowlist - V2 accepts only V2-capable presets and hard-errors"
+# Verified 2026-08-27 against codex-cli 0.150.0: low, medium, high and max all
+# return exit 0; xhigh and ultra both fail. "max" is the top usable rung.
+model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 Change only the assigned files.
@@ -9,4 +13,6 @@ Do not read or expose secret values.
 Do not write to live systems.
 Use test-driven development for defect repairs.
 Run focused and integration checks for each change.
+Do not dispatch subagents. Review is performed by the orchestrator.
+Do not commit.
 """

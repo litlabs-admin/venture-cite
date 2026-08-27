@@ -1,10 +1,34 @@
-[mcp_servers.buffer]
-url = "https://mcp.buffer.com/mcp"
-bearer_token_env_var = "BUFFER_MCP_TOKEN"
-default_tools_approval_mode = "approve"
+# Buffer MCP disabled 2026-08-27.
+#
+# BUFFER_MCP_TOKEN is unset or expired. The failing handshake was fatal to the
+# MCP transport worker and poisoned the process exit code: `codex exec` runs
+# that produced a correct answer still exited 255. Orchestration depends on
+# exit codes being meaningful, so this stays off until a valid token is set.
+#
+# [mcp_servers.buffer]
+# url = "https://mcp.buffer.com/mcp"
+# bearer_token_env_var = "BUFFER_MCP_TOKEN"
+# default_tools_approval_mode = "approve"
 
-[agents]
-enabled = true
-max_concurrent_threads_per_session = 3
-default_subagent_model = "gpt-5.6-luna"
-default_subagent_reasoning_effort = "high"
+# The flat [agents] settings block below was removed on 2026-08-27.
+#
+# codex-cli 0.130.0-alpha.5 parses `[agents]` as a MAP OF NAMED AGENT ROLES
+# (name -> AgentRoleToml), not as a settings table. The old block made every
+# `codex exec` invocation fail at config load with:
+#
+#   Error loading config.toml: invalid type: string "gpt-5.6-luna",
+#   expected struct AgentRoleToml   in `agents`
+#
+# The per-agent definitions in .codex/agents/*.toml are a separate, still-valid
+# mechanism and already carry the same model, reasoning effort, sandbox mode and
+# developer instructions. Nothing was lost by removing this block.
+#
+# Original contents, kept for reference:
+#   [agents]
+#   enabled = true
+#   max_concurrent_threads_per_session = 3
+#   default_subagent_model = "gpt-5.6-luna"
+#   default_subagent_reasoning_effort = "high"
+#
+# Before re-adding any [agents.<name>] table, confirm the current AgentRoleToml
+# schema against the installed CLI rather than hand-writing it.

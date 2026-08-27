@@ -122,3 +122,39 @@ api/
 # `.branches/` is per-machine. These are local CLI artifacts, never source.
 supabase/.temp/
 supabase/.branches/
+
+# ── Agent tooling (added 2026-08-27) ─────────────────────────────────
+# Skill packages installed via `npx skills add`, restorable from skills-lock.json
+# with `npx skills experimental_install`.
+#
+# These are listed INDIVIDUALLY and deliberately. `.agents/skills/` as a whole must
+# NOT be ignored: it already contains 20 tracked, hand-maintained skills (architect,
+# tdd, unslop, the principle-* set, ...) across 79 tracked files. Ignoring the
+# directory would not untrack them - it would only hide future edits to them from
+# `git status`, which is worse than the noise it removes.
+#
+# When adding a skill package, add its directory here explicitly.
+.agents/skills/brainstorming/
+.agents/skills/dispatching-parallel-agents/
+.agents/skills/executing-plans/
+.agents/skills/finishing-a-development-branch/
+.agents/skills/receiving-code-review/
+.agents/skills/requesting-code-review/
+.agents/skills/subagent-driven-development/
+.agents/skills/supabase/
+.agents/skills/supabase-postgres-best-practices/
+.agents/skills/systematic-debugging/
+.agents/skills/test-driven-development/
+.agents/skills/using-git-worktrees/
+.agents/skills/using-superpowers/
+.agents/skills/verification-before-completion/
+.agents/skills/writing-plans/
+.agents/skills/writing-skills/
+
+# Subagent-driven-development scratch: ledgers, briefs, review packages,
+# diffs and JSON schemas for in-flight plans.
+.superpowers/
+
+# Config backups taken before the 2026-08-27 Codex repair.
+*.bak-20260827
+.codex/agents.bak-*/
