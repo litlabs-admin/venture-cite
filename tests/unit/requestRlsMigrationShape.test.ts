@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readSupabaseMirror } from "../helpers/supabaseMirror";
 
 describe("request RLS migration shape", () => {
   it("temporarily enables SET for the current application connection only", () => {
@@ -8,13 +9,7 @@ describe("request RLS migration shape", () => {
       path.resolve(process.cwd(), "migrations/0112_transitional_request_role_set_option.sql"),
       "utf8",
     );
-    const supabaseMigration = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "supabase/migrations/20260421000112_0112_transitional_request_role_set_option.sql",
-      ),
-      "utf8",
-    );
+    const supabaseMigration = readSupabaseMirror("0112_transitional_request_role_set_option.sql");
 
     expect(migration).toContain(
       "Revoke this membership option after DATABASE_URL uses venturecite_runtime.",
@@ -42,13 +37,7 @@ describe("request RLS migration shape", () => {
       path.resolve(process.cwd(), "migrations/0096_request_rls_foundation.sql"),
       "utf8",
     );
-    const supabaseMigration = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "supabase/migrations/20260421000096_0096_request_rls_foundation.sql",
-      ),
-      "utf8",
-    );
+    const supabaseMigration = readSupabaseMirror("0096_request_rls_foundation.sql");
 
     expect(migration).toMatch(/grant select\s*\([^)]+\)\s*on public\.brands/is);
     expect(migration).not.toMatch(/grant select on public\.brands/i);
@@ -69,13 +58,7 @@ describe("request RLS migration shape", () => {
       path.resolve(process.cwd(), "migrations/0097_request_rls_content.sql"),
       "utf8",
     );
-    const supabaseMigration = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "supabase/migrations/20260421000097_0097_request_rls_content.sql",
-      ),
-      "utf8",
-    );
+    const supabaseMigration = readSupabaseMirror("0097_request_rls_content.sql");
 
     expect(migration).not.toMatch(/grant\s+(insert|update|delete)\b/i);
     expect(migration).not.toMatch(/for\s+(insert|update|delete)\b/i);
@@ -96,13 +79,7 @@ describe("request RLS migration shape", () => {
       path.resolve(process.cwd(), "migrations/0114_request_brand_deletion_preview.sql"),
       "utf8",
     );
-    const supabaseMigration = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "supabase/migrations/20260421000114_0114_request_brand_deletion_preview.sql",
-      ),
-      "utf8",
-    );
+    const supabaseMigration = readSupabaseMirror("0114_request_brand_deletion_preview.sql");
 
     expect(migration).toMatch(
       /grant select \(brand_id\)\s+on public\.brand_prompts to venturecite_content_request/i,
@@ -126,12 +103,8 @@ describe("request RLS migration shape", () => {
       ),
       "utf8",
     );
-    const supabaseMigration = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "supabase/migrations/20260421000105_0105_content_request_distribution_keyword_writes.sql",
-      ),
-      "utf8",
+    const supabaseMigration = readSupabaseMirror(
+      "0105_content_request_distribution_keyword_writes.sql",
     );
 
     expect(migration).toMatch(/grant insert\s*\(id, article_id, platform, status, metadata\)/i);
@@ -152,12 +125,8 @@ describe("request RLS migration shape", () => {
       path.resolve(process.cwd(), "migrations/0107_content_request_article_response_columns.sql"),
       "utf8",
     );
-    const supabaseMigration = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "supabase/migrations/20260421000107_0107_content_request_article_response_columns.sql",
-      ),
-      "utf8",
+    const supabaseMigration = readSupabaseMirror(
+      "0107_content_request_article_response_columns.sql",
     );
 
     expect(migration).toMatch(
@@ -173,13 +142,7 @@ describe("request RLS migration shape", () => {
       path.resolve(process.cwd(), "migrations/0098_transactional_outbox.sql"),
       "utf8",
     );
-    const supabaseMigration = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "supabase/migrations/20260421000098_0098_transactional_outbox.sql",
-      ),
-      "utf8",
-    );
+    const supabaseMigration = readSupabaseMirror("0098_transactional_outbox.sql");
 
     expect(migration).toContain("outbox enqueue actor is required");
     expect(migration).toContain("outbox enqueue user is required");
@@ -210,13 +173,7 @@ describe("request RLS migration shape", () => {
       path.resolve(process.cwd(), "migrations/0106_content_request_generation_commands.sql"),
       "utf8",
     );
-    const supabaseMigration = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "supabase/migrations/20260421000106_0106_content_request_generation_commands.sql",
-      ),
-      "utf8",
-    );
+    const supabaseMigration = readSupabaseMirror("0106_content_request_generation_commands.sql");
 
     expect(migration).toContain("private.request_enqueue_content_generation");
     expect(migration).toContain("private.request_cancel_content_generation");
@@ -255,13 +212,7 @@ describe("request RLS migration shape", () => {
       path.resolve(process.cwd(), "migrations/0109_content_generation_quota_period.sql"),
       "utf8",
     );
-    const supabaseMigration = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "supabase/migrations/20260421000109_0109_content_generation_quota_period.sql",
-      ),
-      "utf8",
-    );
+    const supabaseMigration = readSupabaseMirror("0109_content_generation_quota_period.sql");
 
     expect(migration).toContain("quota_reservation_period");
     expect(migration).toContain("content_generation_job_quota_period");

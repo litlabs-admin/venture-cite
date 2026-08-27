@@ -32,6 +32,21 @@ jobs:
       - name: Type check
         run: npm run check
 
+      # Guards the generated Supabase mirror against `migrations/`.
+      #
+      # This was never wired up, and the mirror silently drifted nine files out of
+      # date: `migrations/` held 124 files while `supabase/migrations/` held 116,
+      # missing 0094-0100 and 0115-0116. Every `supabase start`, `supabase db reset`
+      # and preview branch therefore built an incomplete schema - 62 of 74 tables -
+      # with no signal that anything was wrong.
+      #
+      # The check also enforces that generated Supabase versions are unique, which
+      # matters because root migration numbers are not: 0094-0100 each carry two
+      # files. The application runner keys on filename and is unaffected; Supabase
+      # keys on version and cannot apply colliding ones.
+      - name: Supabase migration mirror
+        run: npm run supabase:migrations:check
+
       - name: Lint
         run: npm run lint
 

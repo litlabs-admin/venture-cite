@@ -1,0 +1,31 @@
+-- Source: migrations/0019_api_costs.sql
+-- SHA256: bf8685bb45c2a2b787594e778f6d08804d14ac83921b193b896d7e7b32e8c636
+
+-- Per-user LLM cost and token tracking.
+--
+-- Each row is one provider call: tokens consumed in/out, model name,
+-- est. cost in cents (computed at call time from model pricing). The
+-- budget helper sums recent rows for a user to decide whether to allow
+-- the next call.
+--
+-- user_id is varchar to match users.id (see note in 0017_audit_logs.sql).
+-- ON DELETE CASCADE - when a user is hard-deleted, their cost rows go too;
+-- aggregate analytics should snapshot before purge if needed.
+
+create table if not exists public.api_costs (
+  id varchar primary key default gen_random_uuid()::text,
+  user_id varchar not null references public.users(id) on delete cascade,
+  service text not null,                -- 'openai', 'openrouter', etc.
+  model text,                           -- e.g. 'gpt-4o-mini', 'claude-3-5-sonnet'
+  tokens_in integer not null default 0,
+  tokens_out integer not null default 0,
+  est_cost_cents integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+-- Index on (user_id, created_at) for the budget rollup query - selects
+-- recent rows for a single user and sums tokens.
+create index if not exists api_costs_user_created_idx
+  on public.api_costs (user_id, created_at desc);
+
+alter table public.api_costs enable row level security;

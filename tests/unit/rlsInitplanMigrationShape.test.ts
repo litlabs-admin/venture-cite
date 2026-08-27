@@ -1,15 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { supabaseMirrorPath } from "../helpers/supabaseMirror";
 
 const rootMigrationPath = path.resolve(
   process.cwd(),
   "migrations/0113_rls_current_setting_initplan.sql",
 );
-const mirrorMigrationPath = path.resolve(
-  process.cwd(),
-  "supabase/migrations/20260421000113_0113_rls_current_setting_initplan.sql",
-);
+const mirrorMigrationPath = supabaseMirrorPath("0113_rls_current_setting_initplan.sql");
 
 describe("RLS current_setting initplan migration", () => {
   it("rewrites the 21 audited policies without changing their policy shape", () => {

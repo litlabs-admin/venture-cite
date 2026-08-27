@@ -35,16 +35,64 @@ async function readRootMigrations() {
     .sort();
 
   if (files.length === 0) fail("no root SQL migrations exist");
-  return Promise.all(
-    files.map(async (name) => {
-      const sequence = name.slice(0, 4);
-      return {
-        destination: `${rootMigrationDate}${sequence.padStart(6, "0")}_${name}`,
-        source: name,
-        sql: await readFile(path.join(rootMigrationDirectory, name), "utf8"),
-      };
-    }),
+
+  // The Supabase version is derived from ORDINAL POSITION, not from the four
+  // digits embedded in the root filename.
+  //
+  // Why: root migration numbers are NOT unique. Numbers 0094-0100 each carry two
+  // files (two branches numbered in parallel and both merged), e.g.
+  // 0094_site_health_scan_history.sql and 0094_stripe_webhook_processing_claim.sql.
+  //
+  // The application runner is unaffected - server/lib/migrationRunner.ts keys
+  // public.schema_migrations on FILENAME. Supabase keys
+  // supabase_migrations.schema_migrations on VERSION, so the previous
+  // number-derived scheme emitted two rows with version 20260421000094 and every
+  // `supabase db reset` / `supabase start` / preview branch died with
+  // "duplicate key value violates unique constraint schema_migrations_pkey".
+  //
+  // Ordinal position is unique by construction and monotonic in apply order:
+  // migrationRunner sorts the same directory with the same `.sort()`, so version
+  // order and application order agree exactly.
+  //
+  // This changes only the generated mirror. `migrations/` filenames - which are
+  // the production ledger keys - are untouched, and production's Supabase ledger
+  // holds a single snapshot row rather than per-file versions, so no deployed
+  // ledger references the old version numbers.
+  const migrations = await Promise.all(
+    files.map(async (name, index) => ({
+      destination: `${rootMigrationDate}${String(index + 1).padStart(6, "0")}_${name}`,
+      source: name,
+      sql: await readFile(path.join(rootMigrationDirectory, name), "utf8"),
+    })),
   );
+
+  assertUniqueDestinationVersions(migrations);
+  return migrations;
+}
+
+/**
+ * Guard the invariant that actually matters to Supabase: every generated file
+ * must carry a distinct version prefix.
+ *
+ * Without this, `--check` could pass on an artifact that `supabase db reset`
+ * cannot apply - which is exactly what happened before ordinal versioning.
+ * Duplicate ROOT numbers remain legal (seven pairs exist and renaming them
+ * would rewrite production ledger keys); duplicate generated VERSIONS never are.
+ */
+function assertUniqueDestinationVersions(migrations) {
+  const seen = new Map();
+  for (const migration of migrations) {
+    const version = migration.destination.slice(0, 14);
+    const previous = seen.get(version);
+    if (previous) {
+      fail(
+        `duplicate generated version ${version}: ` +
+          `${previous} and ${migration.source} would collide in ` +
+          `supabase_migrations.schema_migrations`,
+      );
+    }
+    seen.set(version, migration.source);
+  }
 }
 
 function generateBaselineSql(tempDirectory) {
