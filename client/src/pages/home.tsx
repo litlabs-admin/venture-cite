@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useDashboardData } from "@/components/dashboard-panels/useDashboardData";
+import { ActivationBanner } from "@/components/dashboard-panels/ActivationBanner";
 import { KpiStrip } from "@/components/dashboard-panels/KpiStrip";
 import { VisibilityChart } from "@/components/dashboard-panels/VisibilityChart";
 import { RankingsPanel } from "@/components/dashboard-panels/RankingsPanel";
@@ -83,6 +84,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-vc-page">
+      {/* Renders only while this brand's activation pipeline is still running
+          (or has failed). Without it, a brand created minutes ago is
+          indistinguishable from one that finished and genuinely has no data. */}
+      <ActivationBanner brandId={selectedBrandId} />
       {/* data-tour-id values are literal build-gate targets - scripts/
           verify-tour-targets.ts greps for these exact strings and fails the
           build if a registered tour step has nothing to point at. */}

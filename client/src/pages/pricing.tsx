@@ -391,95 +391,115 @@ export default function Pricing() {
             how many features or how long a description each plan has. Without
             it the buttons staircased down the row. */}
         <div className="mb-12 grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
-          {[...planCards, enterpriseCard].map((plan) => (
-            <div
-              key={plan.name}
-              data-testid={`pricing-card-${plan.name.toLowerCase()}`}
-              className={`relative flex h-full flex-col rounded-lg border bg-vc-surface p-6 ${
-                plan.popular ? "border-vc-accent ring-1 ring-vc-accent" : "border-vc-default"
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                  <Badge className="bg-vc-accent text-primary-foreground">Most Popular</Badge>
-                </div>
-              )}
+          {[...planCards, enterpriseCard].map((plan) => {
+            // Is this the card for the plan the user is already paying for?
+            // The page previously read the user's tier only once, to pick
+            // trial-vs-switch wording for EVERY card at once, so the plan you
+            // are already on still said "Switch to this plan" and stayed
+            // clickable - sending you to Checkout for the plan you already
+            // have. `plan.tier` and resolveTier() already share the literal
+            // strings "pro"/"agency", so this is a direct match, and the
+            // signedIn guard keeps anonymous visitors from ever matching.
+            const isCurrentPlan = signedIn && plan.tier === resolveTier(user!);
+            return (
+              <div
+                key={plan.name}
+                data-testid={`pricing-card-${plan.name.toLowerCase()}`}
+                className={`relative flex h-full flex-col rounded-lg border bg-vc-surface p-6 ${
+                  plan.popular ? "border-vc-accent ring-1 ring-vc-accent" : "border-vc-default"
+                }`}
+              >
+                {/* "Current plan" wins over "Most Popular": which plan you are
+                  on is a fact about your account, and it is the more useful
+                  thing to know on the card you are looking at. */}
+                {isCurrentPlan ? (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                    <Badge className="bg-vc-accent text-primary-foreground">Current plan</Badge>
+                  </div>
+                ) : plan.popular ? (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                    <Badge className="bg-vc-accent text-primary-foreground">Most Popular</Badge>
+                  </div>
+                ) : null}
 
-              <div className="mb-4 text-center">
-                <h2 className="text-ui font-semibold text-vc-primary">{plan.name}</h2>
-                {/* Two lines reserved. Descriptions differ in length (Agency
+                <div className="mb-4 text-center">
+                  <h2 className="text-ui font-semibold text-vc-primary">{plan.name}</h2>
+                  {/* Two lines reserved. Descriptions differ in length (Agency
                     wraps, Pro does not), and without a floor the price below
                     sat 18px lower on that one card - measured. */}
-                <p className="mt-1 min-h-[36px] text-caption text-vc-tertiary">
-                  {plan.description}
-                </p>
-              </div>
+                  <p className="mt-1 min-h-[36px] text-caption text-vc-tertiary">
+                    {plan.description}
+                  </p>
+                </div>
 
-              <div className="mb-6 flex items-baseline justify-center gap-1">
-                <span className="text-metric font-semibold text-vc-primary">{plan.price}</span>
-                {plan.interval && (
-                  <span className="text-caption text-vc-tertiary">/{plan.interval}</span>
-                )}
-              </div>
+                <div className="mb-6 flex items-baseline justify-center gap-1">
+                  <span className="text-metric font-semibold text-vc-primary">{plan.price}</span>
+                  {plan.interval && (
+                    <span className="text-caption text-vc-tertiary">/{plan.interval}</span>
+                  )}
+                </div>
 
-              <ul className="mb-6 space-y-2.5">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-vc-accent" aria-hidden />
-                    <span className="text-caption text-vc-secondary">{feature}</span>
-                  </li>
-                ))}
-              </ul>
+                <ul className="mb-6 space-y-2.5">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2">
+                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-vc-accent" aria-hidden />
+                      <span className="text-caption text-vc-secondary">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
 
-              {/* mt-auto pins every CTA to the bottom of its card. */}
-              <div className="mt-auto">
-                <Button
-                  className="w-full"
-                  variant={plan.popular ? "default" : "outline"}
-                  // Tier first, then price availability. Enterprise is
-                  // sales-led and must never reach Checkout; a sellable plan
-                  // reaches it only with a price that matched the expected
-                  // amount (see planCards).
-                  onClick={() => {
-                    if (plan.tier === "enterprise") {
-                      setInquiryOpen(true);
-                      return;
-                    }
-                    // No account yet: the trial starts at registration, so
-                    // that is where this goes. Checkout would only 401.
-                    if (!signedIn) {
-                      window.location.href = "/register";
-                      return;
-                    }
-                    if (plan.priceId) {
-                      checkoutMutation.mutate(plan.priceId);
-                      return;
-                    }
-                    toast({
-                      title: "This plan isn't available for checkout yet.",
-                      description: "Please contact us and we'll get you set up.",
-                    });
-                  }}
-                  disabled={checkoutMutation.isPending}
-                  data-testid={`button-subscribe-${plan.name.toLowerCase()}`}
-                >
-                  {checkoutMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  {/* The label must describe what the button actually does:
+                {/* mt-auto pins every CTA to the bottom of its card. */}
+                <div className="mt-auto">
+                  <Button
+                    className="w-full"
+                    variant={plan.popular ? "default" : "outline"}
+                    // Tier first, then price availability. Enterprise is
+                    // sales-led and must never reach Checkout; a sellable plan
+                    // reaches it only with a price that matched the expected
+                    // amount (see planCards).
+                    onClick={() => {
+                      if (plan.tier === "enterprise") {
+                        setInquiryOpen(true);
+                        return;
+                      }
+                      // No account yet: the trial starts at registration, so
+                      // that is where this goes. Checkout would only 401.
+                      if (!signedIn) {
+                        window.location.href = "/register";
+                        return;
+                      }
+                      if (plan.priceId) {
+                        checkoutMutation.mutate(plan.priceId);
+                        return;
+                      }
+                      toast({
+                        title: "This plan isn't available for checkout yet.",
+                        description: "Please contact us and we'll get you set up.",
+                      });
+                    }}
+                    disabled={isCurrentPlan || checkoutMutation.isPending}
+                    data-testid={`button-subscribe-${plan.name.toLowerCase()}`}
+                  >
+                    {checkoutMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    {/* The label must describe what the button actually does:
                       "Subscribe" only when there is a verified price behind it,
                       never as decoration over a dead branch. */}
-                  {plan.tier === "enterprise"
-                    ? "Book a call"
-                    : !plan.priceId
-                      ? "Contact Sales"
-                      : onATrialablePlan
-                        ? "Start free trial"
-                        : "Switch to this plan"}
-                </Button>
+                    {isCurrentPlan
+                      ? "Current plan"
+                      : plan.tier === "enterprise"
+                        ? "Book a call"
+                        : !plan.priceId
+                          ? "Contact Sales"
+                          : onATrialablePlan
+                            ? "Start free trial"
+                            : "Switch to this plan"}
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Enterprise enquiry. The counterpart to Checkout for the one plan
