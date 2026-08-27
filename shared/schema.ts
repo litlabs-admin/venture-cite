@@ -2374,6 +2374,22 @@ export const factScrapeLogs = pgTable(
 export type FactScrapeLog = typeof factScrapeLogs.$inferSelect;
 export type InsertFactScrapeLog = typeof factScrapeLogs.$inferInsert;
 
+// Pooler-safe mutual-exclusion leases. A transaction pooler can move a client
+// between database backends, so session advisory locks do not have a reliable
+// owner. Each lease operation is one atomic statement and stays pooler-safe.
+export const jobLeases = pgTable(
+  "job_leases",
+  {
+    leaseKey: text("lease_key").primaryKey(),
+    holderToken: uuid("holder_token").notNull(),
+    acquiredAt: timestamp("acquired_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("job_leases_expires_at_idx").on(table.expiresAt)],
+);
+export type JobLease = typeof jobLeases.$inferSelect;
+
 // ── Postgres token bucket for LLM concurrency ──────────────────────────
 export const llmConcurrencySlots = pgTable(
   "llm_concurrency_slots",

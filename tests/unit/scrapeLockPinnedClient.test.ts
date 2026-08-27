@@ -2,20 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const stubs = vi.hoisted(() => {
   const query = vi.fn();
-  const release = vi.fn();
-  const client = { query, release };
 
   return {
-    client,
-    connect: vi.fn(),
     query,
-    release,
   };
 });
 
 vi.mock("../../server/db", () => ({
   db: {},
-  pool: { connect: stubs.connect },
+  pool: { query: stubs.query },
 }));
 
 vi.mock("../../server/lib/logger", () => ({
@@ -25,20 +20,16 @@ vi.mock("../../server/lib/logger", () => ({
 import { DatabaseStorage } from "../../server/databaseStorage";
 import { dynamicLockNamespaces, withDynamicAdvisoryLock } from "../../server/lib/advisoryLock";
 
-const acquireQuery = "SELECT pg_try_advisory_lock($1, $2) AS pg_try_advisory_lock";
-const releaseQuery = "SELECT pg_advisory_unlock($1, $2)";
+const releaseQuery = "delete from job_leases where lease_key = $1 and holder_token = $2";
 
 beforeEach(() => {
-  stubs.connect.mockReset();
   stubs.query.mockReset();
-  stubs.release.mockReset();
-  stubs.connect.mockResolvedValue(stubs.client);
 });
 
-describe("full fact-scrape advisory lock", () => {
-  it("uses one pinned client for full fact-scrape lock acquisition and release", async () => {
+describe("full fact-scrape lease", () => {
+  it("uses atomic lease queries for full fact-scrape acquisition and release", async () => {
     stubs.query
-      .mockResolvedValueOnce({ rows: [{ pg_try_advisory_lock: true }] })
+      .mockResolvedValueOnce({ rows: [{ holder_token: "holder" }] })
       .mockResolvedValueOnce({ rows: [] });
     const work = vi.fn(async () => "completed");
 
@@ -51,22 +42,22 @@ describe("full fact-scrape advisory lock", () => {
 
     expect(result).toEqual({ ran: true, result: "completed" });
     expect(work).toHaveBeenCalledOnce();
-    expect(stubs.connect).toHaveBeenCalledOnce();
-    expect(stubs.query).toHaveBeenNthCalledWith(1, acquireQuery, [
-      dynamicLockNamespaces.fullBrandScrape,
-      expect.any(Number),
-    ]);
+    expect(stubs.query).toHaveBeenCalledTimes(2);
+    expect(stubs.query.mock.calls[0]?.[0]).toMatch(/insert into job_leases/i);
+    expect(stubs.query.mock.calls[0]?.[0]).toMatch(/on conflict \(lease_key\) do update/i);
     expect(stubs.query).toHaveBeenNthCalledWith(2, releaseQuery, [
-      dynamicLockNamespaces.fullBrandScrape,
-      expect.any(Number),
+      expect.stringMatching(/^job-lease:dynamic:920002:/),
+      expect.any(String),
     ]);
-    expect(stubs.query.mock.calls[1]?.[1]).toEqual(stubs.query.mock.calls[0]?.[1]);
-    expect(stubs.release).toHaveBeenCalledOnce();
+    expect(stubs.query.mock.calls[1]?.[1]).toEqual([
+      stubs.query.mock.calls[0]?.[1]?.[0],
+      stubs.query.mock.calls[0]?.[1]?.[1],
+    ]);
   });
 
-  it("releases the full fact-scrape lock when the work throws", async () => {
+  it("releases the full fact-scrape lease when the work throws", async () => {
     stubs.query
-      .mockResolvedValueOnce({ rows: [{ pg_try_advisory_lock: true }] })
+      .mockResolvedValueOnce({ rows: [{ holder_token: "holder" }] })
       .mockResolvedValueOnce({ rows: [] });
     const failure = new Error("source fetch failed");
 
@@ -81,13 +72,14 @@ describe("full fact-scrape advisory lock", () => {
       ),
     ).rejects.toThrow(failure);
 
-    expect(stubs.connect).toHaveBeenCalledOnce();
     expect(stubs.query).toHaveBeenNthCalledWith(2, releaseQuery, [
-      dynamicLockNamespaces.fullBrandScrape,
-      expect.any(Number),
+      expect.stringMatching(/^job-lease:dynamic:920002:/),
+      expect.any(String),
     ]);
-    expect(stubs.query.mock.calls[1]?.[1]).toEqual(stubs.query.mock.calls[0]?.[1]);
-    expect(stubs.release).toHaveBeenCalledOnce();
+    expect(stubs.query.mock.calls[1]?.[1]).toEqual([
+      stubs.query.mock.calls[0]?.[1]?.[0],
+      stubs.query.mock.calls[0]?.[1]?.[1],
+    ]);
   });
 
   it("does not expose unpinned fact-scrape locks from storage", () => {
