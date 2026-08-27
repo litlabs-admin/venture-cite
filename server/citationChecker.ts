@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { storage } from "./storage";
-import type { GeoRanking, Brand } from "@shared/schema";
+import type { GeoRanking, Brand, InsertCompetitorGeoRanking } from "@shared/schema";
 import { resolveTier } from "@shared/schema";
 import { attachAiLogger } from "./lib/aiLogger";
 import { CITATION_MODELS, OPENROUTER_BASE_URL } from "./lib/modelConfig";
@@ -62,6 +62,10 @@ export const DEFAULT_CITATION_PLATFORMS = [
 // silently degrading. Updates to existing competitors always work; only
 // NEW competitor IDs beyond the cap are dropped.
 const COMPETITOR_DETECTIONS_CAP = 5000;
+
+type CompetitorGeoRankingBatchStorage = {
+  createCompetitorGeoRankings(rows: InsertCompetitorGeoRanking[]): Promise<unknown>;
+};
 
 export function addCompetitorDetection(
   map: Map<string, Map<string, number>>,
@@ -922,6 +926,10 @@ export async function runBrandPrompts(
     // The matcher controls isCited. The analyzer's rank and
     // relevance only used when matcher agrees.
     if (responseText && !fetchError) {
+      const competitorGeoRankingRows: Array<{
+        competitorName: string;
+        row: InsertCompetitorGeoRanking;
+      }> = [];
       for (const comp of competitors) {
         const compMatch = matcherCompResultById.get(comp.id);
         if (!compMatch || !compMatch.matched) continue;
@@ -948,8 +956,9 @@ export async function runBrandPrompts(
         // otherwise null/default so we don't fabricate rank/relevance.
         const compRank = analyzerCompCited ? (v?.rank ?? null) : null;
         const compRelevance = analyzerCompCited ? (v?.relevance ?? null) : null;
-        try {
-          await storage.createCompetitorGeoRanking({
+        competitorGeoRankingRows.push({
+          competitorName: comp.name,
+          row: {
             competitorId: comp.id,
             runId: citationRun.id,
             brandPromptId: bp.id,
@@ -960,13 +969,8 @@ export async function runBrandPrompts(
             citationContext: compContext,
             citingOutletUrl: compUrl,
             sentiment: deriveSentiment(compRelevance, true),
-          } as any);
-        } catch (err) {
-          logger.warn(
-            { err: err },
-            `[citationChecker] competitor_geo_rankings insert failed for ${comp.name}:`,
-          );
-        }
+          },
+        });
 
         addCompetitorDetection(competitorDetections, comp.id, platform, 1, () => {
           if (!competitorDetectionsCapWarned) {
@@ -977,6 +981,30 @@ export async function runBrandPrompts(
             );
           }
         });
+      }
+
+      if (competitorGeoRankingRows.length > 0) {
+        const rows = competitorGeoRankingRows.map(({ row }) => row);
+        try {
+          await (
+            storage as typeof storage & CompetitorGeoRankingBatchStorage
+          ).createCompetitorGeoRankings(rows);
+        } catch (err) {
+          logger.warn(
+            { err },
+            "[citationChecker] competitor_geo_rankings batch insert failed; falling back to individual inserts:",
+          );
+          for (const { competitorName, row } of competitorGeoRankingRows) {
+            try {
+              await storage.createCompetitorGeoRanking(row);
+            } catch (err) {
+              logger.warn(
+                { err: err },
+                `[citationChecker] competitor_geo_rankings insert failed for ${competitorName}:`,
+              );
+            }
+          }
+        }
       }
 
       // 5. Auto-discovery - upsert analyzer.untracked brands as new

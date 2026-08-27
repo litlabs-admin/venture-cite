@@ -2163,6 +2163,33 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async createCompetitorGeoRankings(
+    rows: InsertCompetitorGeoRanking[],
+  ): Promise<CompetitorGeoRanking[]> {
+    if (rows.length === 0) return [];
+    return await db
+      .insert(schema.competitorGeoRankings)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: [
+          schema.competitorGeoRankings.competitorId,
+          schema.competitorGeoRankings.runId,
+          schema.competitorGeoRankings.brandPromptId,
+          schema.competitorGeoRankings.aiPlatform,
+        ],
+        set: {
+          isCited: sql`EXCLUDED.is_cited`,
+          rank: sql`COALESCE(EXCLUDED.rank, ${schema.competitorGeoRankings.rank})`,
+          relevanceScore: sql`COALESCE(EXCLUDED.relevance_score, ${schema.competitorGeoRankings.relevanceScore})`,
+          citationContext: sql`COALESCE(EXCLUDED.citation_context, ${schema.competitorGeoRankings.citationContext})`,
+          citingOutletUrl: sql`COALESCE(EXCLUDED.citing_outlet_url, ${schema.competitorGeoRankings.citingOutletUrl})`,
+          sentiment: sql`COALESCE(EXCLUDED.sentiment, ${schema.competitorGeoRankings.sentiment})`,
+          checkedAt: sql`now()`,
+        },
+      })
+      .returning();
+  }
+
   async getCompetitorGeoRankings(
     competitorId: string,
     opts?: { runId?: string; since?: Date },
