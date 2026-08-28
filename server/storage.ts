@@ -1022,6 +1022,7 @@ import { DatabaseStorage } from "./databaseStorage";
 import { brandsStorage } from "./storage/brandsStorage";
 import { chatbotStorage } from "./storage/chatbotStorage";
 import { competitorsStorage } from "./storage/competitorsStorage";
+import { factAgentStorage } from "./storage/factAgentStorage";
 import { identityStorage } from "./storage/identityStorage";
 import { jobsStorage } from "./storage/jobsStorage";
 
@@ -1030,6 +1031,7 @@ function databaseStorageObject(): Omit<
   | keyof typeof brandsStorage
   | keyof typeof chatbotStorage
   | keyof typeof competitorsStorage
+  | keyof typeof factAgentStorage
   | keyof typeof identityStorage
   | keyof typeof jobsStorage
 > {
@@ -1053,4 +1055,5 @@ export const storage: IStorage = {
   ...competitorsStorage,
   ...jobsStorage,
   ...brandsStorage,
+  ...factAgentStorage,
 };
