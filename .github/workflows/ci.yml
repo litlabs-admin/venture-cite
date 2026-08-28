@@ -54,6 +54,14 @@ jobs:
       - name: Project skills
         run: npm run skills:setup
 
+      # `shared/schema.ts` is being split into domain modules behind a barrel
+      # (B4). 147 files import it and 25 use `import * as schema`, so a dropped
+      # or renamed export breaks callers at runtime while the compiler stays
+      # quiet about names nothing currently references. The baseline is the
+      # surface as it stood before the split began.
+      - name: Schema export surface
+        run: npm run schema:surface:check
+
       - name: Lint
         run: npm run lint
 
