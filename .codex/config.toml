@@ -1,7 +1,0 @@
-# Project-level Codex configuration.
-#
-# The Buffer MCP server was removed on 2026-08-28. Its OAuth token had expired,
-# so every `codex exec` run in this repository paid two failed transport
-# handshakes before doing any work.
-#
-# Do not put a credential in this file. It is tracked by git.

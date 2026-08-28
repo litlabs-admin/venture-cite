@@ -167,3 +167,11 @@ supabase/.branches/
 # Raw Codex transcripts from the B1p audit fan-out. Tens of megabytes, and the
 # reports and register in .audit/B1p/ carry everything worth keeping.
 .audit/B1p/logs/
+
+# The Codex desktop app owns and rewrites `.codex/config.toml`, including MCP
+# server credentials. It restored a Buffer token here on 2026-08-28 after that
+# server was removed in 6d48adc, so tracking the file means a credential lands in
+# git every time the app rewrites it. `.codex/agents/*.toml` stay tracked; those
+# are ours.
+.codex/config.toml
+.codex/hooks.json
