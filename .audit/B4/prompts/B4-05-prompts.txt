@@ -1,0 +1,60 @@
+Extract the prompts domain into `shared/schema/prompts.ts`.
+
+Modules `identity.ts`, `brands.ts` and `content.ts` already exist. Follow the
+pattern they set exactly: move the tables with the zod builders and type aliases
+beneath them, re-export from the barrel with `export *`, import dependencies
+one directionally.
+
+## What moves
+
+Lines 133 to 362 of `shared/schema.ts`, a contiguous block.
+Confirm the boundary yourself. A comment block above a table belongs to that
+table, not the one before it.
+
+Tables: `promptGenerations`, `brandPrompts`, `promptTags`, `brandPromptTags`, `promptAudiences`, `brandPromptAudiences`, `promptSetHealthRuns`, `promptPhrasingTests`
+
+## References
+
+These reference `brands` and each other. So `prompts.ts` imports `brands` from `./brands`, and nothing imports back into it from identity, brands or content.
+
+Tables outside this module still reference these by foreign key, so anything
+referenced from the barrel must be importable there as a value, the way
+`brands` and `users` already are.
+
+## Membership completeness
+
+The identity extraction left `insertUserSchema` behind and every gate passed,
+because a declaration in the wrong file still exports, compiles and type-checks.
+After moving, search `shared/schema.ts` for each table name and confirm the only
+remaining references are foreign keys from other tables. No zod builder and no
+type alias belonging to these tables may remain.
+
+## What must not change
+
+No column, type, name or default changes. No new migration. No consumer edits.
+
+## Acceptance, in this order
+
+1. `npm run schema:surface:check` prints "Export surface unchanged. 260 exports."
+2. Generated SQL unchanged. Generate from `git show HEAD:shared/schema.ts` and
+   from the working tree into separate directories with
+   `DATABASE_URL="postgresql://u:p@127.0.0.1:1/none" npx drizzle-kit generate --out=<dir> --schema=<file> --dialect=postgresql`,
+   split both on `--> statement-breakpoint`, normalise whitespace, sort, diff.
+   Identical, 271 statements each. Delete any temporary file you create.
+3. `npm run check`
+4. `npm run lint` and `npm run format:check`
+5. `npm test -- --maxWorkers=1`
+
+If the SQL differs you changed the schema. Find what and fix it. Do not explain
+it away.
+
+## Report
+
+Write `.audit/B4/B4-05-prompts-report.md`: the boundary you confirmed, the membership check
+and its result, the import direction, the five gate outputs, `git diff --stat`,
+and whether any consumer file changed.
+
+## This run is non-interactive
+
+Nobody can answer you. Decide, implement, verify, report. Do not end your turn
+with a question.
