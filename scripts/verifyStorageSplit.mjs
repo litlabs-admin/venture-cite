@@ -1,0 +1,133 @@
+#!/usr/bin/env node
+/**
+ * Verifies one B5 storage-module extraction.
+ *
+ * Runs the surface gate, then three checks the gate cannot make on its own:
+ *
+ * - Every method the allocation assigned to this domain actually moved. The gate
+ *   proves nothing broke; it does not prove the plan was carried out. Both B4 and
+ *   B5 have already produced a module that passed every gate while being
+ *   incomplete.
+ * - The gate script itself is unmodified. A dispatch silently edited it during
+ *   the chatbot module. The edit was correct, which is exactly why it needs to be
+ *   surfaced rather than absorbed.
+ * - No method of this domain is left behind in `DatabaseStorage`.
+ *
+ * Usage: node scripts/verifyStorageSplit.mjs <domain> [--skip-tests]
+ */
+
+import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const domain = process.argv[2];
+const skipTests = process.argv.includes("--skip-tests");
+
+if (!domain) {
+  console.error("Usage: node scripts/verifyStorageSplit.mjs <domain>");
+  process.exit(1);
+}
+
+const results = [];
+function run(cmd, args) {
+  try {
+    return {
+      ok: true,
+      out: execFileSync(cmd, args, {
+        cwd: repoRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: true,
+      }),
+    };
+  } catch (error) {
+    return { ok: false, out: `${error.stdout ?? ""}${error.stderr ?? ""}` };
+  }
+}
+function record(name, ok, detail) {
+  results.push({ name, ok });
+  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  ${detail}` : ""}`);
+}
+
+// The gate must be exactly what was committed. An agent that edits its own judge
+// invalidates the judgement, however good the edit.
+{
+  const r = run("git", ["diff", "--stat", "HEAD", "--", "scripts/storageSurface.ts"]);
+  const dirty = r.out.trim().length > 0;
+  record(
+    "gate script unmodified",
+    !dirty,
+    dirty ? "storageSurface.ts was edited by the dispatch" : "",
+  );
+}
+
+{
+  const r = run("npx", [
+    "tsx",
+    "scripts/storageSurface.ts",
+    "--check",
+    ".audit/B5/storage-surface-before.json",
+  ]);
+  record("storage surface", r.ok, r.out.trim().split("\n")[0]);
+}
+
+// Did the plan actually happen?
+{
+  const alloc = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, ".audit", "B5", "allocation.json"), "utf8"),
+  );
+  const expected = alloc[domain] ?? [];
+  const moduleFile = path.join(repoRoot, "server", "storage", `${domain}Storage.ts`);
+
+  if (!fs.existsSync(moduleFile)) {
+    record(`${domain} module exists`, false, `server/storage/${domain}Storage.ts not found`);
+  } else {
+    const moduleSrc = fs.readFileSync(moduleFile, "utf8");
+    const classSrc = fs.readFileSync(path.join(repoRoot, "server", "databaseStorage.ts"), "utf8");
+    const declared = (src, name) => src.includes(`async ${name}(`) || src.includes(`${name}(`);
+
+    const absent = expected.filter((m) => !declared(moduleSrc, m));
+    const leftBehind = expected.filter((m) =>
+      new RegExp(`^  (async )?${m}\\(`, "m").test(classSrc),
+    );
+
+    record(
+      `${domain}: all ${expected.length} allocated methods present`,
+      absent.length === 0,
+      absent.length ? `missing: ${absent.join(", ")}` : "",
+    );
+    record(
+      `${domain}: none left in DatabaseStorage`,
+      leftBehind.length === 0,
+      leftBehind.length ? `still in class: ${leftBehind.join(", ")}` : "",
+    );
+  }
+}
+
+for (const [name, script] of [
+  ["typecheck", "check"],
+  ["lint", "lint"],
+  ["format", "format:check"],
+]) {
+  const r = run("npm", ["run", script, "--silent"]);
+  record(name, r.ok, r.ok ? "" : r.out.trim().split("\n").slice(-2).join(" "));
+}
+
+if (!skipTests) {
+  const r = run("npm", ["test", "--silent", "--", "--maxWorkers=1"]);
+  record("tests", r.ok, (r.out.split("\n").find((l) => l.includes("Tests ")) ?? "").trim());
+}
+
+const failed = results.filter((r) => !r.ok);
+console.log("");
+if (failed.length === 0) {
+  console.log(`All ${results.length} checks pass. ${domain} is safe to commit.`);
+  process.exit(0);
+}
+console.log(
+  `${failed.length} of ${results.length} FAILED: ${failed.map((f) => f.name).join(", ")}`,
+);
+process.exit(1);
