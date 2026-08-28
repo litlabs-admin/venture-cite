@@ -4,12 +4,8 @@
  * `server/`.
  *
  * Why: AGENTS.md requires `logger` for server logs. An audit on 2026-08-28 found
- * the rule holds everywhere except two known files, and one of those,
- * `server/lib/aiLogger.ts`, prints unredacted AI payloads to stdout. New
- * violations should surface at the moment they are written, not months later.
- *
- * The two known exceptions are allowed so this hook does not cry wolf. Remove
- * `aiLogger.ts` from the list once phase B3 redacts it.
+ * the rule holds everywhere except `server/log.ts`. New violations should
+ * surface at the moment they are written, not months later.
  */
 
 import fs from "node:fs";
@@ -18,7 +14,6 @@ import process from "node:process";
 
 const ALLOWED = new Set([
   "server/log.ts", // Vite-template boot and access logging.
-  "server/lib/aiLogger.ts", // Deliberate AI debug printer. B3 will redact it.
 ]);
 
 let raw = "";

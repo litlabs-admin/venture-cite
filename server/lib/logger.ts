@@ -39,10 +39,68 @@ const SENSITIVE_KEYS = new Set([
   "recipientEmail",
 ]);
 const EMAIL_ADDRESS = /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/g;
+const AI_LOG_STRING_LIMIT = 2000;
+const AI_BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi;
+const AI_API_KEY = /\b(?:sk|rk|pk)[_-][A-Za-z0-9_-]{8,}\b/g;
+const AI_JWT = /\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
+const AI_SECRET_ASSIGNMENT =
+  /\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|secret|token)\s*[:=]\s*(?:Bearer\s+)?[^\s,;}'"`]+/gi;
+const NORMALIZED_SENSITIVE_KEYS = new Set([
+  "password",
+  "passwordhash",
+  "accesstoken",
+  "refreshtoken",
+  "authorization",
+  "token",
+  "secret",
+  "apikey",
+  "email",
+  "firstname",
+  "lastname",
+  "fullname",
+  "company",
+  "organization",
+  "contactemail",
+  "contactname",
+  "contactcompany",
+  "recipientemail",
+]);
 
 function sanitizeLogString(value: string): string {
   const scrubbed = value.replace(EMAIL_ADDRESS, "[redacted]");
   return scrubbed.length > 200 ? scrubbed.slice(0, 197) + "…" : scrubbed;
+}
+
+function isSensitiveKey(key: string): boolean {
+  return NORMALIZED_SENSITIVE_KEYS.has(key.replace(/[_-]/g, "").toLowerCase());
+}
+
+function sanitizeAiLogString(value: string): string {
+  const scrubbed = value
+    .replace(EMAIL_ADDRESS, "[redacted]")
+    .replace(AI_BEARER_TOKEN, "Bearer [redacted]")
+    .replace(AI_API_KEY, "[redacted]")
+    .replace(AI_JWT, "[redacted]")
+    .replace(AI_SECRET_ASSIGNMENT, "[redacted]");
+  return scrubbed.length > AI_LOG_STRING_LIMIT
+    ? scrubbed.slice(0, AI_LOG_STRING_LIMIT - 3) + "..."
+    : scrubbed;
+}
+
+function sanitizeAiLogPayload(value: unknown, depth = 0): unknown {
+  if (depth > 3) return "[truncated]";
+  if (value === null || value === undefined) return value;
+  if (typeof value === "string") return sanitizeAiLogString(value);
+  if (value instanceof Error) return { name: value.name };
+  if (typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    return value.slice(0, 10).map((entry) => sanitizeAiLogPayload(entry, depth + 1));
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = isSensitiveKey(key) ? "[redacted]" : sanitizeAiLogPayload(entry, depth + 1);
+  }
+  return out;
 }
 
 function isLogRecord(value: unknown): value is Record<string, unknown> {
@@ -69,7 +127,9 @@ export function sanitizeLogBody(value: unknown, depth = 0): unknown {
   }
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    if (SENSITIVE_KEYS.has(k)) {
+    if (k === "aiRequest" || k === "aiResponse") {
+      out[k] = sanitizeAiLogPayload(v);
+    } else if (SENSITIVE_KEYS.has(k)) {
       out[k] = "[redacted]";
     } else {
       out[k] = sanitizeLogBody(v, depth + 1);

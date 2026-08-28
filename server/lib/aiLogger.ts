@@ -1,19 +1,19 @@
 import type OpenAI from "openai";
+import { logger } from "./logger";
 
-// Monkey-patches `openai.chat.completions.create` to print every request and
-// response to stdout so you can see exactly what's being sent and received.
-// Works for any OpenAI-SDK-compatible client (OpenAI, OpenRouter, etc.).
-//
-// Writes to console only - no files - so it works on Vercel's ephemeral
-// filesystem. Safe to leave on in production; noisy but cheap.
-//
-// Idempotent: a Symbol-keyed guard prevents re-wrapping if attached twice.
+// Monkey-patches `openai.chat.completions.create` for optional diagnostics.
+// Pino sanitizes the structured payload before it reaches stdout.
 
 const ATTACHED = Symbol.for("venturecite.aiLogger.attached");
+const PAYLOAD_LOGGING_ENABLED = process.env.AI_LOG_PAYLOADS === "true";
 
-function truncate(s: unknown, max = 2000): string {
-  const str = typeof s === "string" ? s : JSON.stringify(s);
-  return str.length > max ? `${str.slice(0, max)}…[+${str.length - max} chars]` : str;
+function messageRoles(messages: unknown): string[] {
+  if (!Array.isArray(messages)) return [];
+  return messages
+    .map((message) =>
+      typeof message === "object" && message ? (message as { role?: unknown }).role : null,
+    )
+    .filter((role): role is string => typeof role === "string");
 }
 
 export function attachAiLogger(openai: OpenAI): void {
@@ -24,26 +24,50 @@ export function attachAiLogger(openai: OpenAI): void {
   const original = client.chat.completions.create.bind(client.chat.completions);
   client.chat.completions.create = async (body: any, options?: any) => {
     const started = Date.now();
-    const tag = `[ai ${body?.model ?? "?"}]`;
+    const model = body?.model ?? "?";
     try {
-      console.log(
-        `${tag} → request`,
-        truncate({
-          model: body?.model,
-          messages: body?.messages,
-          response_format: body?.response_format,
-          max_tokens: body?.max_tokens,
-          temperature: body?.temperature,
-        }),
-      );
+      if (PAYLOAD_LOGGING_ENABLED) {
+        logger.info(
+          {
+            aiRequest: {
+              model,
+              roles: messageRoles(body?.messages),
+              messages: body?.messages,
+              responseFormat: body?.response_format,
+              maxTokens: body?.max_tokens,
+              temperature: body?.temperature,
+            },
+          },
+          "ai request",
+        );
+      }
+
       const result = await original(body, options);
-      const content = result?.choices?.[0]?.message?.content ?? "";
-      console.log(`${tag} ← response (${Date.now() - started}ms)`, truncate(content));
+
+      if (PAYLOAD_LOGGING_ENABLED) {
+        logger.info(
+          {
+            aiResponse: {
+              model,
+              durationMs: Date.now() - started,
+              content: result?.choices?.[0]?.message?.content ?? "",
+            },
+          },
+          "ai response",
+        );
+      }
+
       return result;
     } catch (err) {
-      console.error(
-        `${tag} ✗ error (${Date.now() - started}ms)`,
-        err instanceof Error ? err.message : err,
+      logger.warn(
+        {
+          aiFailure: {
+            model,
+            durationMs: Date.now() - started,
+            errorName: err instanceof Error ? err.name : "UnknownError",
+          },
+        },
+        "ai request failed",
       );
       throw err;
     }
