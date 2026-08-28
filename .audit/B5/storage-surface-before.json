@@ -1,0 +1,1574 @@
+{
+  "interfaceMethods": [
+    "acceptFact",
+    "addBrandNameVariation",
+    "addCompetitorNameVariation",
+    "archiveBrandPrompt",
+    "archiveBrandPrompts",
+    "archiveChatbotThread",
+    "archiveSuggestedPrompts",
+    "attachPromptAudience",
+    "attachPromptTag",
+    "bumpCitationRunProgress",
+    "cancelContentJob",
+    "claimAgentTask",
+    "claimContentJobForSlice",
+    "claimPendingContentJob",
+    "clearTourStateForBrand",
+    "completeContentJobSlice",
+    "countCitedRankingsForArticle",
+    "countSentimentCallsForBrandSince",
+    "createAgentTask",
+    "createAlertHistory",
+    "createAlertSetting",
+    "createArticle",
+    "createBetaInviteCode",
+    "createBofuContent",
+    "createBrand",
+    "createBrandFact",
+    "createBrandHallucination",
+    "createBrandMention",
+    "createBrandPrompt",
+    "createBrandVisibilitySnapshot",
+    "createChatbotThread",
+    "createCitation",
+    "createCitationQuality",
+    "createCitationRun",
+    "createCommunityPost",
+    "createCompetitor",
+    "createCompetitorCitationSnapshot",
+    "createCompetitorGeoRanking",
+    "createCompetitorGeoRankings",
+    "createDistribution",
+    "createDraftArticle",
+    "createFaqItem",
+    "createGeoRanking",
+    "createKeywordResearch",
+    "createListicle",
+    "createMetricsSnapshot",
+    "createPhrasingTest",
+    "createPromptAudience",
+    "createPromptGeneration",
+    "createPromptTag",
+    "createRevision",
+    "createScanJob",
+    "createScrapePage",
+    "createScrapeRun",
+    "createSetHealthRun",
+    "createUser",
+    "createWikipediaMention",
+    "deleteAlertSetting",
+    "deleteAllMentionsForBrand",
+    "deleteArticle",
+    "deleteBetaInviteCode",
+    "deleteBofuContent",
+    "deleteBrand",
+    "deleteBrandFact",
+    "deleteBrandHallucination",
+    "deleteBrandMention",
+    "deleteBrandPromptsByBrandId",
+    "deleteCitationQuality",
+    "deleteCommunityPost",
+    "deleteCompetitor",
+    "deleteExpiredFactScrapeCache",
+    "deleteExpiredLlmConcurrencySlots",
+    "deleteFaqItem",
+    "deleteKeywordResearch",
+    "deleteListicle",
+    "deleteManyBrandMentions",
+    "deleteOldFactScrapeLogs",
+    "deleteOldFactScrapePages",
+    "deleteOldFactScrapeRuns",
+    "deleteOldTourEvents",
+    "deletePromptAudience",
+    "deletePromptTag",
+    "deleteTrackedContentUrlBySource",
+    "deleteWikipediaMention",
+    "detachPromptAudience",
+    "detachPromptTag",
+    "dismissFact",
+    "enqueueContentJob",
+    "failContentJobSlice",
+    "failStaleScanJobs",
+    "failStuckContentJobs",
+    "findSimilarFaqQuestion",
+    "findSlicePendingRuns",
+    "finishContentJobSlice",
+    "getActiveCitationRuns",
+    "getActiveContentJob",
+    "getActiveScanJobForBrand",
+    "getActiveScanJobsForUser",
+    "getAgentTaskById",
+    "getAlertHistory",
+    "getAlertSettingById",
+    "getAlertSettings",
+    "getAllBetaInviteCodes",
+    "getAnalytics",
+    "getArticleById",
+    "getArticleByJobId",
+    "getArticles",
+    "getArticlesByUserId",
+    "getArticlesByUserIdWithStatus",
+    "getAudienceIdsByPromptId",
+    "getBetaInviteCodeByCode",
+    "getBofuContent",
+    "getBofuContentById",
+    "getBrandById",
+    "getBrandByIdForUser",
+    "getBrandFactById",
+    "getBrandFactScrapeEnabled",
+    "getBrandFactSheetConflicts",
+    "getBrandFacts",
+    "getBrandHallucinationById",
+    "getBrandHallucinations",
+    "getBrandMention",
+    "getBrandMentionById",
+    "getBrandMentions",
+    "getBrandPromptById",
+    "getBrandPromptsByBrandId",
+    "getBrandVisibilitySnapshots",
+    "getBrands",
+    "getBrandsByUserId",
+    "getCachedSentiment",
+    "getChatbotThread",
+    "getChatbotThreadMessages",
+    "getCitationQualities",
+    "getCitationQualityById",
+    "getCitationQualityStats",
+    "getCitationRunById",
+    "getCitationRunLiveState",
+    "getCitationRunsByBrandId",
+    "getCitations",
+    "getCitationsByUserId",
+    "getCitedRelevanceStats",
+    "getCommunityPostById",
+    "getCommunityPosts",
+    "getCompetitorById",
+    "getCompetitorCitationSnapshots",
+    "getCompetitorGeoRankings",
+    "getCompetitorGeoRankingsByPromptRuns",
+    "getCompetitorGeoRankingsForCompetitors",
+    "getCompetitorLatestCitations",
+    "getCompetitorLeaderboard",
+    "getCompetitors",
+    "getContentJobById",
+    "getContentJobByIdAdmin",
+    "getDistributionById",
+    "getDistributions",
+    "getFactScrapeCache",
+    "getFaqItemById",
+    "getFaqItems",
+    "getGeoRankings",
+    "getGeoRankingsByArticleIds",
+    "getGeoRankingsByBrandPromptIds",
+    "getGeoRankingsByPlatform",
+    "getGeoRankingsByRunId",
+    "getGeoToolsSummary",
+    "getHallucinationStats",
+    "getInFlightScrapeRun",
+    "getKeywordResearch",
+    "getKeywordResearchById",
+    "getLastCompletedScanForBrand",
+    "getLastCompletedScrapeRunAt",
+    "getLastGeoSignalRunAt",
+    "getLastGeoSignalSummary",
+    "getLatestAiAudienceCreatedAt",
+    "getLatestBrandVisibility",
+    "getLatestCompletedScrapeRun",
+    "getLatestSetHealthRun",
+    "getListicleById",
+    "getListicles",
+    "getMaxBrandPromptOrderIndex",
+    "getMentionStatsForBrand",
+    "getMetricsHistory",
+    "getMonthlyCostCap",
+    "getMostRecentManualScanForBrand",
+    "getOwnedMentionIds",
+    "getPhrasingTestById",
+    "getPhrasingTestsByPromptId",
+    "getPromptAudienceCounts",
+    "getPromptAudienceMapByBrandId",
+    "getPromptAudiencesByBrandId",
+    "getPromptCitationCounts",
+    "getPromptGenerationsByBrandId",
+    "getPromptTagCounts",
+    "getPromptTagsByBrandId",
+    "getPromptTagsMapByBrandId",
+    "getRecentArticlesByBrandId",
+    "getRecentCompletedContentJob",
+    "getRecentRankingsForRun",
+    "getRevisionById",
+    "getScanJob",
+    "getScrapePageById",
+    "getScrapeRunById",
+    "getSourceHealth",
+    "getSystemState",
+    "getTagIdsByPromptId",
+    "getTopKeywordOpportunities",
+    "getTourState",
+    "getTrackedContentUrlsByBrandId",
+    "getUser",
+    "getUserByStripeCustomerId",
+    "getUserByUsername",
+    "getUserUsage",
+    "getVisibilityProgress",
+    "getWeeklyCitationTrend",
+    "getWikipediaMentions",
+    "ignoreCompetitor",
+    "incrementArticleCitations",
+    "incrementArticleUsage",
+    "incrementArticleViews",
+    "incrementCitationRunSelfCitations",
+    "incrementMonthlyCostCents",
+    "incrementScrapeRunCounters",
+    "insertChatbotMessage",
+    "insertFactScrapeLog",
+    "listAdvanceablePendingJobs",
+    "listBrandsWithMentionMonitoring",
+    "listChatbotThreads",
+    "listFactScrapeLogsForRun",
+    "listFactsByRunIdSince",
+    "listMentionsForBrand",
+    "listRevisions",
+    "listScrapePagesForRun",
+    "listScrapeRunsForBrand",
+    "markAutopilotAttempt",
+    "patchTourState",
+    "promoteSuggestionToTracked",
+    "pruneChatbotMessages",
+    "pruneOldScanJobs",
+    "pruneOldSentimentCache",
+    "recomputeCitationRunAggregate",
+    "recordCurrentMetrics",
+    "recordGeoSignalRun",
+    "recordTourEvents",
+    "releaseContentJobSliceLease",
+    "renewContentJobSliceLease",
+    "reorderBrandPrompts",
+    "resetArticleForCancelledContentJob",
+    "resetMonthlyUsage",
+    "resolveBrandHallucination",
+    "restoreChatbotThread",
+    "setArticleDraft",
+    "setArticleFailed",
+    "setArticleGeneratingForContentJob",
+    "setArticleGeneratingFromDraft",
+    "setArticleReady",
+    "setBrandFactScrapeEnabled",
+    "setBrandMonitorMentions",
+    "setBrandPromptPaused",
+    "setBrandPromptStatus",
+    "setChatbotThreadTitle",
+    "setPhrasingTestResults",
+    "setSystemState",
+    "setVisibilityStep",
+    "softDeleteBrand",
+    "stampSelfCitation",
+    "touchChatbotThread",
+    "transitionAutopilotFromFailedToPending",
+    "transitionScrapeRunStatusCAS",
+    "tryInsertBrandMention",
+    "tryInsertListicle",
+    "tryInsertWikipediaMention",
+    "unsetVisibilityStep",
+    "updateAgentTask",
+    "updateAlertSetting",
+    "updateAnalytics",
+    "updateArticle",
+    "updateArticleIfVersion",
+    "updateBofuContent",
+    "updateBrand",
+    "updateBrandFact",
+    "updateBrandHallucination",
+    "updateBrandIfVersion",
+    "updateBrandMention",
+    "updateBrandMentionStatus",
+    "updateBrandPromptText",
+    "updateBrandsUsed",
+    "updateCitationQuality",
+    "updateCitationRun",
+    "updateCommunityPost",
+    "updateCompetitor",
+    "updateContentJob",
+    "updateContentJobResponseId",
+    "updateDistribution",
+    "updateFaqItem",
+    "updateGeoRanking",
+    "updateKeywordResearch",
+    "updateListicle",
+    "updatePromptTag",
+    "updateScanJob",
+    "updateScrapePageStatus",
+    "updateScrapeRunStatus",
+    "updateUserStripeInfo",
+    "updateWikipediaMention",
+    "upsertCachedSentiment",
+    "upsertFactScrapeCache",
+    "upsertSourceHealth",
+    "upsertTrackedContentUrl",
+    "useBetaInviteCode"
+  ],
+  "implementations": {
+    "getUser": {
+      "body": "{ const result = await db.select().from(schema.users).where(eq(schema.users.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getUserByUsername": {
+      "body": "{ const result = await db.select().from(schema.users).where(eq(schema.users.email, username)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createUser": {
+      "body": "{ // No trial granted here. Stripe owns the trial now: a new account starts // at \"pending\", the app is gated until they pick a plan, and the 14 days // live on the Stripe subscription. (This method also has no callers in // practice - real signups create the users row via the handle_new_user // trigger - but it must not disagree with the trigger if that changes.) const result = await db .insert(schema.users) .values({ ...insertUser, accessTier: insertUser.accessTier ?? \"pending\", isAdmin: insertUser.isAdmin ?? 0, articlesUsedThisMonth: insertUser.articlesUsedThisMonth ?? 0, brandsUsed: insertUser.brandsUsed ?? 0, usageResetDate: insertUser.usageResetDate ?? new Date(), }) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCitations": {
+      "body": "{ const q = db.select().from(schema.citations); if (opts?.limit !== undefined) { return await q.limit(opts.limit).offset(opts.offset ?? 0); } return await q; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCitationsByUserId": {
+      "body": "{ const q = db.select().from(schema.citations).where(eq(schema.citations.userId, userId)); if (opts?.limit !== undefined) { return await q.limit(opts.limit).offset(opts.offset ?? 0); } return await q; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createCitation": {
+      "body": "{ const result = await db.insert(schema.citations).values(insertCitation).returning(); const analyticsRows = await db.select().from(schema.analytics); if (analyticsRows.length > 0) { await db .update(schema.analytics) .set({ totalCitations: sql`${schema.analytics.totalCitations} + 1`, updatedAt: new Date(), }) .where(eq(schema.analytics.id, analyticsRows[0].id)); } return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getAnalytics": {
+      "body": "{ let analyticsRows = await db.select().from(schema.analytics); if (analyticsRows.length === 0) { const created = await db .insert(schema.analytics) .values({ totalCitations: 0, weeklyGrowth: \"0\", avgPosition: \"0\", monthlyTraffic: 0, }) .returning(); analyticsRows = created; } const row = analyticsRows[0]; const allArticles = await db.select().from(schema.articles); const totalCitations = allArticles.reduce( (sum, article) => sum + (article.citationCount || 0), 0, ); const totalViews = allArticles.reduce((sum, article) => sum + (article.viewCount || 0), 0); const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); const recentArticles = allArticles.filter((a) => new Date(a.createdAt) > oneWeekAgo); const weeklyGrowth = recentArticles.length > 0 ? Math.round((recentArticles.length / Math.max(allArticles.length, 1)) * 100) : 0; return { id: row.id, totalCitations: totalCitations, weeklyGrowth: weeklyGrowth.toString(), avgPosition: row.avgPosition, monthlyTraffic: totalViews, updatedAt: new Date(), }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateAnalytics": {
+      "body": "{ const existing = await db.select().from(schema.analytics); if (existing.length > 0) { const result = await db .update(schema.analytics) .set({ ...analyticsUpdate, updatedAt: new Date() }) .where(eq(schema.analytics.id, existing[0].id)) .returning(); return result[0]; } const result = await db .insert(schema.analytics) .values({ ...analyticsUpdate, updatedAt: new Date(), }) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createBrand": {
+      "body": "{ const result = await db .insert(schema.brands) .values({ ...insertBrand, tone: insertBrand.tone ?? \"professional\", }) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrands": {
+      "body": "{ return await db.select().from(schema.brands).where(isNull(schema.brands.deletedAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandsByUserId": {
+      "body": "{ return await db .select() .from(schema.brands) .where(and(eq(schema.brands.userId, userId), isNull(schema.brands.deletedAt))); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandById": {
+      "body": "{ const result = await db .select() .from(schema.brands) .where(and(eq(schema.brands.id, id), isNull(schema.brands.deletedAt))); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandByIdForUser": {
+      "body": "{ const result = await db .select() .from(schema.brands) .where( and( eq(schema.brands.id, id), eq(schema.brands.userId, userId), isNull(schema.brands.deletedAt), ), ); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "markAutopilotAttempt": {
+      "body": "{ // Increment in SQL, not read-modify-write: the cron sweep and a boot-time // resume can touch the same brand concurrently, and a lost increment would // let a broken brand retry past its cap. await db.execute(sql` UPDATE brands SET autopilot_attempts = autopilot_attempts + 1, autopilot_last_attempt_at = now() WHERE id = ${brandId} `); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateBrand": {
+      "body": "{ const result = await db .update(schema.brands) .set({ ...brandUpdate, updatedAt: new Date(), version: sql`${schema.brands.version} + 1`, }) .where(eq(schema.brands.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateBrandIfVersion": {
+      "body": "{ const result = await db .update(schema.brands) .set({ ...brandUpdate, updatedAt: new Date(), version: sql`${schema.brands.version} + 1`, }) .where(and(eq(schema.brands.id, id), eq(schema.brands.version, expectedVersion))) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "transitionAutopilotFromFailedToPending": {
+      "body": "{ const result = await db .update(schema.brands) .set({ autopilotStatus: \"pending\", autopilotError: null, updatedAt: new Date(), }) .where(and(eq(schema.brands.id, brandId), eq(schema.brands.autopilotStatus, \"failed\"))) .returning({ id: schema.brands.id }); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteBrand": {
+      "body": "{ // Hard-delete primitive - used by the brand purge cron after the // grace window. Application code should call softDeleteBrand // instead so users get a 30-day undo window. The FK cascade // (migrations/0003_fk_hardening.sql) cleans up child rows. await this.clearTourStateForBrand(id); const result = await db.delete(schema.brands).where(eq(schema.brands.id, id)).returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getTourState": {
+      "body": "{ const [row] = await db .select({ onboardingState: schema.users.onboardingState }) .from(schema.users) .where(eq(schema.users.id, userId)) .limit(1); const state = (row?.onboardingState ?? {}) as Record<string, unknown>; const tours = (state.tours as Record<string, unknown> | undefined) ?? {}; return tours; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "patchTourState": {
+      "body": "{ // Read-modify-write of the whole onboarding_state column, so it must // be atomic: a SELECT ... FOR UPDATE row lock serializes concurrent // tour patches AND blocks the sibling /api/onboarding/state writer // (any UPDATE of this row waits on the lock) for the duration of the // transaction. Without this, two concurrent writers each computed // from a stale snapshot and the second clobbered the first (lost // updates, including legacy onboarding flags). return await db.transaction(async (tx) => { const [current] = await tx .select({ onboardingState: schema.users.onboardingState }) .from(schema.users) .where(eq(schema.users.id, userId)) .limit(1) .for(\"update\"); const existing = (current?.onboardingState ?? {}) as Record<string, unknown>; const tours = (existing.tours ?? {}) as Record<string, unknown>; const next = applyTourStateOp(tours, op, args); const merged = { ...existing, tours: next }; const [updated] = await tx .update(schema.users) .set({ onboardingState: merged }) .where(eq(schema.users.id, userId)) .returning({ onboardingState: schema.users.onboardingState }); const newTours = ((updated?.onboardingState as Record<string, unknown> | undefined)?.tours ?? {}) as Record<string, unknown>; return newTours; }); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "clearTourStateForBrand": {
+      "body": "{ // Strip perBrand[brandId] sub-tree from every user that has it. // Called from deleteBrand (synchronous hard delete) AND directly // from the brand-purge cron (runBrandPurgeJob raw-deletes the row // without going through deleteBrand, so it must call this itself - // otherwise the JSONB sub-tree is orphaned forever on purge). await db.execute(sql` UPDATE users SET onboarding_state = jsonb_set( onboarding_state, '{tours,perBrand}', COALESCE(onboarding_state->'tours'->'perBrand', '{}'::jsonb) - ${brandId} ) WHERE onboarding_state->'tours'->'perBrand' ? ${brandId} `); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "recordTourEvents": {
+      "body": "{ if (events.length === 0) return 0; await db .insert(schema.tourEvents) .values(events) .onConflictDoNothing({ target: schema.tourEvents.id }); return events.length; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteOldTourEvents": {
+      "body": "{ // Retain on server_received_at (server clock), not occurred_at // (clamped, but still client-influenced) - retention must key off // a trusted column so rows can't dodge or trigger early cleanup. const result = await db.execute(sql` DELETE FROM tour_events WHERE server_received_at < ${olderThan.toISOString()} `); return (result as unknown as { rowCount?: number }).rowCount ?? 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "softDeleteBrand": {
+      "body": "{ const now = new Date(); const scheduledFor = new Date(now.getTime() + graceDays * 24 * 60 * 60 * 1000); const result = await db .update(schema.brands) .set({ deletedAt: now, deletionScheduledFor: scheduledFor }) .where(and(eq(schema.brands.id, id), isNull(schema.brands.deletedAt))) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createArticle": {
+      "body": "{ const result = await db .insert(schema.articles) .values({ ...insertArticle, author: insertArticle.author ?? \"GEO Platform\", viewCount: 0, citationCount: 0, }) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getArticles": {
+      "body": "{ const q = db.select().from(schema.articles); if (opts?.limit !== undefined) { return await q.limit(opts.limit).offset(opts.offset ?? 0); } return await q; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getArticlesByUserId": {
+      "body": "{ const limit = opts?.limit ?? 100; const offset = opts?.offset ?? 0; const result = await db .select({ articles: schema.articles }) .from(schema.articles) .innerJoin(schema.brands, eq(schema.articles.brandId, schema.brands.id)) .where(and(eq(schema.brands.userId, userId), isNull(schema.brands.deletedAt))) .orderBy(desc(schema.articles.createdAt)) .limit(limit) .offset(offset); return result.map((r) => r.articles); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getArticleById": {
+      "body": "{ const result = await db.select().from(schema.articles).where(eq(schema.articles.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateArticle": {
+      "body": "{ const result = await db .update(schema.articles) .set({ ...articleUpdate, updatedAt: new Date(), version: sql`${schema.articles.version} + 1`, }) .where(eq(schema.articles.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateArticleIfVersion": {
+      "body": "{ const result = await db .update(schema.articles) .set({ ...articleUpdate, updatedAt: new Date(), version: sql`${schema.articles.version} + 1`, }) .where(and(eq(schema.articles.id, id), eq(schema.articles.version, expectedVersion))) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteArticle": {
+      "body": "{ const result = await db.delete(schema.articles).where(eq(schema.articles.id, id)).returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "incrementArticleViews": {
+      "body": "{ await db .update(schema.articles) .set({ viewCount: sql`${schema.articles.viewCount} + 1` }) .where(eq(schema.articles.id, id)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "incrementArticleCitations": {
+      "body": "{ await db .update(schema.articles) .set({ citationCount: sql`${schema.articles.citationCount} + 1` }) .where(eq(schema.articles.id, id)); const analyticsRows = await db.select().from(schema.analytics); if (analyticsRows.length > 0) { await db .update(schema.analytics) .set({ totalCitations: sql`${schema.analytics.totalCitations} + 1`, updatedAt: new Date(), }) .where(eq(schema.analytics.id, analyticsRows[0].id)); } }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createDistribution": {
+      "body": "{ const result = await db.insert(schema.distributions).values(insertDistribution).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getDistributions": {
+      "body": "{ if (articleId) { return await db .select() .from(schema.distributions) .where(eq(schema.distributions.articleId, articleId)); } return await db.select().from(schema.distributions); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getDistributionById": {
+      "body": "{ const result = await db .select() .from(schema.distributions) .where(eq(schema.distributions.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateDistribution": {
+      "body": "{ const result = await db .update(schema.distributions) .set(update) .where(eq(schema.distributions.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createGeoRanking": {
+      "body": "{ // onConflictDoNothing guards the partial unique index on // (run_id, brand_prompt_id, ai_platform) - migration 0085. The unlocked // kickoff-inline run and the cron drain can otherwise both write the same // (run, prompt, platform) cell, and the run aggregate COUNT(*)/SUM would // then double-count, corrupting total_checks / citation_rate. const result = await db .insert(schema.geoRankings) .values(insertRanking) .onConflictDoNothing() .returning(); if (result[0]) return result[0]; // Conflict: a row for this (run, prompt, platform) already exists - the // index only fires when both run_id and brand_prompt_id are non-null, so // both are safe to filter on here. Return the existing row so the caller's // contract (always get a row back) holds. const [existing] = await db .select() .from(schema.geoRankings) .where( and( eq(schema.geoRankings.runId, insertRanking.runId as string), eq(schema.geoRankings.brandPromptId, insertRanking.brandPromptId as string), eq(schema.geoRankings.aiPlatform, insertRanking.aiPlatform), ), ) .limit(1); return existing; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getGeoRankings": {
+      "body": "{ if (articleId) { return await db .select() .from(schema.geoRankings) .where(eq(schema.geoRankings.articleId, articleId)); } return await db.select().from(schema.geoRankings); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getGeoRankingsByPlatform": {
+      "body": "{ return await db .select() .from(schema.geoRankings) .where(eq(schema.geoRankings.aiPlatform, platform)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "countCitedRankingsForArticle": {
+      "body": "{ const result = await db .select({ count: sql<number>`count(*)::int` }) .from(schema.geoRankings) .where(and(eq(schema.geoRankings.articleId, articleId), eq(schema.geoRankings.isCited, 1))); return result[0]?.count ?? 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getGeoRankingsByBrandPromptIds": {
+      "body": "{ if (ids.length === 0) return []; const conditions = [inArray(schema.geoRankings.brandPromptId, ids)]; if (sinceDate) conditions.push(gte(schema.geoRankings.checkedAt, sinceDate)); return await db .select() .from(schema.geoRankings) .where(and(...conditions)) .orderBy(desc(schema.geoRankings.checkedAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getPromptCitationCounts": {
+      "body": "{ if (promptIds.length === 0) return []; return await db .select({ brandPromptId: schema.geoRankings.brandPromptId, checks: sql<number>`count(*)::int`, cited: sql<number>`count(*) filter (where is_cited = 1)::int`, }) .from(schema.geoRankings) .where(inArray(schema.geoRankings.brandPromptId, promptIds)) .groupBy(schema.geoRankings.brandPromptId); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCitedRelevanceStats": {
+      "body": "{ if (promptIds.length === 0) return { cited: 0, scored: 0, avgRelevance: null }; const [result] = await db .select({ cited: sql<number>`count(*) filter (where is_cited = 1)::int`, scored: sql<number>`count(relevance_score) filter (where is_cited = 1)::int`, avgRelevance: sql< number | null >`(avg(relevance_score) filter (where is_cited = 1))::float8`, }) .from(schema.geoRankings) .where(inArray(schema.geoRankings.brandPromptId, promptIds)); return result ?? { cited: 0, scored: 0, avgRelevance: null }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getWeeklyCitationTrend": {
+      "body": "{ if (promptIds.length === 0) return []; const weekStart = sql<string>`date_trunc('week', ${schema.geoRankings.checkedAt})::date`; return await db .select({ weekStart, total: sql<number>`count(*)::int`, cited: sql<number>`count(*) filter (where is_cited = 1)::int`, }) .from(schema.geoRankings) .where( and( inArray(schema.geoRankings.brandPromptId, promptIds), gte(schema.geoRankings.checkedAt, since), ), ) .groupBy(weekStart) .orderBy(weekStart); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getGeoRankingsByArticleIds": {
+      "body": "{ if (ids.length === 0) return []; const conditions = [inArray(schema.geoRankings.articleId, ids)]; if (sinceDate) conditions.push(gte(schema.geoRankings.checkedAt, sinceDate)); return await db .select() .from(schema.geoRankings) .where(and(...conditions)) .orderBy(desc(schema.geoRankings.checkedAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateGeoRanking": {
+      "body": "{ const [row] = await db .update(schema.geoRankings) .set(update) .where(eq(schema.geoRankings.id, id)) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createBrandPrompt": {
+      "body": "{ const [row] = await db.insert(schema.brandPrompts).values(p).returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandPromptsByBrandId": {
+      "body": "{ const status = opts.status ?? \"tracked\"; const where = status === \"all\" ? eq(schema.brandPrompts.brandId, brandId) : and(eq(schema.brandPrompts.brandId, brandId), eq(schema.brandPrompts.status, status)); return await db .select() .from(schema.brandPrompts) .where(where) .orderBy(asc(schema.brandPrompts.orderIndex)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteBrandPromptsByBrandId": {
+      "body": "{ await db.delete(schema.brandPrompts).where(eq(schema.brandPrompts.brandId, brandId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "archiveBrandPrompts": {
+      "body": "{ // Archive every tracked prompt for this brand. Does not touch // suggestions - call archiveSuggestedPrompts for those. await db .update(schema.brandPrompts) .set({ isActive: 0, status: \"archived\" }) .where( and(eq(schema.brandPrompts.brandId, brandId), eq(schema.brandPrompts.status, \"tracked\")), ); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "archiveSuggestedPrompts": {
+      "body": "{ await db .update(schema.brandPrompts) .set({ isActive: 0, status: \"archived\" }) .where( and(eq(schema.brandPrompts.brandId, brandId), eq(schema.brandPrompts.status, \"suggested\")), ); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateBrandPromptText": {
+      "body": "{ const [row] = await db .update(schema.brandPrompts) .set({ prompt }) .where(eq(schema.brandPrompts.id, id)) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "archiveBrandPrompt": {
+      "body": "{ await db .update(schema.brandPrompts) .set({ isActive: 0, status: \"archived\" }) .where(eq(schema.brandPrompts.id, id)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setBrandPromptStatus": {
+      "body": "{ const [row] = await db .update(schema.brandPrompts) .set({ status, isActive: status === \"tracked\" ? 1 : 0 }) .where(eq(schema.brandPrompts.id, id)) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandPromptById": {
+      "body": "{ const [row] = await db.select().from(schema.brandPrompts).where(eq(schema.brandPrompts.id, id)); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setBrandPromptPaused": {
+      "body": "{ const [row] = await db .update(schema.brandPrompts) .set({ paused }) .where(eq(schema.brandPrompts.id, id)) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getPromptTagsByBrandId": {
+      "body": "{ return db .select() .from(schema.promptTags) .where(eq(schema.promptTags.brandId, brandId)) .orderBy(asc(schema.promptTags.name)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getPromptTagCounts": {
+      "body": "{ const rows = await db .select({ tagId: schema.brandPromptTags.tagId, count: sql<number>`count(*)::int`, }) .from(schema.brandPromptTags) .innerJoin(schema.promptTags, eq(schema.promptTags.id, schema.brandPromptTags.tagId)) .where(eq(schema.promptTags.brandId, brandId)) .groupBy(schema.brandPromptTags.tagId); const out: Record<string, number> = {}; for (const r of rows) out[r.tagId] = r.count; return out; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createPromptTag": {
+      "body": "{ const [row] = await db .insert(schema.promptTags) .values({ brandId: t.brandId, name: t.name, color: t.color ?? null }) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updatePromptTag": {
+      "body": "{ const [row] = await db .update(schema.promptTags) .set(update) .where(eq(schema.promptTags.id, id)) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deletePromptTag": {
+      "body": "{ await db.delete(schema.promptTags).where(eq(schema.promptTags.id, id)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getTagIdsByPromptId": {
+      "body": "{ const rows = await db .select({ tagId: schema.brandPromptTags.tagId }) .from(schema.brandPromptTags) .where(eq(schema.brandPromptTags.brandPromptId, promptId)); return rows.map((r) => r.tagId); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getPromptTagsMapByBrandId": {
+      "body": "{ const rows = await db .select({ brandPromptId: schema.brandPromptTags.brandPromptId, tagId: schema.brandPromptTags.tagId, }) .from(schema.brandPromptTags) .innerJoin(schema.promptTags, eq(schema.promptTags.id, schema.brandPromptTags.tagId)) .where(eq(schema.promptTags.brandId, brandId)); const out: Record<string, string[]> = {}; for (const r of rows) { (out[r.brandPromptId] ??= []).push(r.tagId); } return out; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "attachPromptTag": {
+      "body": "{ await db .insert(schema.brandPromptTags) .values({ brandPromptId: promptId, tagId }) .onConflictDoNothing(); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "detachPromptTag": {
+      "body": "{ await db .delete(schema.brandPromptTags) .where( and( eq(schema.brandPromptTags.brandPromptId, promptId), eq(schema.brandPromptTags.tagId, tagId), ), ); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getPromptAudiencesByBrandId": {
+      "body": "{ return db .select() .from(schema.promptAudiences) .where(eq(schema.promptAudiences.brandId, brandId)) .orderBy(asc(schema.promptAudiences.name)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getPromptAudienceCounts": {
+      "body": "{ const rows = await db .select({ audienceId: schema.brandPromptAudiences.audienceId, count: sql<number>`count(*)::int`, }) .from(schema.brandPromptAudiences) .innerJoin( schema.promptAudiences, eq(schema.promptAudiences.id, schema.brandPromptAudiences.audienceId), ) .where(eq(schema.promptAudiences.brandId, brandId)) .groupBy(schema.brandPromptAudiences.audienceId); const out: Record<string, number> = {}; for (const r of rows) out[r.audienceId] = r.count; return out; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createPromptAudience": {
+      "body": "{ const [row] = await db .insert(schema.promptAudiences) .values({ brandId: a.brandId, name: a.name, description: a.description ?? null, funnelStage: a.funnelStage ?? null, generatedBy: a.generatedBy ?? \"manual\", }) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deletePromptAudience": {
+      "body": "{ await db.delete(schema.promptAudiences).where(eq(schema.promptAudiences.id, id)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getAudienceIdsByPromptId": {
+      "body": "{ const rows = await db .select({ audienceId: schema.brandPromptAudiences.audienceId }) .from(schema.brandPromptAudiences) .where(eq(schema.brandPromptAudiences.brandPromptId, promptId)); return rows.map((r) => r.audienceId); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getPromptAudienceMapByBrandId": {
+      "body": "{ const rows = await db .select({ brandPromptId: schema.brandPromptAudiences.brandPromptId, audienceId: schema.brandPromptAudiences.audienceId, }) .from(schema.brandPromptAudiences) .innerJoin( schema.promptAudiences, eq(schema.promptAudiences.id, schema.brandPromptAudiences.audienceId), ) .where(eq(schema.promptAudiences.brandId, brandId)); const out: Record<string, string[]> = {}; for (const r of rows) { (out[r.brandPromptId] ??= []).push(r.audienceId); } return out; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "attachPromptAudience": {
+      "body": "{ await db .insert(schema.brandPromptAudiences) .values({ brandPromptId: promptId, audienceId }) .onConflictDoNothing(); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "detachPromptAudience": {
+      "body": "{ await db .delete(schema.brandPromptAudiences) .where( and( eq(schema.brandPromptAudiences.brandPromptId, promptId), eq(schema.brandPromptAudiences.audienceId, audienceId), ), ); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getLatestAiAudienceCreatedAt": {
+      "body": "{ const [row] = await db .select({ createdAt: schema.promptAudiences.createdAt }) .from(schema.promptAudiences) .where( and( eq(schema.promptAudiences.brandId, brandId), eq(schema.promptAudiences.generatedBy, \"ai\"), ), ) .orderBy(desc(schema.promptAudiences.createdAt)) .limit(1); return row?.createdAt ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getLatestSetHealthRun": {
+      "body": "{ const [row] = await db .select() .from(schema.promptSetHealthRuns) .where(eq(schema.promptSetHealthRuns.brandId, brandId)) .orderBy(desc(schema.promptSetHealthRuns.createdAt)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createSetHealthRun": {
+      "body": "{ const [row] = await db .insert(schema.promptSetHealthRuns) .values({ brandId: run.brandId, score: run.score, verdict: run.verdict, topFix: run.topFix as any, issues: run.issues as any, workingWell: run.workingWell, }) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getPhrasingTestsByPromptId": {
+      "body": "{ return db .select() .from(schema.promptPhrasingTests) .where(eq(schema.promptPhrasingTests.brandPromptId, promptId)) .orderBy(desc(schema.promptPhrasingTests.createdAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getPhrasingTestById": {
+      "body": "{ const [row] = await db .select() .from(schema.promptPhrasingTests) .where(eq(schema.promptPhrasingTests.id, id)); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createPhrasingTest": {
+      "body": "{ const [row] = await db .insert(schema.promptPhrasingTests) .values({ brandPromptId: t.brandPromptId, phrasing: t.phrasing, rationale: t.rationale ?? null, }) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setPhrasingTestResults": {
+      "body": "{ const [row] = await db .update(schema.promptPhrasingTests) .set({ results: results as any }) .where(eq(schema.promptPhrasingTests.id, id)) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "reorderBrandPrompts": {
+      "body": "{ if (orderedIds.length === 0) return; await db.transaction(async (tx) => { for (const [index, id] of orderedIds.entries()) { await tx .update(schema.brandPrompts) .set({ orderIndex: index }) .where(and(eq(schema.brandPrompts.id, id), eq(schema.brandPrompts.brandId, brandId))); } }); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getMaxBrandPromptOrderIndex": {
+      "body": "{ const rows = await db .select({ orderIndex: schema.brandPrompts.orderIndex }) .from(schema.brandPrompts) .where(eq(schema.brandPrompts.brandId, brandId)) .orderBy(desc(schema.brandPrompts.orderIndex)) .limit(1); return rows[0]?.orderIndex ?? -1; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "promoteSuggestionToTracked": {
+      "body": "{ // Use an atomic swap when replacing. Both updates succeed together // so we can't end up with two tracked prompts (or none) for the slot. // When replaceTrackedId is null, the user is filling an // empty slot (tracked count < cap) - just promote, no archive. await db.transaction(async (tx) => { if (replaceTrackedId) { await tx .update(schema.brandPrompts) .set({ isActive: 0, status: \"archived\" }) .where(eq(schema.brandPrompts.id, replaceTrackedId)); } await tx .update(schema.brandPrompts) .set({ isActive: 1, status: \"tracked\" }) .where(eq(schema.brandPrompts.id, suggestionId)); }); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createPromptGeneration": {
+      "body": "{ // Count existing generations for this brand to determine the next number const existing = await db .select({ id: schema.promptGenerations.id }) .from(schema.promptGenerations) .where(eq(schema.promptGenerations.brandId, brandId)); const generationNumber = existing.length + 1; const [row] = await db .insert(schema.promptGenerations) .values({ brandId, generationNumber }) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getPromptGenerationsByBrandId": {
+      "body": "{ return await db .select() .from(schema.promptGenerations) .where(eq(schema.promptGenerations.brandId, brandId)) .orderBy(desc(schema.promptGenerations.createdAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getGeoRankingsByRunId": {
+      "body": "{ return await db .select() .from(schema.geoRankings) .where(eq(schema.geoRankings.runId, runId)) .orderBy(asc(schema.geoRankings.prompt), asc(schema.geoRankings.aiPlatform)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getRecentArticlesByBrandId": {
+      "body": "{ return await db .select() .from(schema.articles) .where(eq(schema.articles.brandId, brandId)) .orderBy(desc(schema.articles.createdAt)) .limit(limit); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getVisibilityProgress": {
+      "body": "{ return await db .select() .from(schema.visibilityProgress) .where(eq(schema.visibilityProgress.brandId, brandId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setVisibilityStep": {
+      "body": "{ await db .insert(schema.visibilityProgress) .values({ brandId, engineId, stepId }) .onConflictDoNothing(); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "unsetVisibilityStep": {
+      "body": "{ await db .delete(schema.visibilityProgress) .where( and( eq(schema.visibilityProgress.brandId, brandId), eq(schema.visibilityProgress.engineId, engineId), eq(schema.visibilityProgress.stepId, stepId), ), ); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "recordGeoSignalRun": {
+      "body": "{ const [row] = await db.insert(schema.geoSignalRuns).values(run).returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getLastGeoSignalRunAt": {
+      "body": "{ const [row] = await db .select({ ranAt: schema.geoSignalRuns.ranAt }) .from(schema.geoSignalRuns) .where(eq(schema.geoSignalRuns.brandId, brandId)) .orderBy(desc(schema.geoSignalRuns.ranAt)) .limit(1); return row?.ranAt ? new Date(row.ranAt as string | Date) : null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getLastGeoSignalSummary": {
+      "body": "{ const [row] = await db .select({ ranAt: schema.geoSignalRuns.ranAt, overallScore: schema.geoSignalRuns.overallScore, }) .from(schema.geoSignalRuns) .where(eq(schema.geoSignalRuns.brandId, brandId)) .orderBy(desc(schema.geoSignalRuns.ranAt)) .limit(1); if (!row?.ranAt) return null; return { ranAt: new Date(row.ranAt as string | Date), overallScore: row.overallScore ?? null, }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createCitationRun": {
+      "body": "{ const [row] = await db.insert(schema.citationRuns).values(run).returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateCitationRun": {
+      "body": "{ const [row] = await db .update(schema.citationRuns) .set(update) .where(eq(schema.citationRuns.id, id)) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCitationRunsByBrandId": {
+      "body": "{ return await db .select() .from(schema.citationRuns) .where(eq(schema.citationRuns.brandId, brandId)) .orderBy(desc(schema.citationRuns.startedAt)) .limit(limit); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCitationRunById": {
+      "body": "{ const [row] = await db .select() .from(schema.citationRuns) .where(eq(schema.citationRuns.id, runId)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "recomputeCitationRunAggregate": {
+      "body": "{ const runRows = await db .select({ isCited: schema.geoRankings.isCited, aiPlatform: schema.geoRankings.aiPlatform, }) .from(schema.geoRankings) .where(eq(schema.geoRankings.runId, runId)); const totalChecks = runRows.length; const totalCited = runRows.filter((x) => x.isCited === 1).length; const citationRate = totalChecks > 0 ? Math.round((totalCited / totalChecks) * 100) : 0; const platformMap = new Map<string, { cited: number; checks: number }>(); for (const x of runRows) { const e = platformMap.get(x.aiPlatform) || { cited: 0, checks: 0 }; e.checks += 1; if (x.isCited === 1) e.cited += 1; platformMap.set(x.aiPlatform, e); } const platformBreakdown = Object.fromEntries( Array.from(platformMap.entries()).map(([p, s]) => [ p, { ...s, rate: s.checks > 0 ? Math.round((s.cited / s.checks) * 100) : 0 }, ]), ); await db .update(schema.citationRuns) .set({ totalChecks, totalCited, citationRate, platformBreakdown }) .where(eq(schema.citationRuns.id, runId)); return { totalChecks, totalCited, citationRate }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getActiveCitationRuns": {
+      "body": "{ const rows = await db .select({ id: schema.citationRuns.id, startedAt: schema.citationRuns.startedAt, progressPct: schema.citationRuns.progressPct, status: schema.citationRuns.status, }) .from(schema.citationRuns) .where( and( eq(schema.citationRuns.brandId, brandId), inArray(schema.citationRuns.status, [\"pending\", \"running\"]), ), ) .orderBy(desc(schema.citationRuns.startedAt)); return rows; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "bumpCitationRunProgress": {
+      "body": "{ await db .update(schema.citationRuns) .set({ progressPct, totalChecks, totalCited, status: \"running\", }) .where(eq(schema.citationRuns.id, runId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCitationRunLiveState": {
+      "body": "{ const [row] = await db .select({ id: schema.citationRuns.id, status: schema.citationRuns.status, progressPct: schema.citationRuns.progressPct, totalChecks: schema.citationRuns.totalChecks, totalCited: schema.citationRuns.totalCited, citationRate: schema.citationRuns.citationRate, }) .from(schema.citationRuns) .where(eq(schema.citationRuns.id, runId)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getRecentRankingsForRun": {
+      "body": "{ const since = new Date(sinceMs); const rows = await db .select({ id: schema.geoRankings.id, aiPlatform: schema.geoRankings.aiPlatform, isCited: schema.geoRankings.isCited, checkedAt: schema.geoRankings.checkedAt, }) .from(schema.geoRankings) .where( and(eq(schema.geoRankings.runId, runId), sql`${schema.geoRankings.checkedAt} > ${since}`), ) .orderBy(asc(schema.geoRankings.checkedAt)) .limit(limit); return rows; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "enqueueContentJob": {
+      "body": "{ const [row] = await db.insert(schema.contentGenerationJobs).values(job).returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "claimPendingContentJob": {
+      "body": "{ const result = await db.execute(sql` update public.content_generation_jobs set status = 'running', started_at = now() where id = ( select id from public.content_generation_jobs where status = 'pending' order by created_at asc limit 1 for update skip locked ) returning id, user_id as \"userId\", brand_id as \"brandId\", status, request_payload as \"requestPayload\", article_id as \"articleId\", error_message as \"errorMessage\", created_at as \"createdAt\", started_at as \"startedAt\", completed_at as \"completedAt\" `); const row = (result as any).rows?.[0]; return row as ContentGenerationJob | undefined; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateContentJob": {
+      "body": "{ const [row] = await db .update(schema.contentGenerationJobs) .set(update) .where(eq(schema.contentGenerationJobs.id, id)) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getContentJobById": {
+      "body": "{ const [row] = await db .select() .from(schema.contentGenerationJobs) .where( and( eq(schema.contentGenerationJobs.id, id), eq(schema.contentGenerationJobs.userId, userId), ), ) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getContentJobByIdAdmin": {
+      "body": "{ const [row] = await db .select() .from(schema.contentGenerationJobs) .where(eq(schema.contentGenerationJobs.id, id)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateContentJobResponseId": {
+      "body": "{ const result = await db .update(schema.contentGenerationJobs) .set({ openaiResponseId }) .where( and( eq(schema.contentGenerationJobs.id, jobId), eq(schema.contentGenerationJobs.advanceToken, advanceToken), eq(schema.contentGenerationJobs.status, \"running\"), ), ) .returning({ id: schema.contentGenerationJobs.id }); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "claimContentJobForSlice": {
+      "body": "{ const leaseSeconds = Math.max(sliceBudgetSeconds, CONTENT_JOB_LEASE_SECONDS); const result = await db.execute(sql` UPDATE public.content_generation_jobs SET status = 'running', started_at = COALESCE(started_at, now()), last_advance_started_at = now(), advance_token = gen_random_uuid()::text, advance_lease_expires_at = now() + make_interval(secs => ${leaseSeconds}) WHERE id = ${id} AND status IN ('pending', 'running') AND ( advance_lease_expires_at IS NULL OR advance_lease_expires_at < now() ) RETURNING id, user_id AS \"userId\", brand_id AS \"brandId\", status, request_payload AS \"requestPayload\", article_id AS \"articleId\", error_message AS \"errorMessage\", error_kind AS \"errorKind\", stream_buffer AS \"streamBuffer\", refunded_at AS \"refundedAt\", last_advance_started_at AS \"lastAdvanceStartedAt\", advance_token AS \"advanceToken\", advance_lease_expires_at AS \"advanceLeaseExpiresAt\", created_at AS \"createdAt\", started_at AS \"startedAt\", completed_at AS \"completedAt\" `); const row = (result as any).rows?.[0]; return row as ClaimedContentGenerationJob | undefined; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "finishContentJobSlice": {
+      "body": "{ const [row] = await db .update(schema.contentGenerationJobs) .set({ ...update, advanceToken: null, advanceLeaseExpiresAt: null }) .where( and( eq(schema.contentGenerationJobs.id, id), eq(schema.contentGenerationJobs.advanceToken, advanceToken), eq(schema.contentGenerationJobs.status, \"running\"), ), ) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "completeContentJobSlice": {
+      "body": "{ return this.completeContentJobSliceInTransaction(id, advanceToken, article, cost); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "completeContentJobSliceLegacy": {
+      "body": "{ return this.completeContentJobSliceInTransaction(id, advanceToken, article, null); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "completeContentJobSliceInTransaction": {
+      "body": "{ return db.transaction(async (tx) => { const [job] = await tx .update(schema.contentGenerationJobs) .set({ status: \"succeeded\", completedAt: new Date(), advanceToken: null, advanceLeaseExpiresAt: null, }) .where( and( eq(schema.contentGenerationJobs.id, id), eq(schema.contentGenerationJobs.advanceToken, advanceToken), eq(schema.contentGenerationJobs.status, \"running\"), ), ) .returning({ articleId: schema.contentGenerationJobs.articleId, userId: schema.contentGenerationJobs.userId, brandId: schema.contentGenerationJobs.brandId, }); if (!job) return false; if (!job.articleId) { throw new Error(\"Content generation job has no article\"); } const [updatedArticle] = await tx .update(schema.articles) .set({ status: \"ready\", content: article.content, title: article.title, aiGenerated: true, jobId: null, version: sql`${schema.articles.version} + 1`, updatedAt: new Date(), }) .where(and(eq(schema.articles.id, job.articleId), eq(schema.articles.jobId, id))) .returning({ id: schema.articles.id }); if (!updatedArticle) { throw new Error(\"Content generation article is missing or has a newer job\"); } await tx.insert(schema.articleRevisions).values({ articleId: job.articleId, content: article.content, source: \"generated\", createdBy: \"system\", }); if (cost) { if (!job.userId || !job.brandId) { throw new Error(\"Content generation job has no user or brand for cost recording\"); } await tx.execute(sql`set local role venturecite_content_request`); await tx.execute(sql`select set_config('venturecite.user_id', ${job.userId}, true)`); await enqueueContentCostCommand(tx, { ...cost, contentJobId: id, userId: job.userId, brandId: job.brandId, }); } return true; }); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "failContentJobSlice": {
+      "body": "{ return db.transaction(async (tx) => { const [job] = await tx .update(schema.contentGenerationJobs) .set({ status: \"failed\", errorKind: failure.errorKind, errorMessage: failure.errorMessage, completedAt: new Date(), advanceToken: null, advanceLeaseExpiresAt: null, }) .where( and( eq(schema.contentGenerationJobs.id, id), eq(schema.contentGenerationJobs.advanceToken, advanceToken), eq(schema.contentGenerationJobs.status, \"running\"), ), ) .returning({ articleId: schema.contentGenerationJobs.articleId }); if (!job) return false; if (!job.articleId) { throw new Error(\"Content generation job has no article\"); } const [updatedArticle] = await tx .update(schema.articles) .set({ status: \"failed\", jobId: null, updatedAt: new Date() }) .where(and(eq(schema.articles.id, job.articleId), eq(schema.articles.jobId, id))) .returning({ id: schema.articles.id }); if (!updatedArticle) { throw new Error(\"Content generation article is missing or has a newer job\"); } return true; }); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "renewContentJobSliceLease": {
+      "body": "{ const result = await db.execute(sql` UPDATE public.content_generation_jobs SET advance_lease_expires_at = now() + make_interval(secs => ${CONTENT_JOB_LEASE_SECONDS}) WHERE id = ${id} AND advance_token = ${advanceToken} AND status = 'running' RETURNING id `); return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "releaseContentJobSliceLease": {
+      "body": "{ const result = await db.execute(sql` UPDATE public.content_generation_jobs SET advance_token = NULL, advance_lease_expires_at = NULL WHERE id = ${id} AND advance_token = ${advanceToken} AND status = 'running' RETURNING id `); return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "cancelContentJob": {
+      "body": "{ const [row] = await db .update(schema.contentGenerationJobs) .set({ status: \"cancelled\", completedAt: new Date(), advanceToken: null, advanceLeaseExpiresAt: null, }) .where( and( eq(schema.contentGenerationJobs.id, id), inArray(schema.contentGenerationJobs.status, [\"pending\", \"running\"]), ), ) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "resetArticleForCancelledContentJob": {
+      "body": "{ const result = await db.execute(sql` UPDATE public.articles SET status = 'draft', job_id = NULL, updated_at = now() WHERE job_id = ${id} AND EXISTS ( SELECT 1 FROM public.content_generation_jobs WHERE id = ${id} AND status = 'cancelled' ) RETURNING id `); return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setArticleGeneratingForContentJob": {
+      "body": "{ const result = await db.execute(sql` UPDATE public.articles SET status = 'generating', updated_at = now() WHERE id = ( SELECT article_id FROM public.content_generation_jobs WHERE id = ${id} AND advance_token = ${advanceToken} AND status = 'running' ) AND status IN ('draft', 'generating') RETURNING id `); return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "listAdvanceablePendingJobs": {
+      "body": "{ const result = await db.execute(sql` SELECT id, user_id AS \"userId\", brand_id AS \"brandId\", status, request_payload AS \"requestPayload\", article_id AS \"articleId\", error_message AS \"errorMessage\", error_kind AS \"errorKind\", stream_buffer AS \"streamBuffer\", refunded_at AS \"refundedAt\", last_advance_started_at AS \"lastAdvanceStartedAt\", created_at AS \"createdAt\", started_at AS \"startedAt\", completed_at AS \"completedAt\" FROM public.content_generation_jobs WHERE status IN ('pending', 'running') AND ( advance_lease_expires_at IS NULL OR advance_lease_expires_at < now() ) ORDER BY created_at ASC LIMIT ${limit} `); return ((result as any).rows ?? []) as ContentGenerationJob[]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getActiveContentJob": {
+      "body": "{ const [row] = await db .select() .from(schema.contentGenerationJobs) .where( and( eq(schema.contentGenerationJobs.userId, userId), or( eq(schema.contentGenerationJobs.status, \"pending\"), eq(schema.contentGenerationJobs.status, \"running\"), ), ), ) .orderBy(desc(schema.contentGenerationJobs.createdAt)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getRecentCompletedContentJob": {
+      "body": "{ const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); const [row] = await db .select() .from(schema.contentGenerationJobs) .where( and( eq(schema.contentGenerationJobs.userId, userId), eq(schema.contentGenerationJobs.status, \"succeeded\"), gte(schema.contentGenerationJobs.completedAt, oneDayAgo), ), ) .orderBy(desc(schema.contentGenerationJobs.completedAt)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "failStuckContentJobs": {
+      "body": "{ const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000); const result = await db .update(schema.contentGenerationJobs) .set({ status: \"failed\", errorMessage: \"Job was interrupted (server restart or crash).\", errorKind: \"timeout\", completedAt: new Date(), }) .where( and( eq(schema.contentGenerationJobs.status, \"running\"), sql`${schema.contentGenerationJobs.startedAt} < ${cutoff}`, ), ) .returning({ id: schema.contentGenerationJobs.id, userId: schema.contentGenerationJobs.userId, articleId: schema.contentGenerationJobs.articleId, }); return result; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateUserStripeInfo": {
+      "body": "{ const result = await db .update(schema.users) .set(info) .where(eq(schema.users.id, userId)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getUserByStripeCustomerId": {
+      "body": "{ const result = await db .select() .from(schema.users) .where(eq(schema.users.stripeCustomerId, customerId)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getUserUsage": {
+      "body": "{ const result = await db.select().from(schema.users).where(eq(schema.users.id, userId)); const user = result[0]; if (!user) return undefined; const now = new Date(); const resetDate = user.usageResetDate ? new Date(user.usageResetDate) : null; // Compare absolute months (year*12+month) so a January 2026 reset-date vs // January 2025 now doesn't collide on the same month number. const absMonth = (d: Date) => d.getUTCFullYear() * 12 + d.getUTCMonth(); if (resetDate && absMonth(now) !== absMonth(resetDate)) { await this.resetMonthlyUsage(userId); return { articlesUsed: 0, brandsUsed: user.brandsUsed || 0, resetDate: now }; } return { articlesUsed: user.articlesUsedThisMonth || 0, brandsUsed: user.brandsUsed || 0, resetDate: resetDate, }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "incrementArticleUsage": {
+      "body": "{ const result = await db .update(schema.users) .set({ articlesUsedThisMonth: sql`${schema.users.articlesUsedThisMonth} + 1` }) .where(eq(schema.users.id, userId)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "resetMonthlyUsage": {
+      "body": "{ await db .update(schema.users) .set({ articlesUsedThisMonth: 0, usageResetDate: new Date() }) .where(eq(schema.users.id, userId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateBrandsUsed": {
+      "body": "{ await db.update(schema.users).set({ brandsUsed: count }).where(eq(schema.users.id, userId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createBetaInviteCode": {
+      "body": "{ const result = await db .insert(schema.betaInviteCodes) .values({ ...insertCode, maxUses: insertCode.maxUses ?? 1, usedCount: 0, accessTier: insertCode.accessTier ?? \"beta\", }) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBetaInviteCodeByCode": {
+      "body": "{ const result = await db .select() .from(schema.betaInviteCodes) .where(eq(schema.betaInviteCodes.code, codeStr)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "useBetaInviteCode": {
+      "body": "{ // Atomic conditional update: only increments when the code still has // uses left AND hasn't expired. This collapses the previous // check-then-update TOCTOU race into a single statement so two // concurrent redemptions of a 1-use code can't both win. const rows = await db.execute(sql` update ${schema.betaInviteCodes} set used_count = used_count + 1 where code = ${codeStr} and used_count < max_uses and (expires_at is null or expires_at > now()) returning * `); const list = (rows as any).rows ?? (rows as any); if (!list || list.length === 0) return undefined; const row = list[0]; return { id: row.id, code: row.code, maxUses: row.max_uses, usedCount: row.used_count, accessTier: row.access_tier, expiresAt: row.expires_at ? new Date(row.expires_at) : null, createdBy: row.created_by, createdAt: row.created_at ? new Date(row.created_at) : new Date(), }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getAllBetaInviteCodes": {
+      "body": "{ return await db.select().from(schema.betaInviteCodes); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteBetaInviteCode": {
+      "body": "{ const result = await db .delete(schema.betaInviteCodes) .where(eq(schema.betaInviteCodes.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createCompetitor": {
+      "body": "{ const discoveredBy = insertCompetitor.discoveredBy ?? \"manual\"; const isManual = discoveredBy === \"manual\"; // Single source of truth for the tier policy: callers may set tier // explicitly (discovery does, per-source), but when they don't we derive // it so every entry point stays consistent. Manual adds (Add dialog AND // onboarding) and AI profile-inferred competitors are the curated core // set; citation-mined / auto / scheduler rows are the discovered pool. const tier = insertCompetitor.tier ?? (discoveredBy === \"manual\" || discoveredBy === \"ai\" ? \"core\" : \"discovered\"); // Use raw SQL so we can target the functional unique index // (lower(name), lower(coalesce(domain,''))). db.execute returns raw // snake_case pg rows - we only use it for the id, then re-read via // Drizzle to get the camelCase-mapped row callers expect. const result = await db.execute<{ id: string }>(sql` INSERT INTO competitors ( brand_id, name, domain, industry, description, discovered_by, tier, relevance_score, deleted_at, is_ignored, last_seen_at ) VALUES ( ${insertCompetitor.brandId}, ${insertCompetitor.name}, ${insertCompetitor.domain}, ${insertCompetitor.industry ?? null}, ${insertCompetitor.description ?? null}, ${discoveredBy}, ${tier}, ${insertCompetitor.relevanceScore ?? null}, NULL, 0, now() ) ON CONFLICT (brand_id, lower(name), lower(coalesce(domain, ''))) DO UPDATE SET industry = COALESCE(EXCLUDED.industry, competitors.industry), description = COALESCE(EXCLUDED.description, competitors.description), relevance_score = COALESCE(EXCLUDED.relevance_score, competitors.relevance_score), last_seen_at = now(), -- Manual re-add promotes to core; automated re-discovery never demotes -- an existing tier (so a user-curated core row stays core). tier = CASE WHEN ${isManual} THEN 'core' ELSE competitors.tier END, -- Revive soft-deleted rows only on manual re-add. deleted_at = CASE WHEN ${isManual} THEN NULL ELSE competitors.deleted_at END, is_ignored = CASE WHEN ${isManual} THEN 0 ELSE competitors.is_ignored END RETURNING id; `); const id = (result as any).rows?.[0]?.id; if (!id) throw new Error(\"createCompetitor upsert returned no id\"); const [row] = await db .select() .from(schema.competitors) .where(eq(schema.competitors.id, id)) .limit(1); if (!row) throw new Error(\"createCompetitor: row not found after upsert\"); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCompetitors": {
+      "body": "{ const includeDeleted = opts?.includeDeleted === true; const conditions = [] as any[]; if (brandId) conditions.push(eq(schema.competitors.brandId, brandId)); if (!includeDeleted) conditions.push(isNull(schema.competitors.deletedAt)); // `core` is the curated competitive set: manual adds and AI-inferred // direct competitors. `discovered` is the citation-mined pool - every // entity a model happened to name in an answer, which includes product // lines (\"iPhone\", \"S Pen\"), publishers (\"CNET\"), operating systems // (\"macOS\") and the tracked brand itself. That pool is useful as MENTION // data; it is not a competitor list, and anything presenting a // competitive set must ask for core. if (opts?.tier) conditions.push(eq(schema.competitors.tier, opts.tier)); const where = conditions.length === 1 ? conditions[0] : and(...conditions); const q = db.select().from(schema.competitors); return await (where ? q.where(where) : q); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCompetitorById": {
+      "body": "{ const result = await db.select().from(schema.competitors).where(eq(schema.competitors.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateCompetitor": {
+      "body": "{ const result = await db .update(schema.competitors) .set(patch) .where(eq(schema.competitors.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "addBrandNameVariation": {
+      "body": "{ const trimmed = variation.trim(); if (!trimmed) return false; const brand = await this.getBrandById(brandId); if (!brand) return false; const existing = (brand.nameVariations ?? []) as string[]; const lower = trimmed.toLowerCase(); if (existing.some((v) => v.toLowerCase() === lower)) return false; const next = [...existing, trimmed]; await db .update(schema.brands) .set({ nameVariations: next }) .where(eq(schema.brands.id, brandId)); return true; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "addCompetitorNameVariation": {
+      "body": "{ const trimmed = variation.trim(); if (!trimmed) return false; const competitor = await this.getCompetitorById(competitorId); if (!competitor) return false; const existing = ((competitor as Competitor).nameVariations ?? []) as string[]; const lower = trimmed.toLowerCase(); if (existing.some((v) => v.toLowerCase() === lower)) return false; const next = [...existing, trimmed]; await db .update(schema.competitors) .set({ nameVariations: next }) .where(eq(schema.competitors.id, competitorId)); return true; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteCompetitor": {
+      "body": "{ const result = await db .update(schema.competitors) .set({ deletedAt: new Date() }) .where(eq(schema.competitors.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "ignoreCompetitor": {
+      "body": "{ const result = await db .update(schema.competitors) .set({ isIgnored: 1, deletedAt: new Date() }) .where(eq(schema.competitors.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createCompetitorGeoRanking": {
+      "body": "{ const [result] = await db .insert(schema.competitorGeoRankings) .values({ competitorId: row.competitorId, runId: row.runId, brandPromptId: row.brandPromptId, aiPlatform: row.aiPlatform, isCited: row.isCited ?? 0, rank: row.rank ?? null, relevanceScore: row.relevanceScore ?? null, citationContext: row.citationContext ?? null, citingOutletUrl: row.citingOutletUrl ?? null, sentiment: row.sentiment ?? null, }) .onConflictDoUpdate({ target: [ schema.competitorGeoRankings.competitorId, schema.competitorGeoRankings.runId, schema.competitorGeoRankings.brandPromptId, schema.competitorGeoRankings.aiPlatform, ], set: { isCited: sql`EXCLUDED.is_cited`, rank: sql`COALESCE(EXCLUDED.rank, ${schema.competitorGeoRankings.rank})`, relevanceScore: sql`COALESCE(EXCLUDED.relevance_score, ${schema.competitorGeoRankings.relevanceScore})`, citationContext: sql`COALESCE(EXCLUDED.citation_context, ${schema.competitorGeoRankings.citationContext})`, citingOutletUrl: sql`COALESCE(EXCLUDED.citing_outlet_url, ${schema.competitorGeoRankings.citingOutletUrl})`, sentiment: sql`COALESCE(EXCLUDED.sentiment, ${schema.competitorGeoRankings.sentiment})`, checkedAt: sql`now()`, }, }) .returning(); if (!result) throw new Error(\"createCompetitorGeoRanking upsert returned no row\"); return result; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createCompetitorGeoRankings": {
+      "body": "{ if (rows.length === 0) return []; return await db .insert(schema.competitorGeoRankings) .values(rows) .onConflictDoUpdate({ target: [ schema.competitorGeoRankings.competitorId, schema.competitorGeoRankings.runId, schema.competitorGeoRankings.brandPromptId, schema.competitorGeoRankings.aiPlatform, ], set: { isCited: sql`EXCLUDED.is_cited`, rank: sql`COALESCE(EXCLUDED.rank, ${schema.competitorGeoRankings.rank})`, relevanceScore: sql`COALESCE(EXCLUDED.relevance_score, ${schema.competitorGeoRankings.relevanceScore})`, citationContext: sql`COALESCE(EXCLUDED.citation_context, ${schema.competitorGeoRankings.citationContext})`, citingOutletUrl: sql`COALESCE(EXCLUDED.citing_outlet_url, ${schema.competitorGeoRankings.citingOutletUrl})`, sentiment: sql`COALESCE(EXCLUDED.sentiment, ${schema.competitorGeoRankings.sentiment})`, checkedAt: sql`now()`, }, }) .returning(); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCompetitorGeoRankings": {
+      "body": "{ const conditions = [eq(schema.competitorGeoRankings.competitorId, competitorId)]; if (opts?.runId) conditions.push(eq(schema.competitorGeoRankings.runId, opts.runId)); if (opts?.since) conditions.push(gte(schema.competitorGeoRankings.checkedAt, opts.since)); return await db .select() .from(schema.competitorGeoRankings) .where(and(...conditions)) .orderBy(desc(schema.competitorGeoRankings.checkedAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCompetitorGeoRankingsForCompetitors": {
+      "body": "{ if (competitorIds.length === 0) return []; return await db .select() .from(schema.competitorGeoRankings) .where( and( inArray(schema.competitorGeoRankings.competitorId, competitorIds), gte(schema.competitorGeoRankings.checkedAt, opts.since), ), ) .orderBy(desc(schema.competitorGeoRankings.checkedAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCompetitorGeoRankingsByPromptRuns": {
+      "body": "{ if (runIds.length === 0) return []; return await db .select() .from(schema.competitorGeoRankings) .where( and( eq(schema.competitorGeoRankings.brandPromptId, brandPromptId), inArray(schema.competitorGeoRankings.runId, runIds), ), ) .orderBy(desc(schema.competitorGeoRankings.checkedAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createCompetitorCitationSnapshot": {
+      "body": "{ if ((insertSnapshot as any).runId) { // Same rationale as createCompetitor: db.execute returns raw // snake_case rows. Re-read via Drizzle for camelCase mapping. const result = await db.execute<{ id: string }>(sql` INSERT INTO competitor_citation_snapshots ( competitor_id, ai_platform, citation_count, run_id, metadata ) VALUES ( ${insertSnapshot.competitorId}, ${insertSnapshot.aiPlatform}, ${insertSnapshot.citationCount ?? 0}, ${(insertSnapshot as any).runId}, ${insertSnapshot.metadata ?? null} ) ON CONFLICT (competitor_id, ai_platform, run_id) WHERE run_id IS NOT NULL DO UPDATE SET citation_count = EXCLUDED.citation_count, metadata = EXCLUDED.metadata RETURNING id; `); const id = (result as any).rows?.[0]?.id; if (!id) throw new Error(\"createCompetitorCitationSnapshot upsert returned no id\"); const [row] = await db .select() .from(schema.competitorCitationSnapshots) .where(eq(schema.competitorCitationSnapshots.id, id)) .limit(1); if (!row) throw new Error(\"createCompetitorCitationSnapshot: row not found\"); return row; } // Legacy path for callers that don't yet pass a runId. const result = await db .insert(schema.competitorCitationSnapshots) .values(insertSnapshot) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCompetitorCitationSnapshots": {
+      "body": "{ return await db .select() .from(schema.competitorCitationSnapshots) .where(eq(schema.competitorCitationSnapshots.competitorId, competitorId)) .orderBy(desc(schema.competitorCitationSnapshots.snapshotDate)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCompetitorLatestCitations": {
+      "body": "{ const snapshots = await this.getCompetitorCitationSnapshots(competitorId); const latestByPlatform = new Map<string, number>(); for (const snapshot of snapshots) { if (!latestByPlatform.has(snapshot.aiPlatform)) { latestByPlatform.set(snapshot.aiPlatform, snapshot.citationCount); } } return Array.from(latestByPlatform.entries()).map(([platform, count]) => ({ platform, count })); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCompetitorLeaderboard": {
+      "body": "{ // 3 queries total: brands, cited rankings, competitor snapshots. // `opts.since` constrains every time-scoped read so the leaderboard // reflects a window (default: last 30 days) instead of all-time // cumulative totals - which is what makes \"Square\" look like it // exploded when really the numbers just accumulate forever. const since = opts?.since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); const leaderboard: { name: string; domain: string; isOwn: boolean; totalCitations: number; platformBreakdown: Record<string, number>; shareOfVoice: number; }[] = []; const brands = brandId ? ([await this.getBrandById(brandId)].filter(Boolean) as Brand[]) : await this.getBrands(); if (brands.length === 0) return leaderboard; const brandIds = brands.map((b) => b.id); // Wave B - a brand's citations live on geo_rankings rows keyed by // BOTH article_id (from article-attached citation runs) and // brand_prompt_id (from brand-prompt citation runs). The original // leaderboard only summed articles, so any brand whose citations were // driven by the prompts-only flow (most real brands) showed 0 // citations and therefore 0% share-of-voice. Below we sum both paths // against the same window. // Pull every article for these brands in one query. const allArticles = await db .select({ id: schema.articles.id, brandId: schema.articles.brandId }) .from(schema.articles) .where(inArray(schema.articles.brandId, brandIds)); const articleToBrand = new Map<string, string>(); for (const a of allArticles) { if (a.brandId) articleToBrand.set(a.id, a.brandId); } const articleIds = allArticles.map((a) => a.id); // Pull every brand_prompt for these brands in one query. const allPrompts = await db .select({ id: schema.brandPrompts.id, brandId: schema.brandPrompts.brandId }) .from(schema.brandPrompts) .where(inArray(schema.brandPrompts.brandId, brandIds)); const promptToBrand = new Map<string, string>(); for (const p of allPrompts) { promptToBrand.set(p.id, p.brandId); } const promptIds = allPrompts.map((p) => p.id); // Pull cited rankings for articles + brand_prompts in a single query. // Filters on (article_id IN ... OR brand_prompt_id IN ...) + is_cited=1 // + checked_at >= since. let cited: GeoRanking[] = []; if (articleIds.length > 0 || promptIds.length > 0) { const orClauses: any[] = []; if (articleIds.length > 0) orClauses.push(inArray(schema.geoRankings.articleId, articleIds)); if (promptIds.length > 0) orClauses.push(inArray(schema.geoRankings.brandPromptId, promptIds)); const scope = orClauses.length === 1 ? orClauses[0] : or(...orClauses); cited = await db .select() .from(schema.geoRankings) .where( and(scope, eq(schema.geoRankings.isCited, 1), gte(schema.geoRankings.checkedAt, since)), ); } // Bucket by brand via whichever key the ranking has. Dedup each // ranking by id so a row that has BOTH article_id and brand_prompt_id // (shouldn't happen today, but defensively) doesn't double-count. const perBrand = new Map<string, Record<string, number>>(); for (const b of brandIds) perBrand.set(b, {}); const seenRankings = new Set<string>(); for (const r of cited) { if (seenRankings.has(r.id)) continue; seenRankings.add(r.id); let bId: string | undefined; if (r.articleId) bId = articleToBrand.get(r.articleId); if (!bId && r.brandPromptId) bId = promptToBrand.get(r.brandPromptId); if (!bId) continue; const bucket = perBrand.get(bId)!; bucket[r.aiPlatform] = (bucket[r.aiPlatform] || 0) + 1; } for (const brand of brands) { const breakdown = perBrand.get(brand.id) ?? {}; const totalCitations = Object.values(breakdown).reduce((s, n) => s + n, 0); leaderboard.push({ name: brand.name, domain: brand.website || brand.companyName, isOwn: true, totalCitations, platformBreakdown: breakdown, shareOfVoice: 0, // filled after all rows are in }); } // Read from the per-run, per-prompt competitor_geo_rankings // table so the leaderboard reflects actual LLM-judged citations, not // a coarse aggregate. One row per (competitor × platform × prompt × // run); count cited rows within the window, bucket by platform. // Read EVERY competitor row, then present only the core ones. // // Presentation must be core-only: this is a competitive set, so it holds // competitor BRANDS and nothing else. Ranking the citation-mined // `discovered` pool alongside them put \"iPhone\", \"iPad\", \"AirPods\", // \"Apple Watch\", \"MacBook Air\", \"S Pen\" and \"Samsung Galaxy Tab\" on the // board as rival companies, plus publishers (CNET, PCMag) and the // tracked brand itself, twice. 82 of the Apple brand's 96 rows. // // But the COUNTS still have to come from every row. competitor_geo_ // rankings are keyed by competitor row id, and the same company often // exists as both a core row and a discovered one - measured live, core // `Spotify / spotify.com` had 0 citations while discovered `Spotify / \"\"` // had 11. Filtering before counting would silently discard those. const allCompetitors = brandId ? await this.getCompetitors(brandId) : await this.getCompetitors(); if (allCompetitors.length > 0) { const compIds = allCompetitors.map((c) => c.id); const cgr = await db .select() .from(schema.competitorGeoRankings) .where( and( inArray(schema.competitorGeoRankings.competitorId, compIds), eq(schema.competitorGeoRankings.isCited, 1), gte(schema.competitorGeoRankings.checkedAt, since), ), ); const perCompetitor = new Map<string, Map<string, number>>(); for (const c of compIds) perCompetitor.set(c, new Map()); for (const r of cgr) { const bucket = perCompetitor.get(r.competitorId); if (!bucket) continue; bucket.set(r.aiPlatform, (bucket.get(r.aiPlatform) || 0) + 1); } // One row per core competitor, carrying the citations of every row for // the same company (see server/lib/leaderboardMerge). leaderboard.push(...buildCoreCompetitorRows(allCompetitors, perCompetitor)); } // Fold rows that are the same company (see server/lib/leaderboardMerge). const merged = mergeLeaderboardByDomain(leaderboard); leaderboard.length = 0; leaderboard.push(...merged); // Compute share-of-voice so each row answers the \"are they cited more // than me, and by how much?\" question directly. const totalAll = leaderboard.reduce((s, r) => s + r.totalCitations, 0); for (const row of leaderboard) { row.shareOfVoice = totalAll > 0 ? Math.round((row.totalCitations / totalAll) * 1000) / 10 : 0; } return leaderboard.sort((a, b) => b.totalCitations - a.totalCitations); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createBrandVisibilitySnapshot": {
+      "body": "{ const result = await db.insert(schema.brandVisibilitySnapshots).values(snapshot).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandVisibilitySnapshots": {
+      "body": "{ const query = db .select() .from(schema.brandVisibilitySnapshots) .where(eq(schema.brandVisibilitySnapshots.brandId, brandId)) .orderBy(desc(schema.brandVisibilitySnapshots.snapshotDate)); if (limit) { return await query.limit(limit); } return await query; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getLatestBrandVisibility": {
+      "body": "{ const snapshots = await this.getBrandVisibilitySnapshots(brandId); if (snapshots.length === 0) return null; const platformBreakdown: Record<string, number> = {}; let totalVisibility = 0; let totalSoV = 0; let totalPositive = 0; let totalNeutral = 0; let totalNegative = 0; const latestByPlatform = new Map<string, BrandVisibilitySnapshot>(); for (const snapshot of snapshots) { if (!latestByPlatform.has(snapshot.aiPlatform)) { latestByPlatform.set(snapshot.aiPlatform, snapshot); } } const entries = Array.from(latestByPlatform.entries()); for (const [platform, snapshot] of entries) { platformBreakdown[platform] = snapshot.visibilityScore; totalVisibility += snapshot.visibilityScore; totalSoV += parseFloat(snapshot.shareOfVoice || \"0\"); totalPositive += snapshot.sentimentPositive; totalNeutral += snapshot.sentimentNeutral; totalNegative += snapshot.sentimentNegative; } const platformCount = latestByPlatform.size || 1; return { visibilityScore: Math.round(totalVisibility / platformCount), shareOfVoice: Math.round((totalSoV / platformCount) * 10) / 10, sentiment: { positive: totalPositive, neutral: totalNeutral, negative: totalNegative, }, platformBreakdown, }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createListicle": {
+      "body": "{ const result = await db.insert(schema.listicles).values(insertListicle).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getListicles": {
+      "body": "{ if (brandId) { return await db.select().from(schema.listicles).where(eq(schema.listicles.brandId, brandId)); } return await db.select().from(schema.listicles); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getListicleById": {
+      "body": "{ const result = await db.select().from(schema.listicles).where(eq(schema.listicles.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateListicle": {
+      "body": "{ const result = await db .update(schema.listicles) .set({ ...update, lastChecked: new Date() }) .where(eq(schema.listicles.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteListicle": {
+      "body": "{ const result = await db.delete(schema.listicles).where(eq(schema.listicles.id, id)).returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createWikipediaMention": {
+      "body": "{ const result = await db.insert(schema.wikipediaMentions).values(insertMention).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getWikipediaMentions": {
+      "body": "{ if (brandId) { return await db .select() .from(schema.wikipediaMentions) .where(eq(schema.wikipediaMentions.brandId, brandId)); } return await db.select().from(schema.wikipediaMentions); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateWikipediaMention": {
+      "body": "{ const result = await db .update(schema.wikipediaMentions) .set({ ...update, lastVerified: new Date() }) .where(eq(schema.wikipediaMentions.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteWikipediaMention": {
+      "body": "{ const result = await db .delete(schema.wikipediaMentions) .where(eq(schema.wikipediaMentions.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createBofuContent": {
+      "body": "{ const result = await db.insert(schema.bofuContent).values(insertContent).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBofuContent": {
+      "body": "{ const conditions = []; if (brandId) conditions.push(eq(schema.bofuContent.brandId, brandId)); if (contentType) conditions.push(eq(schema.bofuContent.contentType, contentType)); if (conditions.length > 0) { return await db .select() .from(schema.bofuContent) .where(and(...conditions)); } return await db.select().from(schema.bofuContent); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBofuContentById": {
+      "body": "{ const result = await db.select().from(schema.bofuContent).where(eq(schema.bofuContent.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateBofuContent": {
+      "body": "{ const result = await db .update(schema.bofuContent) .set({ ...update, updatedAt: new Date() }) .where(eq(schema.bofuContent.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteBofuContent": {
+      "body": "{ const result = await db .delete(schema.bofuContent) .where(eq(schema.bofuContent.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createFaqItem": {
+      "body": "{ const result = await db.insert(schema.faqItems).values(insertFaq).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getFaqItems": {
+      "body": "{ const conditions = []; if (brandId) conditions.push(eq(schema.faqItems.brandId, brandId)); if (articleId) conditions.push(eq(schema.faqItems.articleId, articleId)); if (conditions.length > 0) { return await db .select() .from(schema.faqItems) .where(and(...conditions)); } return await db.select().from(schema.faqItems); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getFaqItemById": {
+      "body": "{ const result = await db.select().from(schema.faqItems).where(eq(schema.faqItems.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateFaqItem": {
+      "body": "{ const result = await db .update(schema.faqItems) .set({ ...update, updatedAt: new Date() }) .where(eq(schema.faqItems.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteFaqItem": {
+      "body": "{ const result = await db.delete(schema.faqItems).where(eq(schema.faqItems.id, id)).returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createBrandMention": {
+      "body": "{ const withDiscoveredAt = { ...insertMention, discoveredAt: (insertMention as { discoveredAt?: Date }).discoveredAt ?? new Date(), }; const result = await db.insert(schema.brandMentions).values(withDiscoveredAt).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandMentions": {
+      "body": "{ const conditions = []; if (brandId) conditions.push(eq(schema.brandMentions.brandId, brandId)); if (platform) conditions.push(eq(schema.brandMentions.platform, platform)); if (conditions.length > 0) { return await db .select() .from(schema.brandMentions) .where(and(...conditions)) .orderBy(desc(schema.brandMentions.discoveredAt)); } return await db .select() .from(schema.brandMentions) .orderBy(desc(schema.brandMentions.discoveredAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandMentionById": {
+      "body": "{ const result = await db .select() .from(schema.brandMentions) .where(eq(schema.brandMentions.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateBrandMention": {
+      "body": "{ const result = await db .update(schema.brandMentions) .set(update) .where(eq(schema.brandMentions.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteBrandMention": {
+      "body": "{ const result = await db .delete(schema.brandMentions) .where(eq(schema.brandMentions.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "tryInsertListicle": {
+      "body": "{ const result = await db .insert(schema.listicles) .values(insert) .onConflictDoNothing() .returning(); return result[0] ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "tryInsertWikipediaMention": {
+      "body": "{ const result = await db .insert(schema.wikipediaMentions) .values(insert) .onConflictDoNothing() .returning(); return result[0] ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "tryInsertBrandMention": {
+      "body": "{ // Force discoveredAt from the Node process's `new Date()` rather than // letting Postgres default it via `now()`. The DB clock or session // timezone can be hours off from real UTC, which made every mention // display \"about 6 hours ago\" the moment it was inserted. JS Date // is always an absolute UTC instant, independent of host config. const withDiscoveredAt = { ...insert, discoveredAt: (insert as { discoveredAt?: Date }).discoveredAt ?? new Date(), }; const result = await db .insert(schema.brandMentions) .values(withDiscoveredAt) .onConflictDoNothing() .returning(); return result[0] ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "findSimilarFaqQuestion": {
+      "body": "{ try { const rows = await db.execute(sql` SELECT id, question, extensions.similarity(question, ${question}) AS sim FROM faq_items WHERE brand_id = ${brandId} AND extensions.similarity(question, ${question}) >= ${threshold} ORDER BY sim DESC LIMIT 1 `); const row = (rows as any).rows?.[0] ?? (rows as any)[0]; if (!row) return null; return { id: String(row.id), question: String(row.question), similarity: Number(row.sim), }; } catch { // pg_trgm not available - fall back to exact case-insensitive match. const exact = await db .select({ id: schema.faqItems.id, question: schema.faqItems.question }) .from(schema.faqItems) .where( and( eq(schema.faqItems.brandId, brandId), sql`lower(${schema.faqItems.question}) = lower(${question})`, ), ) .limit(1); if (exact.length === 0) return null; return { id: exact[0].id, question: exact[0].question, similarity: 1 }; } }",
+      "source": "server/databaseStorage.ts"
+    },
+    "upsertTrackedContentUrl": {
+      "body": "{ // One row per (source_type, source_id) - when a piece of content's // published_url changes we update in place rather than churning. const existing = await db .select() .from(schema.trackedContentUrls) .where( and( eq(schema.trackedContentUrls.sourceType, insert.sourceType), eq(schema.trackedContentUrls.sourceId, insert.sourceId), ), ) .limit(1); if (existing[0]) { const updated = await db .update(schema.trackedContentUrls) .set({ brandId: insert.brandId, url: insert.url, normalizedUrl: insert.normalizedUrl, }) .where(eq(schema.trackedContentUrls.id, existing[0].id)) .returning(); return updated[0]; } const inserted = await db.insert(schema.trackedContentUrls).values(insert).returning(); return inserted[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteTrackedContentUrlBySource": {
+      "body": "{ const result = await db .delete(schema.trackedContentUrls) .where( and( eq(schema.trackedContentUrls.sourceType, sourceType), eq(schema.trackedContentUrls.sourceId, sourceId), ), ) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getTrackedContentUrlsByBrandId": {
+      "body": "{ return await db .select() .from(schema.trackedContentUrls) .where(eq(schema.trackedContentUrls.brandId, brandId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "stampSelfCitation": {
+      "body": "{ if (sourceType === \"bofu\") { await db .update(schema.bofuContent) .set({ lastCitedAt: at }) .where(eq(schema.bofuContent.id, sourceId)); } else { await db .update(schema.faqItems) .set({ lastCitedAt: at }) .where(eq(schema.faqItems.id, sourceId)); } }",
+      "source": "server/databaseStorage.ts"
+    },
+    "incrementCitationRunSelfCitations": {
+      "body": "{ await db .update(schema.citationRuns) .set({ selfCitationCount: sql`${schema.citationRuns.selfCitationCount} + ${by}`, }) .where(eq(schema.citationRuns.id, runId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getGeoToolsSummary": {
+      "body": "{ const cutoff30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); const [listicleAgg] = await db .select({ total: sql<number>`count(*)::int`, included: sql<number>`count(*) filter (where is_included = 1)::int`, }) .from(schema.listicles) .where(eq(schema.listicles.brandId, brandId)); const [wikiAgg] = await db .select({ existing: sql<number>`count(*) filter (where mention_type = 'existing')::int`, opportunities: sql<number>`count(*) filter (where mention_type = 'opportunity')::int`, }) .from(schema.wikipediaMentions) .where(eq(schema.wikipediaMentions.brandId, brandId)); const [bofuAgg] = await db .select({ drafts: sql<number>`count(*) filter (where published_at is null)::int`, published: sql<number>`count(*) filter (where published_at is not null)::int`, cited30d: sql<number>`count(*) filter (where last_cited_at >= ${cutoff30d})::int`, }) .from(schema.bofuContent) .where(eq(schema.bofuContent.brandId, brandId)); const [faqAgg] = await db .select({ drafts: sql<number>`count(*) filter (where published_at is null)::int`, published: sql<number>`count(*) filter (where published_at is not null)::int`, cited30d: sql<number>`count(*) filter (where last_cited_at >= ${cutoff30d})::int`, }) .from(schema.faqItems) .where(eq(schema.faqItems.brandId, brandId)); const [mentionAgg] = await db .select({ total: sql<number>`count(*)::int`, unaddressed: sql<number>`count(*) filter (where status = 'new')::int`, negative: sql<number>`count(*) filter (where sentiment = 'negative')::int`, }) .from(schema.brandMentions) .where(eq(schema.brandMentions.brandId, brandId)); return { listicles: { total: listicleAgg?.total ?? 0, included: listicleAgg?.included ?? 0, }, wikipedia: { existing: wikiAgg?.existing ?? 0, opportunities: wikiAgg?.opportunities ?? 0, }, bofu: { drafts: bofuAgg?.drafts ?? 0, published: bofuAgg?.published ?? 0, cited30d: bofuAgg?.cited30d ?? 0, }, faqs: { drafts: faqAgg?.drafts ?? 0, published: faqAgg?.published ?? 0, cited30d: faqAgg?.cited30d ?? 0, }, mentions: { total: mentionAgg?.total ?? 0, unaddressed: mentionAgg?.unaddressed ?? 0, negative: mentionAgg?.negative ?? 0, }, }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createCitationQuality": {
+      "body": "{ const result = await db.insert(schema.citationQuality).values(insertQuality).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCitationQualities": {
+      "body": "{ const conditions = []; if (brandId) conditions.push(eq(schema.citationQuality.brandId, brandId)); if (filters?.aiPlatform) conditions.push(eq(schema.citationQuality.aiPlatform, filters.aiPlatform)); if (filters?.minScore !== undefined) conditions.push(gte(schema.citationQuality.totalQualityScore, filters.minScore)); const rows = conditions.length > 0 ? await db .select() .from(schema.citationQuality) .where(and(...conditions)) .orderBy(desc(schema.citationQuality.totalQualityScore)) : await db .select() .from(schema.citationQuality) .orderBy(desc(schema.citationQuality.totalQualityScore)); // Wave D - Phase-1 fallback. citation_quality is a Phase-2 table the // active pipeline doesn't populate, so for real brands this always // returns []. Synthesize rows from geo_rankings so the Citation // Quality breakdown card actually renders. // Only kicks in when filtered to a brand; global queries skip it. if (rows.length === 0 && brandId) { const bps = await this.getBrandPromptsByBrandId(brandId); if (bps.length === 0) return rows; const rankings = await this.getGeoRankingsByBrandPromptIds(bps.map((b) => b.id)); const cited = rankings.filter((r) => r.isCited === 1); if (cited.length === 0) return rows; const synthesized: CitationQuality[] = cited .map((r) => { const rank = r.rank ?? 99; const relevance = r.relevanceScore ?? 50; const authority = r.authorityScore ?? 50; // Position score inverts rank: rank 1 = 100, rank 10+ = 0 const positionScore = Math.max(0, Math.min(100, 100 - (rank - 1) * 10)); // Quality = weighted mix of position + relevance + authority. const totalQualityScore = Math.round( positionScore * 0.4 + relevance * 0.4 + authority * 0.2, ); if (filters?.minScore !== undefined && totalQualityScore < filters.minScore) return null; if (filters?.aiPlatform && r.aiPlatform !== filters.aiPlatform) return null; return { id: `phase1:${r.id}`, brandId, articleId: r.articleId, aiPlatform: r.aiPlatform, prompt: r.prompt, citationUrl: r.citingOutletUrl ?? null, authorityScore: authority, relevanceScore: relevance, // No \"recency\" signal in Phase-1 data - derive from checkedAt // age: brand-new rows = 100, 90+ day old = 0. recencyScore: Math.max( 0, Math.min( 100, Math.round( 100 - ((Date.now() - new Date(r.checkedAt).getTime()) / (90 * 24 * 60 * 60 * 1000)) * 100, ), ), ), positionScore, isPrimaryCitation: rank <= 3 ? 1 : 0, totalQualityScore, sourceType: r.sourceType ?? \"ai-generated\", competingCitations: null, scoredAt: r.checkedAt, metadata: { phase: 1, rank } as any, } as CitationQuality; }) .filter((x): x is CitationQuality => x !== null) .sort((a, b) => b.totalQualityScore - a.totalQualityScore); return synthesized; } return rows; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCitationQualityById": {
+      "body": "{ const result = await db .select() .from(schema.citationQuality) .where(eq(schema.citationQuality.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateCitationQuality": {
+      "body": "{ const result = await db .update(schema.citationQuality) .set(update) .where(eq(schema.citationQuality.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteCitationQuality": {
+      "body": "{ const result = await db .delete(schema.citationQuality) .where(eq(schema.citationQuality.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCitationQualityStats": {
+      "body": "{ const qualities = await this.getCitationQualities(brandId); // Fallback to Phase 1 data if Phase 2 citation_quality table is empty. // Compute a proxy \"quality score\" from rank (better rank → higher score) // and group citations by whether the citing outlet is the brand's own // site vs Reddit/Quora/Wikipedia/other. if (qualities.length === 0) { const brandPrompts = await this.getBrandPromptsByBrandId(brandId); const rankings = brandPrompts.length > 0 ? (await this.getGeoRankingsByBrandPromptIds(brandPrompts.map((p) => p.id))).filter( (r) => r.isCited === 1, ) : []; if (rankings.length === 0) { return { avgQualityScore: 0, primaryCitations: 0, secondaryCitations: 0, bySourceType: {} }; } // rank 1-3 → primary, rank 4+ or null → secondary const primaryCitations = rankings.filter((r) => r.rank !== null && r.rank <= 3).length; const secondaryCitations = rankings.length - primaryCitations; // Average score: top rank = 100, rank 10 = 10, no rank = 50 baseline. const avgQualityScore = rankings.reduce((sum, r) => { if (r.rank === null || r.rank === undefined) return sum + 50; return sum + Math.max(0, 100 - (r.rank - 1) * 10); }, 0) / rankings.length; const bySourceType: Record<string, number> = {}; rankings.forEach((r) => { const url = r.citingOutletUrl || \"\"; let type = \"other\"; if (url.includes(\"reddit.com\")) type = \"reddit\"; else if (url.includes(\"quora.com\")) type = \"quora\"; else if (url.includes(\"wikipedia.org\")) type = \"wikipedia\"; else if (url.includes(\"youtube.com\")) type = \"youtube\"; else if (url.includes(\"linkedin.com\")) type = \"linkedin\"; else if (url.includes(\"medium.com\")) type = \"medium\"; bySourceType[type] = (bySourceType[type] || 0) + 1; }); return { avgQualityScore, primaryCitations, secondaryCitations, bySourceType }; } const avgQualityScore = qualities.length > 0 ? qualities.reduce((sum, q) => sum + q.totalQualityScore, 0) / qualities.length : 0; const primaryCitations = qualities.filter((q) => q.isPrimaryCitation === 1).length; const secondaryCitations = qualities.filter((q) => q.isPrimaryCitation === 0).length; const bySourceType: Record<string, number> = {}; qualities.forEach((q) => { const type = q.sourceType || \"unknown\"; bySourceType[type] = (bySourceType[type] || 0) + 1; }); return { avgQualityScore, primaryCitations, secondaryCitations, bySourceType }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createBrandHallucination": {
+      "body": "{ const h = insertHallucination as any; // db.execute returns raw snake_case rows. Upsert for the id, then // re-read via Drizzle so callers see camelCase-mapped fields. const result = await db.execute<{ id: string }>(sql` INSERT INTO brand_hallucinations ( brand_id, ai_platform, prompt, claimed_statement, actual_fact, hallucination_type, severity, category, is_resolved, remediation_steps, remediation_status, ranking_id, citing_outlet_url, citation_context, article_title, metadata, last_seen_at, seen_count ) VALUES ( ${h.brandId}, ${h.aiPlatform}, ${h.prompt}, ${h.claimedStatement}, ${h.actualFact ?? null}, ${h.hallucinationType}, ${h.severity ?? \"medium\"}, ${h.category ?? null}, ${h.isResolved ?? 0}, ${h.remediationSteps ?? null}, ${h.remediationStatus ?? \"pending\"}, ${h.rankingId ?? null}, ${h.citingOutletUrl ?? null}, ${h.citationContext ?? null}, ${h.articleTitle ?? null}, ${h.metadata ?? null}, now(), 1 ) ON CONFLICT (brand_id, ai_platform, md5(claimed_statement)) DO UPDATE SET last_seen_at = now(), seen_count = brand_hallucinations.seen_count + 1, -- Preserve actualFact if the re-detection happened to omit it. actual_fact = COALESCE(EXCLUDED.actual_fact, brand_hallucinations.actual_fact), ranking_id = COALESCE(EXCLUDED.ranking_id, brand_hallucinations.ranking_id), citing_outlet_url = COALESCE(EXCLUDED.citing_outlet_url, brand_hallucinations.citing_outlet_url), citation_context = COALESCE(EXCLUDED.citation_context, brand_hallucinations.citation_context) RETURNING id; `); const id = (result as any).rows?.[0]?.id; if (!id) throw new Error(\"createBrandHallucination upsert returned no id\"); const [row] = await db .select() .from(schema.brandHallucinations) .where(eq(schema.brandHallucinations.id, id)) .limit(1); if (!row) throw new Error(\"createBrandHallucination: row not found after upsert\"); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandHallucinations": {
+      "body": "{ const conditions = []; if (brandId) conditions.push(eq(schema.brandHallucinations.brandId, brandId)); if (filters?.severity) conditions.push(eq(schema.brandHallucinations.severity, filters.severity)); if (filters?.isResolved !== undefined) conditions.push(eq(schema.brandHallucinations.isResolved, filters.isResolved ? 1 : 0)); if (conditions.length > 0) { return await db .select() .from(schema.brandHallucinations) .where(and(...conditions)) .orderBy(desc(schema.brandHallucinations.detectedAt)); } return await db .select() .from(schema.brandHallucinations) .orderBy(desc(schema.brandHallucinations.detectedAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandHallucinationById": {
+      "body": "{ const result = await db .select() .from(schema.brandHallucinations) .where(eq(schema.brandHallucinations.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateBrandHallucination": {
+      "body": "{ const result = await db .update(schema.brandHallucinations) .set(update) .where(eq(schema.brandHallucinations.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteBrandHallucination": {
+      "body": "{ const result = await db .delete(schema.brandHallucinations) .where(eq(schema.brandHallucinations.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "resolveBrandHallucination": {
+      "body": "{ const result = await db .update(schema.brandHallucinations) .set({ isResolved: 1, resolvedAt: new Date(), remediationStatus: \"resolved\" }) .where(eq(schema.brandHallucinations.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getHallucinationStats": {
+      "body": "{ const hallucinations = await this.getBrandHallucinations(brandId); const total = hallucinations.length; const resolved = hallucinations.filter((h) => h.isResolved === 1).length; const bySeverity: Record<string, number> = {}; const byType: Record<string, number> = {}; hallucinations.forEach((h) => { bySeverity[h.severity] = (bySeverity[h.severity] || 0) + 1; byType[h.hallucinationType] = (byType[h.hallucinationType] || 0) + 1; }); return { total, resolved, bySeverity, byType }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createBrandFact": {
+      "body": "{ const result = await db.insert(schema.brandFactSheet).values(insertFact).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandFacts": {
+      "body": "{ // 2026-05-28: query-time dedup across sources. // // The partial unique index on `(brandId, domain, subcategory, factKey)` // is filtered to `source='scraped' AND dismissed_at IS NULL`, so user- // entered rows + scraped rows for the SAME logical fact can both // exist. The UI then renders them twice - the user-reported \"duplicate // unrelated data\" symptom. // // Collapse them here. Within a (domain, subcategory, factKey) group: // 1. Prefer user_manual (explicit user edit) over user (onboarding- // derived) over scraped over paste. // 2. Within the same source priority, prefer the row whose value // survived more sources (sources.length on valuePayload), then // higher confidence, then most recent updatedAt. // 3. Carry the OTHER source's value into the canonical row's // valuePayload.alternatives so the user can still see it in the // provenance disclosure. // // Result: one row per logical fact, all variants visible on demand, // no double-render. const rows = await db .select() .from(schema.brandFactSheet) .where(and(eq(schema.brandFactSheet.brandId, brandId), eq(schema.brandFactSheet.isActive, 1))) .orderBy(asc(schema.brandFactSheet.subcategory)); if (rows.length === 0) return rows; const SOURCE_PRIORITY: Record<string, number> = { user_manual: 4, user: 3, scraped: 2, paste: 1, }; type Row = (typeof rows)[number]; type Payload = { n?: number; items?: string[]; sources?: Array<{ url: string; excerpt: string; confidence: number }>; alternatives?: Array<{ value: string; sources: Array<{ url: string; excerpt: string; confidence: number }>; }>; otherLabel?: string; }; const normalizeForDedup = (s: string): string => (s ?? \"\") .toLowerCase() .normalize(\"NFD\") .replace(/[̀-ͯ]/g, \"\") .replace(/[^\\w\\s]/g, \"\") .replace(/\\s+/g, \" \") .trim(); const groups = new Map<string, Row[]>(); for (const row of rows) { const key = `${row.domain}|${row.subcategory}|${row.factKey}`; const bucket = groups.get(key); if (bucket) bucket.push(row); else groups.set(key, [row]); } const out: Row[] = []; for (const bucket of Array.from(groups.values())) { if (bucket.length === 1) { out.push(bucket[0]); continue; } // Pick winner. bucket.sort((a: Row, b: Row) => { const pa = SOURCE_PRIORITY[a.source ?? \"scraped\"] ?? 0; const pb = SOURCE_PRIORITY[b.source ?? \"scraped\"] ?? 0; if (pa !== pb) return pb - pa; const sa = ((a.valuePayload as Payload | null)?.sources ?? []).length; const sb = ((b.valuePayload as Payload | null)?.sources ?? []).length; if (sa !== sb) return sb - sa; const ca = Number(a.confidence ?? 0); const cb = Number(b.confidence ?? 0); if (ca !== cb) return cb - ca; const ua = a.updatedAt ? new Date(a.updatedAt).getTime() : 0; const ub = b.updatedAt ? new Date(b.updatedAt).getTime() : 0; return ub - ua; }); const winner = bucket[0]; const others = bucket.slice(1); const winnerNorm = normalizeForDedup(winner.factValue ?? \"\"); const winnerPayload: Payload = (winner.valuePayload as Payload | null) ?? {}; const carriedAlternatives = [...(winnerPayload.alternatives ?? [])]; for (const loser of others) { const loserNorm = normalizeForDedup(loser.factValue ?? \"\"); const loserPayload: Payload = (loser.valuePayload as Payload | null) ?? {}; if (loserNorm === winnerNorm) { // Same value - merge losing row's sources into the winner's. const winnerSources = winnerPayload.sources ?? []; const loserSources = loserPayload.sources ?? []; const byUrl = new Map(winnerSources.map((s) => [s.url, s])); for (const s of loserSources) { if (!byUrl.has(s.url)) byUrl.set(s.url, s); } winnerPayload.sources = Array.from(byUrl.values()).slice(0, 20); } else { // Different value - carry as an alternative. const existing = carriedAlternatives.find( (a) => normalizeForDedup(a.value) === loserNorm, ); if (existing) { const merged = new Map(existing.sources.map((s) => [s.url, s])); for (const s of loserPayload.sources ?? []) { if (!merged.has(s.url)) merged.set(s.url, s); } existing.sources = Array.from(merged.values()).slice(0, 20); } else { carriedAlternatives.push({ value: loser.factValue ?? \"\", sources: loserPayload.sources ?? [], }); } } } const finalPayload: Payload = { ...winnerPayload, alternatives: carriedAlternatives.length > 0 ? carriedAlternatives.slice(0, 10) : undefined, }; out.push({ ...winner, valuePayload: finalPayload as Row[\"valuePayload\"] }); } return out; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandFactById": {
+      "body": "{ const result = await db .select() .from(schema.brandFactSheet) .where(eq(schema.brandFactSheet.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateBrandFact": {
+      "body": "{ const result = await db .update(schema.brandFactSheet) .set({ ...update, updatedAt: new Date() }) .where(eq(schema.brandFactSheet.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteBrandFact": {
+      "body": "{ const result = await db .delete(schema.brandFactSheet) .where(eq(schema.brandFactSheet.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createScrapeRun": {
+      "body": "{ const [row] = await db.insert(schema.brandFactScrapeRuns).values(run).returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getScrapeRunById": {
+      "body": "{ const [row] = await db .select() .from(schema.brandFactScrapeRuns) .where(eq(schema.brandFactScrapeRuns.id, runId)) .limit(1); return row ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "listScrapeRunsForBrand": {
+      "body": "{ return await db .select() .from(schema.brandFactScrapeRuns) .where(eq(schema.brandFactScrapeRuns.brandId, brandId)) .orderBy(desc(schema.brandFactScrapeRuns.startedAt)) .limit(limit); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getLatestCompletedScrapeRun": {
+      "body": "{ const rows = await db .select() .from(schema.brandFactScrapeRuns) .where( and( eq(schema.brandFactScrapeRuns.brandId, brandId), eq(schema.brandFactScrapeRuns.status, \"completed\"), ), ) .orderBy(desc(schema.brandFactScrapeRuns.startedAt)) .limit(1); return rows[0] ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getInFlightScrapeRun": {
+      "body": "{ const rows = await db .select({ id: schema.brandFactScrapeRuns.id }) .from(schema.brandFactScrapeRuns) .where( and( eq(schema.brandFactScrapeRuns.brandId, brandId), sql`${schema.brandFactScrapeRuns.status} NOT IN ('completed','failed','timeout','cancelled')`, ), ) .orderBy(desc(schema.brandFactScrapeRuns.startedAt)) .limit(1); return rows[0] ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getLastCompletedScrapeRunAt": {
+      "body": "{ const rows = await db .select({ completedAt: schema.brandFactScrapeRuns.completedAt }) .from(schema.brandFactScrapeRuns) .where( and( eq(schema.brandFactScrapeRuns.brandId, brandId), eq(schema.brandFactScrapeRuns.status, \"completed\"), ), ) .orderBy(desc(schema.brandFactScrapeRuns.completedAt)) .limit(1); const completedAt = rows[0]?.completedAt; return completedAt ? new Date(completedAt) : null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateScrapeRunStatus": {
+      "body": "{ const update: Record<string, unknown> = { status, lastAdvanceAt: new Date(), }; if (fields?.completedAt !== undefined) update.completedAt = fields.completedAt; if (fields?.errorKind !== undefined) update.errorKind = fields.errorKind; if (fields?.errorMessage !== undefined) update.errorMessage = fields.errorMessage; if (fields?.progress !== undefined) update.progress = fields.progress; const [row] = await db .update(schema.brandFactScrapeRuns) .set(update) .where(eq(schema.brandFactScrapeRuns.id, runId)) .returning(); return row ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "transitionScrapeRunStatusCAS": {
+      "body": "{ const [row] = await db .update(schema.brandFactScrapeRuns) .set({ status: next, lastAdvanceAt: new Date() }) .where( and( eq(schema.brandFactScrapeRuns.id, runId), eq(schema.brandFactScrapeRuns.status, expected), ), ) .returning(); return row ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "incrementScrapeRunCounters": {
+      "body": "{ // Use a single SQL with column-level increment expressions. Drizzle's // .set() lifts sql tags so we can build per-column `col + delta` snippets. const setClause: Record<string, unknown> = {}; if (deltas.pagesFetched != null) setClause.pagesFetched = sql`${schema.brandFactScrapeRuns.pagesFetched} + ${deltas.pagesFetched}`; if (deltas.pagesFailed != null) setClause.pagesFailed = sql`${schema.brandFactScrapeRuns.pagesFailed} + ${deltas.pagesFailed}`; if (deltas.factsExtracted != null) setClause.factsExtracted = sql`${schema.brandFactScrapeRuns.factsExtracted} + ${deltas.factsExtracted}`; if (deltas.factsValidated != null) setClause.factsValidated = sql`${schema.brandFactScrapeRuns.factsValidated} + ${deltas.factsValidated}`; if (deltas.factsRedacted != null) setClause.factsRedacted = sql`${schema.brandFactScrapeRuns.factsRedacted} + ${deltas.factsRedacted}`; if (deltas.llmCostCents != null) setClause.llmCostCents = sql`${schema.brandFactScrapeRuns.llmCostCents} + ${deltas.llmCostCents}`; if (deltas.llmCalls != null) setClause.llmCalls = sql`${schema.brandFactScrapeRuns.llmCalls} + ${deltas.llmCalls}`; if (deltas.llmInputTokens != null) setClause.llmInputTokens = sql`${schema.brandFactScrapeRuns.llmInputTokens} + ${deltas.llmInputTokens}`; if (deltas.llmOutputTokens != null) setClause.llmOutputTokens = sql`${schema.brandFactScrapeRuns.llmOutputTokens} + ${deltas.llmOutputTokens}`; if (Object.keys(setClause).length === 0) return; await db .update(schema.brandFactScrapeRuns) .set(setClause) .where(eq(schema.brandFactScrapeRuns.id, runId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "findSlicePendingRuns": {
+      "body": "{ const cutoff = new Date(Date.now() - staleSeconds * 1000); // HIGH 11: skip runs for brands with fact_scrape_enabled=false so // the drain doesn't keep churning a paused brand into 'blocked' fails. // // Also rescue 'pending' runs whose initial dispatch never fired: // @vercel/functions waitUntil is a no-op when the per-request Vercel // context isn't installed (our bundle doesn't install it), so any // path still using waitUntil leaves the run in 'pending' indefinitely. // The daily-orchestrator drain picks them up here. const rows = await db .select({ run: schema.brandFactScrapeRuns }) .from(schema.brandFactScrapeRuns) .innerJoin(schema.brands, eq(schema.brandFactScrapeRuns.brandId, schema.brands.id)) .where( and( or( and( eq(schema.brandFactScrapeRuns.status, \"slice_pending\"), lt(schema.brandFactScrapeRuns.lastAdvanceAt, cutoff), ), and( eq(schema.brandFactScrapeRuns.status, \"pending\"), lt(schema.brandFactScrapeRuns.startedAt, cutoff), ), ), eq(schema.brands.factScrapeEnabled, true), ), ) .limit(limit); return rows.map((r) => r.run); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createScrapePage": {
+      "body": "{ const [row] = await db.insert(schema.brandFactScrapePages).values(page).returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateScrapePageStatus": {
+      "body": "{ const update: Record<string, unknown> = { status }; if (fields) Object.assign(update, fields); const [row] = await db .update(schema.brandFactScrapePages) .set(update) .where(eq(schema.brandFactScrapePages.id, pageId)) .returning(); return row ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "listScrapePagesForRun": {
+      "body": "{ return await db .select() .from(schema.brandFactScrapePages) .where(eq(schema.brandFactScrapePages.runId, runId)) .orderBy(asc(schema.brandFactScrapePages.id)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getScrapePageById": {
+      "body": "{ const rows = await db .select({ id: schema.brandFactScrapePages.id, runId: schema.brandFactScrapePages.runId, url: schema.brandFactScrapePages.url, canonicalUrl: schema.brandFactScrapePages.canonicalUrl, }) .from(schema.brandFactScrapePages) .where(eq(schema.brandFactScrapePages.id, pageId)) .limit(1); return rows[0] ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getMonthlyCostCap": {
+      "body": "{ const [row] = await db .select() .from(schema.brandMonthlyCostCaps) .where( and( eq(schema.brandMonthlyCostCaps.brandId, brandId), eq(schema.brandMonthlyCostCaps.monthKey, monthKey), ), ) .limit(1); return row ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "incrementMonthlyCostCents": {
+      "body": "{ // Upsert. Drizzle's onConflictDoUpdate with `excluded` semantics keeps // the migration's default monthlyCapCents (500) for new rows and adds // deltaCents to existing fact_scrape_cents for old rows. const [row] = await db .insert(schema.brandMonthlyCostCaps) .values({ brandId, monthKey, factScrapeCents: deltaCents, monthlyCapCents: 500, }) .onConflictDoUpdate({ target: [schema.brandMonthlyCostCaps.brandId, schema.brandMonthlyCostCaps.monthKey], set: { factScrapeCents: sql`${schema.brandMonthlyCostCaps.factScrapeCents} + ${deltaCents}`, }, }) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandFactScrapeEnabled": {
+      "body": "{ const [row] = await db .select({ enabled: schema.brands.factScrapeEnabled }) .from(schema.brands) .where(eq(schema.brands.id, brandId)) .limit(1); return row?.enabled ?? false; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setBrandFactScrapeEnabled": {
+      "body": "{ const [row] = await db .update(schema.brands) .set({ factScrapeEnabled: enabled }) .where(eq(schema.brands.id, brandId)) .returning({ enabled: schema.brands.factScrapeEnabled }); return row?.enabled ?? enabled; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandFactSheetConflicts": {
+      "body": "{ // Pull every active (user, scraped) row for this brand, group in JS. // Counts are small (typically <50 rows per brand) so a single SELECT // + in-memory grouping is correct and simple. const rows = await db .select() .from(schema.brandFactSheet) .where( and( eq(schema.brandFactSheet.brandId, brandId), sql`${schema.brandFactSheet.acceptedAt} IS NULL`, sql`${schema.brandFactSheet.dismissedAt} IS NULL`, ), ); const userByKey = new Map<string, BrandFactSheet>(); const scrapedByKey = new Map<string, BrandFactSheet>(); for (const r of rows) { const key = `${r.domain}::${r.subcategory}::${r.factKey}`; if (r.source === \"user\") userByKey.set(key, r); else if (r.source === \"scraped\") scrapedByKey.set(key, r); } const conflicts: Array<{ userFact: BrandFactSheet; scrapedFact: BrandFactSheet }> = []; userByKey.forEach((userFact, key) => { const scrapedFact = scrapedByKey.get(key); if (scrapedFact) conflicts.push({ userFact, scrapedFact }); }); return conflicts; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "acceptFact": {
+      "body": "{ // Stamp accepted_at on this fact. const [target] = await db .update(schema.brandFactSheet) .set({ acceptedAt: new Date() }) .where(eq(schema.brandFactSheet.id, factId)) .returning(); if (!target) return null; if (options.dismissOtherSide) { // Find the conflicting row (same brand/domain/subcategory/factKey, different source). await db .update(schema.brandFactSheet) .set({ dismissedAt: new Date() }) .where( and( eq(schema.brandFactSheet.brandId, target.brandId), eq(schema.brandFactSheet.domain, target.domain), eq(schema.brandFactSheet.subcategory, target.subcategory), eq(schema.brandFactSheet.factKey, target.factKey), sql`${schema.brandFactSheet.source} != ${target.source}`, sql`${schema.brandFactSheet.dismissedAt} IS NULL`, ), ); } return target; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "dismissFact": {
+      "body": "{ const [row] = await db .update(schema.brandFactSheet) .set({ dismissedAt: new Date() }) .where(eq(schema.brandFactSheet.id, factId)) .returning(); return row ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "listFactsByRunIdSince": {
+      "body": "{ // HIGH 5 (narrower fix chosen): UUID v4 ids are random, so ordering by id // alone is non-monotonic and a late-arriving row with a smaller id would // be skipped on reconnect. We now ORDER BY created_at ASC, id ASC so the // stream emits in insertion order. The `id > sinceId` cursor is retained // (rather than a composite (created_at, id) cursor) to keep the change // surgical; rare skip/replay on reconnect with identical-ms inserts is // an acceptable trade-off vs. broader signature churn. const conditions = [eq(schema.brandFactSheet.runId, runId)]; if (sinceId) conditions.push(sql`${schema.brandFactSheet.id} > ${sinceId}`); return await db .select() .from(schema.brandFactSheet) .where(and(...conditions)) .orderBy(asc(schema.brandFactSheet.createdAt), asc(schema.brandFactSheet.id)) .limit(limit); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createMetricsSnapshot": {
+      "body": "{ const result = await db.insert(schema.metricsHistory).values(snapshot).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getMetricsHistory": {
+      "body": "{ const cutoffDate = new Date(); cutoffDate.setDate(cutoffDate.getDate() - days); const conditions = [ eq(schema.metricsHistory.brandId, brandId), gte(schema.metricsHistory.snapshotDate, cutoffDate), ]; if (metricType) conditions.push(eq(schema.metricsHistory.metricType, metricType)); return await db .select() .from(schema.metricsHistory) .where(and(...conditions)) .orderBy(asc(schema.metricsHistory.snapshotDate)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "recordCurrentMetrics": {
+      "body": "{ // The \"Record Snapshot\" button on the Trends tab calls this. Compute // share-of-answer from brand_prompts × geo_rankings - the tables the // active citation pipeline actually writes to. (The prompt_portfolio // table this used to prefer was dead - the active pipeline never wrote // to it - and was dropped; see migration 0082.) const brandPrompts = await this.getBrandPromptsByBrandId(brandId); if (brandPrompts.length > 0) { const rankings = await this.getGeoRankingsByBrandPromptIds(brandPrompts.map((p) => p.id)); const totalChecks = rankings.length; const citedChecks = rankings.filter((r) => r.isCited === 1).length; const soaValue = totalChecks > 0 ? (citedChecks / totalChecks) * 100 : 0; await this.createMetricsSnapshot({ brandId, metricType: \"share_of_answer\", metricValue: soaValue.toFixed(2), metricDetails: { promptCount: brandPrompts.length, totalChecks, citedChecks, }, } as any); } // citation_quality - average totalQualityScore across citations. // getCitationQualities has its own Phase-1 fallback (Wave D), so this // always returns something when there are cited rankings. const citations = await this.getCitationQualities(brandId); if (citations.length > 0) { const avgQuality = citations.reduce((sum, c) => sum + c.totalQualityScore, 0) / citations.length; await this.createMetricsSnapshot({ brandId, metricType: \"citation_quality\", metricValue: avgQuality.toFixed(2), metricDetails: { citationCount: citations.length }, } as any); } // hallucinations - always write a row (even 0 unresolved is useful for // trend tracking). const hallucinations = await this.getBrandHallucinations(brandId); const unresolvedCount = hallucinations.filter( (h: BrandHallucination) => h.isResolved === 0, ).length; await this.createMetricsSnapshot({ brandId, metricType: \"hallucinations\", metricValue: unresolvedCount.toString(), metricDetails: { total: hallucinations.length, unresolved: unresolvedCount }, } as any); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createAlertSetting": {
+      "body": "{ const result = await db.insert(schema.alertSettings).values(setting).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getAlertSettings": {
+      "body": "{ return await db .select() .from(schema.alertSettings) .where(eq(schema.alertSettings.brandId, brandId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getAlertSettingById": {
+      "body": "{ const result = await db .select() .from(schema.alertSettings) .where(eq(schema.alertSettings.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateAlertSetting": {
+      "body": "{ const result = await db .update(schema.alertSettings) .set(update) .where(eq(schema.alertSettings.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteAlertSetting": {
+      "body": "{ const result = await db .delete(schema.alertSettings) .where(eq(schema.alertSettings.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createAlertHistory": {
+      "body": "{ const result = await db.insert(schema.alertHistory).values(history).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getAlertHistory": {
+      "body": "{ return await db .select() .from(schema.alertHistory) .where(eq(schema.alertHistory.brandId, brandId)) .orderBy(desc(schema.alertHistory.sentAt)) .limit(limit); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createAgentTask": {
+      "body": "{ const result = await db.insert(schema.agentTasks).values(insertTask).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getAgentTaskById": {
+      "body": "{ const result = await db.select().from(schema.agentTasks).where(eq(schema.agentTasks.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateAgentTask": {
+      "body": "{ const result = await db .update(schema.agentTasks) .set({ ...update, updatedAt: new Date() }) .where(eq(schema.agentTasks.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "claimAgentTask": {
+      "body": "{ const now = new Date(); const result = await db .update(schema.agentTasks) .set({ status: \"in_progress\", startedAt: now, updatedAt: now }) .where( and( eq(schema.agentTasks.id, id), inArray(schema.agentTasks.status, [\"queued\", \"scheduled\"]), ), ) .returning(); return result[0] ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createKeywordResearch": {
+      "body": "{ const result = await db.insert(schema.keywordResearch).values(keyword).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getKeywordResearch": {
+      "body": "{ const conditions = [eq(schema.keywordResearch.brandId, brandId)]; if (filters?.status) conditions.push(eq(schema.keywordResearch.status, filters.status)); if (filters?.category) conditions.push(eq(schema.keywordResearch.category, filters.category)); return await db .select() .from(schema.keywordResearch) .where(and(...conditions)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getKeywordResearchById": {
+      "body": "{ const result = await db .select() .from(schema.keywordResearch) .where(eq(schema.keywordResearch.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateKeywordResearch": {
+      "body": "{ const result = await db .update(schema.keywordResearch) .set({ ...update, updatedAt: new Date() }) .where(eq(schema.keywordResearch.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteKeywordResearch": {
+      "body": "{ const result = await db .delete(schema.keywordResearch) .where(eq(schema.keywordResearch.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getTopKeywordOpportunities": {
+      "body": "{ return await db .select() .from(schema.keywordResearch) .where( and( eq(schema.keywordResearch.brandId, brandId), eq(schema.keywordResearch.status, \"discovered\"), ), ) .orderBy(desc(schema.keywordResearch.opportunityScore)) .limit(limit); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createCommunityPost": {
+      "body": "{ const result = await db.insert(schema.communityPosts).values(post).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCommunityPosts": {
+      "body": "{ const conditions = []; if (brandId) conditions.push(eq(schema.communityPosts.brandId, brandId)); if (filters?.platform) conditions.push(eq(schema.communityPosts.platform, filters.platform)); if (filters?.status) conditions.push(eq(schema.communityPosts.status, filters.status)); if (conditions.length > 0) { return await db .select() .from(schema.communityPosts) .where(and(...conditions)); } return await db.select().from(schema.communityPosts); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCommunityPostById": {
+      "body": "{ const result = await db .select() .from(schema.communityPosts) .where(eq(schema.communityPosts.id, id)); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateCommunityPost": {
+      "body": "{ const result = await db .update(schema.communityPosts) .set(update) .where(eq(schema.communityPosts.id, id)) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteCommunityPost": {
+      "body": "{ const result = await db .delete(schema.communityPosts) .where(eq(schema.communityPosts.id, id)) .returning(); return result.length > 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createDraftArticle": {
+      "body": "{ // Verify the brand belongs to the user before creating an article under it. const ownsBrand = await db .select({ id: schema.brands.id }) .from(schema.brands) .where( and( eq(schema.brands.id, brandId), eq(schema.brands.userId, userId), isNull(schema.brands.deletedAt), ), ) .limit(1); if (ownsBrand.length === 0) { throw new Error(\"Brand not found or not owned by user\"); } const result = await db .insert(schema.articles) .values({ brandId, title: fields.title ?? null, content: null, keywords: fields.keywords ?? null, industry: fields.industry ?? null, contentType: fields.contentType ?? null, targetCustomers: fields.targetCustomers ?? null, geography: fields.geography ?? null, contentStyle: fields.contentStyle ?? \"b2c\", status: \"draft\", author: \"GEO Platform\", }) .returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getArticlesByUserIdWithStatus": {
+      "body": "{ const limit = opts.limit ?? 100; const offset = opts.offset ?? 0; const conds = [eq(schema.brands.userId, userId), isNull(schema.brands.deletedAt)]; if (opts.brandId) conds.push(eq(schema.articles.brandId, opts.brandId)); if (opts.status) { if (Array.isArray(opts.status)) { conds.push(inArray(schema.articles.status, opts.status)); } else { conds.push(eq(schema.articles.status, opts.status)); } } const result = await db .select({ articles: schema.articles }) .from(schema.articles) .innerJoin(schema.brands, eq(schema.articles.brandId, schema.brands.id)) .where(and(...conds)) .orderBy(desc(schema.articles.updatedAt)) .limit(limit) .offset(offset); return result.map((r) => r.articles); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getArticleByJobId": {
+      "body": "{ const result = await db .select() .from(schema.articles) .where(eq(schema.articles.jobId, jobId)) .limit(1); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setArticleGeneratingFromDraft": {
+      "body": "{ // Flip draft|generating → generating. The route handler already does // this synchronously so the UI flips on click; this call is the worker // re-asserting the state when it claims the job (idempotent). await db .update(schema.articles) .set({ status: \"generating\", jobId, updatedAt: new Date(), }) .where( and( eq(schema.articles.id, articleId), inArray(schema.articles.status, [\"draft\", \"generating\"]), ), ); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setArticleReady": {
+      "body": "{ await db .update(schema.articles) .set({ status: \"ready\", content, title: title ?? sql`${schema.articles.title}`, // keep existing title if caller passes null jobId: null, version: sql`${schema.articles.version} + 1`, // This is the only path that flips // ai_generated=true. Manual creates (POST /api/articles) leave the // default false, so the AI-disclosure pill only renders for worker // output. aiGenerated: true, updatedAt: new Date(), }) .where(eq(schema.articles.id, articleId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setArticleFailed": {
+      "body": "{ await db .update(schema.articles) .set({ status: \"failed\", jobId: null, updatedAt: new Date() }) .where(eq(schema.articles.id, articleId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setArticleDraft": {
+      "body": "{ await db .update(schema.articles) .set({ status: \"draft\", jobId: null, updatedAt: new Date() }) .where(eq(schema.articles.id, articleId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createRevision": {
+      "body": "{ const result = await db.insert(schema.articleRevisions).values(input).returning(); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "listRevisions": {
+      "body": "{ return db .select() .from(schema.articleRevisions) .where(eq(schema.articleRevisions.articleId, articleId)) .orderBy(desc(schema.articleRevisions.createdAt)) .limit(limit); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getRevisionById": {
+      "body": "{ const result = await db .select() .from(schema.articleRevisions) .where(eq(schema.articleRevisions.id, revisionId)) .limit(1); return result[0]; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "listChatbotThreads": {
+      "body": "{ const rows = await db.execute(sql` select t.*, coalesce(m.cnt, 0)::int as message_count from public.chatbot_threads t left join ( select thread_id, count(*) as cnt from public.chatbot_messages group by thread_id ) m on m.thread_id = t.id where t.user_id = ${userId} and t.archived_at is null order by t.updated_at desc limit ${limit} `); const data = (rows as unknown as { rows?: unknown[] }).rows ?? (rows as unknown as unknown[]); return (data as Array<Record<string, unknown>>).map((r) => ({ id: r.id as string, userId: r.user_id as string, brandId: (r.brand_id as string | null) ?? null, title: r.title as string, createdAt: new Date(r.created_at as string), updatedAt: new Date(r.updated_at as string), archivedAt: r.archived_at ? new Date(r.archived_at as string) : null, messageCount: (r.message_count as number) ?? 0, })); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getChatbotThread": {
+      "body": "{ const [row] = await db .select() .from(schema.chatbotThreads) .where(eq(schema.chatbotThreads.id, threadId)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createChatbotThread": {
+      "body": "{ const [row] = await db .insert(schema.chatbotThreads) .values({ userId, brandId: brandId ?? null, }) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "archiveChatbotThread": {
+      "body": "{ await db .update(schema.chatbotThreads) .set({ archivedAt: new Date() }) .where(eq(schema.chatbotThreads.id, threadId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "restoreChatbotThread": {
+      "body": "{ await db .update(schema.chatbotThreads) .set({ archivedAt: null }) .where(eq(schema.chatbotThreads.id, threadId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setChatbotThreadTitle": {
+      "body": "{ await db .update(schema.chatbotThreads) .set({ title }) .where(eq(schema.chatbotThreads.id, threadId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "touchChatbotThread": {
+      "body": "{ await db .update(schema.chatbotThreads) .set({ updatedAt: new Date() }) .where(eq(schema.chatbotThreads.id, threadId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getChatbotThreadMessages": {
+      "body": "{ return db .select() .from(schema.chatbotMessages) .where(eq(schema.chatbotMessages.threadId, threadId)) .orderBy(schema.chatbotMessages.createdAt) .limit(limit); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "insertChatbotMessage": {
+      "body": "{ const [row] = await db .insert(schema.chatbotMessages) .values({ userId: msg.userId, threadId: msg.threadId, brandId: msg.brandId ?? null, role: msg.role, content: msg.content, inputTokens: msg.inputTokens ?? null, outputTokens: msg.outputTokens ?? null, model: msg.model ?? null, }) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "pruneChatbotMessages": {
+      "body": "{ // 30-day TTL on messages. const ageRes = await db.execute(sql` delete from public.chatbot_messages where created_at < now() - interval '30 days' returning id `); const ageR = ageRes as unknown as { rows?: unknown[] } & unknown[]; const deletedByAge = ageR.rows?.length ?? ageR.length ?? 0; // Per-user soft cap of 500 messages across threads, keeping newest. const capRes = await db.execute(sql` with ranked as ( select id, row_number() over (partition by user_id order by created_at desc) as rn from public.chatbot_messages ) delete from public.chatbot_messages where id in (select id from ranked where rn > 500) returning id `); const capR = capRes as unknown as { rows?: unknown[] } & unknown[]; const deletedByCap = capR.rows?.length ?? capR.length ?? 0; // Hard-delete threads archived more than 30 days ago. await db.execute(sql` delete from public.chatbot_threads where archived_at is not null and archived_at < now() - interval '30 days' `); return { deletedByAge, deletedByCap }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createScanJob": {
+      "body": "{ // Explicit createdAt from JS Date avoids any DB/server timezone // misconfiguration causing \"6 hours ago\" relative-time bugs. JS Date is // an absolute UTC instant regardless of host TZ settings. const [row] = await db .insert(schema.scanJobs) .values({ brandId: input.brandId, userId: input.userId, trigger: input.trigger, status: \"queued\", perSource: {}, totals: {}, createdAt: new Date(), }) .returning(); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getScanJob": {
+      "body": "{ const [row] = await db .select({ ...getTableColumns(schema.scanJobs), brandName: schema.brands.name }) .from(schema.scanJobs) .leftJoin(schema.brands, eq(schema.scanJobs.brandId, schema.brands.id)) .where(eq(schema.scanJobs.id, id)) .limit(1); if (!row) return undefined; return { ...row, brandName: row.brandName ?? \"\" }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getActiveScanJobForBrand": {
+      "body": "{ // Freshness bound: never attach a new scan to a job older than the stale // threshold. A scan killed mid-run stays status='running' forever; without // this bound every future scan would attach to the dead job and wedge // scanning permanently. The cron reaper (failStaleScanJobs) flips these to // 'failed', but this guard makes attachment safe even before the reaper // has run. const staleCutoff = new Date(Date.now() - SCAN_JOB_STALE_MINUTES * 60 * 1000); const [row] = await db .select() .from(schema.scanJobs) .where( and( eq(schema.scanJobs.brandId, brandId), or(eq(schema.scanJobs.status, \"queued\"), eq(schema.scanJobs.status, \"running\")), sql`${schema.scanJobs.createdAt} >= ${staleCutoff}`, ), ) .orderBy(desc(schema.scanJobs.createdAt)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "failStaleScanJobs": {
+      "body": "{ const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000); const result = await db .update(schema.scanJobs) .set({ status: \"failed\", error: \"Scan was interrupted (timeout, deploy, or crash).\", completedAt: new Date(), }) .where( and( or(eq(schema.scanJobs.status, \"queued\"), eq(schema.scanJobs.status, \"running\")), sql`${schema.scanJobs.createdAt} < ${cutoff}`, ), ) .returning({ id: schema.scanJobs.id }); return result.length; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getActiveScanJobsForUser": {
+      "body": "{ const rows = await db .select({ ...getTableColumns(schema.scanJobs), brandName: schema.brands.name }) .from(schema.scanJobs) .leftJoin(schema.brands, eq(schema.scanJobs.brandId, schema.brands.id)) .where( and( eq(schema.scanJobs.userId, userId), or(eq(schema.scanJobs.status, \"queued\"), eq(schema.scanJobs.status, \"running\")), ), ) .orderBy(desc(schema.scanJobs.createdAt)); return rows.map((r) => ({ ...r, brandName: r.brandName ?? \"\" })); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getLastCompletedScanForBrand": {
+      "body": "{ const [row] = await db .select({ ...getTableColumns(schema.scanJobs), brandName: schema.brands.name }) .from(schema.scanJobs) .leftJoin(schema.brands, eq(schema.scanJobs.brandId, schema.brands.id)) .where(and(eq(schema.scanJobs.brandId, brandId), eq(schema.scanJobs.status, \"complete\"))) .orderBy(desc(schema.scanJobs.completedAt)) .limit(1); if (!row) return undefined; return { ...row, brandName: row.brandName ?? \"\" }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateScanJob": {
+      "body": "{ await db.update(schema.scanJobs).set(patch).where(eq(schema.scanJobs.id, id)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "pruneOldScanJobs": {
+      "body": "{ const res = await db.execute(sql` DELETE FROM scan_jobs WHERE status IN ('complete', 'failed') AND completed_at < now() - (${beforeDays} || ' days')::interval RETURNING id `); const r = res as unknown as { rows?: unknown[] } & unknown[]; return r.rows?.length ?? (Array.isArray(r) ? r.length : 0); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getMostRecentManualScanForBrand": {
+      "body": "{ const [row] = await db .select() .from(schema.scanJobs) .where(and(eq(schema.scanJobs.brandId, brandId), eq(schema.scanJobs.trigger, \"manual\"))) .orderBy(desc(schema.scanJobs.createdAt)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getSourceHealth": {
+      "body": "{ const [row] = await db .select() .from(schema.sourceHealth) .where(and(eq(schema.sourceHealth.brandId, brandId), eq(schema.sourceHealth.source, source))) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "upsertSourceHealth": {
+      "body": "{ await db .insert(schema.sourceHealth) .values(input) .onConflictDoUpdate({ target: [schema.sourceHealth.brandId, schema.sourceHealth.source], set: { consecutiveFailures: input.consecutiveFailures ?? 0, lastFailureAt: input.lastFailureAt ?? null, lastFailureReason: input.lastFailureReason ?? null, pausedUntil: input.pausedUntil ?? null, lastSuccessfulScanAt: input.lastSuccessfulScanAt ?? null, }, }); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getCachedSentiment": {
+      "body": "{ const [row] = await db .select() .from(schema.sentimentCache) .where(eq(schema.sentimentCache.contentHash, contentHash)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "upsertCachedSentiment": {
+      "body": "{ await db .insert(schema.sentimentCache) .values({ contentHash: input.contentHash, sentiment: input.sentiment, sentimentScore: input.sentimentScore, }) .onConflictDoUpdate({ target: schema.sentimentCache.contentHash, set: { sentiment: input.sentiment, sentimentScore: input.sentimentScore, cachedAt: new Date(), }, }); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "pruneOldSentimentCache": {
+      "body": "{ const res = await db.execute(sql` DELETE FROM sentiment_cache WHERE cached_at < now() - (${beforeDays} || ' days')::interval RETURNING content_hash `); const r = res as unknown as { rows?: unknown[] } & unknown[]; return r.rows?.length ?? (Array.isArray(r) ? r.length : 0); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "countSentimentCallsForBrandSince": {
+      "body": "{ const [row] = await db .select({ count: sql<number>`count(*)::int` }) .from(schema.brandMentions) .where( and( eq(schema.brandMentions.brandId, brandId), eq(schema.brandMentions.sentimentSource, \"llm\"), gte(schema.brandMentions.discoveredAt, since), ), ); return row?.count ?? 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setBrandMonitorMentions": {
+      "body": "{ await db .update(schema.brands) .set({ monitorMentions: enabled }) .where(eq(schema.brands.id, brandId)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "listBrandsWithMentionMonitoring": {
+      "body": "{ const lastScan = db .select({ brandId: schema.scanJobs.brandId, lastAt: sql<Date | null>`max(${schema.scanJobs.createdAt})`.as(\"last_at\"), }) .from(schema.scanJobs) .groupBy(schema.scanJobs.brandId) .as(\"last_scan\"); const rows = await db .select({ id: schema.brands.id, userId: schema.brands.userId }) .from(schema.brands) .leftJoin(lastScan, eq(lastScan.brandId, schema.brands.id)) .where(eq(schema.brands.monitorMentions, true)) .orderBy(sql`${lastScan.lastAt} asc nulls first`); // userId is nullable in the schema (historical design); brands with // monitor_mentions=true must have a user, so cast is safe in practice. return rows.map((r) => ({ id: r.id, userId: r.userId ?? \"\" })); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getBrandMention": {
+      "body": "{ const [row] = await db .select() .from(schema.brandMentions) .where(eq(schema.brandMentions.id, id)) .limit(1); return row; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteManyBrandMentions": {
+      "body": "{ if (ids.length === 0) return 0; const result = await db .delete(schema.brandMentions) .where(inArray(schema.brandMentions.id, ids)) .returning({ id: schema.brandMentions.id }); return result.length; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteAllMentionsForBrand": {
+      "body": "{ const result = await db .delete(schema.brandMentions) .where(eq(schema.brandMentions.brandId, brandId)) .returning({ id: schema.brandMentions.id }); return result.length; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getOwnedMentionIds": {
+      "body": "{ if (ids.length === 0) return []; const rows = await db .select({ id: schema.brandMentions.id }) .from(schema.brandMentions) .innerJoin(schema.brands, eq(schema.brandMentions.brandId, schema.brands.id)) .where(and(inArray(schema.brandMentions.id, ids), eq(schema.brands.userId, userId))); return rows.map((r) => r.id); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "updateBrandMentionStatus": {
+      "body": "{ await db.update(schema.brandMentions).set({ status }).where(eq(schema.brandMentions.id, id)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getMentionStatsForBrand": {
+      "body": "{ // Single-pass aggregate for total + sentiment breakdown. // `total` is every mention. The positive/neutral/negative buckets are // scoped to sentiment_source = 'llm': sentimentBatcher writes a fake // {neutral, score 0} verdict on LLM failure / budget cap (tagged // 'fallback' / 'capped'), so counting those would inflate \"neutral\" // and misreport the real sentiment distribution. const [agg] = await db .select({ total: sql<number>`count(*)::int`, positive: sql<number>`count(*) filter (where sentiment = 'positive' and sentiment_source = 'llm')::int`, neutral: sql<number>`count(*) filter (where sentiment = 'neutral' and sentiment_source = 'llm')::int`, negative: sql<number>`count(*) filter (where sentiment = 'negative' and sentiment_source = 'llm')::int`, }) .from(schema.brandMentions) .where(eq(schema.brandMentions.brandId, brandId)); // Per-platform breakdown. const platformRows = await db .select({ platform: schema.brandMentions.platform, count: sql<number>`count(*)::int`, }) .from(schema.brandMentions) .where(eq(schema.brandMentions.brandId, brandId)) .groupBy(schema.brandMentions.platform); // Per-status breakdown. const statusRows = await db .select({ status: schema.brandMentions.status, count: sql<number>`count(*)::int`, }) .from(schema.brandMentions) .where(eq(schema.brandMentions.brandId, brandId)) .groupBy(schema.brandMentions.status); const byPlatform: Record<string, number> = {}; for (const r of platformRows) { if (r.platform) byPlatform[r.platform] = r.count; } const byStatus: Record<string, number> = {}; for (const r of statusRows) { if (r.status) byStatus[r.status] = r.count; } return { total: agg?.total ?? 0, byPlatform, bySentiment: { positive: agg?.positive ?? 0, neutral: agg?.neutral ?? 0, negative: agg?.negative ?? 0, }, byStatus, }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "listMentionsForBrand": {
+      "body": "{ const limit = Math.min(opts.limit ?? 25, 100); const sort = opts.sort ?? \"newest\"; // Raw `SELECT *` returns snake_case column names; the rest of the app // (Drizzle types + frontend) expects camelCase. Map at the boundary. const mapRow = (r: Record<string, unknown>): BrandMention => ({ id: r.id as string, brandId: r.brand_id as string, platform: r.platform as string, sourceUrl: r.source_url as string, sourceTitle: (r.source_title as string | null) ?? null, mentionContext: (r.mention_context as string | null) ?? null, sentiment: (r.sentiment as string | null) ?? null, sentimentScore: (r.sentiment_score as string | null) ?? null, engagementScore: (r.engagement_score as number | null) ?? null, authorUsername: (r.author_username as string | null) ?? null, isVerified: r.is_verified as number, mentionedAt: r.mentioned_at ? new Date(r.mentioned_at as string) : null, discoveredAt: new Date(r.discovered_at as string), metadata: (r.metadata ?? null) as BrandMention[\"metadata\"], status: r.status as string, mentionLocation: (r.mention_location as string | null) ?? null, linkStatus: (r.link_status as string | null) ?? null, lastVerifiedAt: r.last_verified_at ? new Date(r.last_verified_at as string) : null, matchedVariation: (r.matched_variation as string | null) ?? null, matchedField: (r.matched_field as string | null) ?? null, source: (r.source as string | null) ?? null, scannerVersion: (r.scanner_version as number | null) ?? null, sentimentSource: (r.sentiment_source as string | null) ?? null, engagementNormalized: (r.engagement_normalized as number | null) ?? null, }); // Build filter conditions. // All filtering is applied inline via raw SQL templates in each sort branch // (ILIKE across OR'd columns isn't expressible in Drizzle's ORM helpers). let rows: BrandMention[]; if (sort === \"engagement\") { // Keyset pagination on (engagement_normalized DESC, id ASC). const cursorClause = opts.cursor != null ? sql`AND (engagement_normalized, id) < ( (SELECT engagement_normalized FROM brand_mentions WHERE id = ${opts.cursor.id}), ${opts.cursor.id} )` : sql``; const qFilter = opts.q ? sql`AND (source_title ILIKE ${\"%\" + opts.q + \"%\"} OR mention_context ILIKE ${\"%\" + opts.q + \"%\"})` : sql``; const res = await db.execute(sql` SELECT * FROM brand_mentions WHERE brand_id = ${brandId} ${opts.status ? sql`AND status = ${opts.status}` : sql``} ${opts.platform ? sql`AND platform = ${opts.platform}` : sql``} ${opts.sentiment ? sql`AND sentiment = ${opts.sentiment}` : sql``} ${opts.from ? sql`AND discovered_at >= ${opts.from}` : sql``} ${opts.to ? sql`AND discovered_at <= ${opts.to}` : sql``} ${qFilter} ${cursorClause} ORDER BY engagement_normalized DESC NULLS LAST, id ASC LIMIT ${limit + 1} `); const data = (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]); rows = (data as Record<string, unknown>[]).map(mapRow); } else if (sort === \"oldest\") { // Keyset on (discovered_at ASC, id ASC). const cursorClause = opts.cursor != null ? sql`AND (discovered_at, id) > (${opts.cursor.discoveredAt}, ${opts.cursor.id})` : sql``; const qFilter = opts.q ? sql`AND (source_title ILIKE ${\"%\" + opts.q + \"%\"} OR mention_context ILIKE ${\"%\" + opts.q + \"%\"})` : sql``; const res = await db.execute(sql` SELECT * FROM brand_mentions WHERE brand_id = ${brandId} ${opts.status ? sql`AND status = ${opts.status}` : sql``} ${opts.platform ? sql`AND platform = ${opts.platform}` : sql``} ${opts.sentiment ? sql`AND sentiment = ${opts.sentiment}` : sql``} ${opts.from ? sql`AND discovered_at >= ${opts.from}` : sql``} ${opts.to ? sql`AND discovered_at <= ${opts.to}` : sql``} ${qFilter} ${cursorClause} ORDER BY discovered_at ASC, id ASC LIMIT ${limit + 1} `); const data = (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]); rows = (data as Record<string, unknown>[]).map(mapRow); } else { // Default: newest first - keyset on (discovered_at DESC, id DESC). const cursorClause = opts.cursor != null ? sql`AND (discovered_at, id) < (${opts.cursor.discoveredAt}, ${opts.cursor.id})` : sql``; const qFilter = opts.q ? sql`AND (source_title ILIKE ${\"%\" + opts.q + \"%\"} OR mention_context ILIKE ${\"%\" + opts.q + \"%\"})` : sql``; const res = await db.execute(sql` SELECT * FROM brand_mentions WHERE brand_id = ${brandId} ${opts.status ? sql`AND status = ${opts.status}` : sql``} ${opts.platform ? sql`AND platform = ${opts.platform}` : sql``} ${opts.sentiment ? sql`AND sentiment = ${opts.sentiment}` : sql``} ${opts.from ? sql`AND discovered_at >= ${opts.from}` : sql``} ${opts.to ? sql`AND discovered_at <= ${opts.to}` : sql``} ${qFilter} ${cursorClause} ORDER BY discovered_at DESC, id DESC LIMIT ${limit + 1} `); const data = (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]); rows = (data as Record<string, unknown>[]).map(mapRow); } // Determine next cursor. let nextCursor: { discoveredAt: Date; id: string } | null = null; if (rows.length > limit) { rows = rows.slice(0, limit); const last = rows[rows.length - 1]; nextCursor = { discoveredAt: last.discoveredAt instanceof Date ? last.discoveredAt : new Date(last.discoveredAt as string), id: last.id, }; } return { rows, nextCursor }; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getFactScrapeCache": {
+      "body": "{ const rows = await db .select({ cacheKey: schema.factScrapeCache.cacheKey, valueJson: schema.factScrapeCache.valueJson, expiresAt: schema.factScrapeCache.expiresAt, }) .from(schema.factScrapeCache) .where( and( eq(schema.factScrapeCache.cacheKey, cacheKey), gt(schema.factScrapeCache.expiresAt, new Date()), ), ) .limit(1); return rows[0] ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "upsertFactScrapeCache": {
+      "body": "{ await db .insert(schema.factScrapeCache) .values({ cacheKey: row.cacheKey, source: row.source, brandId: row.brandId, valueJson: row.valueJson, expiresAt: row.expiresAt, }) .onConflictDoUpdate({ target: schema.factScrapeCache.cacheKey, set: { valueJson: row.valueJson, expiresAt: row.expiresAt, createdAt: new Date(), }, }); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteExpiredFactScrapeCache": {
+      "body": "{ const result = await db .delete(schema.factScrapeCache) .where(lt(schema.factScrapeCache.expiresAt, new Date())); return (result as unknown as { rowCount: number | null }).rowCount ?? 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "insertFactScrapeLog": {
+      "body": "{ await db.insert(schema.factScrapeLogs).values({ runId: row.runId, source: row.source, status: row.status, factCount: row.factCount ?? 0, latencyMs: row.latencyMs ?? null, providerLatencyMs: row.providerLatencyMs ?? null, errorKind: row.errorKind ?? null, diagnostics: (row.diagnostics ?? null) as never, }); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "listFactScrapeLogsForRun": {
+      "body": "{ return await db .select({ source: schema.factScrapeLogs.source, status: schema.factScrapeLogs.status, factCount: schema.factScrapeLogs.factCount, errorKind: schema.factScrapeLogs.errorKind, createdAt: schema.factScrapeLogs.createdAt, }) .from(schema.factScrapeLogs) .where(eq(schema.factScrapeLogs.runId, runId)) .orderBy(asc(schema.factScrapeLogs.createdAt)); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "getSystemState": {
+      "body": "{ const rows = await db .select({ valueJson: schema.systemState.valueJson }) .from(schema.systemState) .where(eq(schema.systemState.key, key)) .limit(1); return rows[0]?.valueJson ?? null; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "setSystemState": {
+      "body": "{ await db .insert(schema.systemState) .values({ key, valueJson: value, updatedAt: new Date(), }) .onConflictDoUpdate({ target: schema.systemState.key, set: { valueJson: value, updatedAt: new Date() }, }); }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteOldFactScrapePages": {
+      "body": "{ const result = await db.execute(sql` DELETE FROM brand_fact_scrape_pages WHERE run_id IN ( SELECT id FROM brand_fact_scrape_runs WHERE started_at < now() - (${olderThanDays} || ' days')::interval ) `); return (result as unknown as { rowCount: number | null }).rowCount ?? 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteOldFactScrapeRuns": {
+      "body": "{ const result = await db.execute(sql` DELETE FROM brand_fact_scrape_runs WHERE started_at < now() - (${olderThanDays} || ' days')::interval `); return (result as unknown as { rowCount: number | null }).rowCount ?? 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteOldFactScrapeLogs": {
+      "body": "{ const result = await db.execute(sql` DELETE FROM fact_scrape_logs WHERE created_at < now() - (${olderThanDays} || ' days')::interval `); return (result as unknown as { rowCount: number | null }).rowCount ?? 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "deleteExpiredLlmConcurrencySlots": {
+      "body": "{ const result = await db.execute(sql` DELETE FROM llm_concurrency_slots WHERE expires_at < now() `); return (result as unknown as { rowCount: number | null }).rowCount ?? 0; }",
+      "source": "server/databaseStorage.ts"
+    },
+    "createRun": {
+      "body": "{ const [row] = await db.insert(schema.workflowRuns).values(data).returning(); return row; }",
+      "source": "server/storage/workflowStorage.ts"
+    },
+    "getRun": {
+      "body": "{ const [row] = await db .select() .from(schema.workflowRuns) .where(eq(schema.workflowRuns.id, id)) .limit(1); return row; }",
+      "source": "server/storage/workflowStorage.ts"
+    },
+    "getRunsByBrand": {
+      "body": "{ const clauses = [eq(schema.workflowRuns.brandId, brandId)]; if (filters.status) clauses.push(eq(schema.workflowRuns.status, filters.status)); if (filters.workflowKey) clauses.push(eq(schema.workflowRuns.workflowKey, filters.workflowKey)); return db .select() .from(schema.workflowRuns) .where(and(...clauses)) .orderBy(desc(schema.workflowRuns.createdAt)); }",
+      "source": "server/storage/workflowStorage.ts"
+    },
+    "getActiveRuns": {
+      "body": "{ return db .select() .from(schema.workflowRuns) .where(inArray(schema.workflowRuns.status, [\"running\", \"pending\"])); }",
+      "source": "server/storage/workflowStorage.ts"
+    },
+    "getActiveRunsByUser": {
+      "body": "{ return db .select() .from(schema.workflowRuns) .where( and( eq(schema.workflowRuns.userId, userId), inArray(schema.workflowRuns.status, [\"running\", \"pending\"]), ), ); }",
+      "source": "server/storage/workflowStorage.ts"
+    },
+    "updateRun": {
+      "body": "{ const [row] = await db .update(schema.workflowRuns) .set({ ...patch, updatedAt: new Date() }) .where(eq(schema.workflowRuns.id, id)) .returning(); return row; }",
+      "source": "server/storage/workflowStorage.ts"
+    }
+  },
+  "duplicates": []
+}
