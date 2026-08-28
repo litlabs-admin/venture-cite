@@ -47,3 +47,22 @@ Then `npm run check`, `npm run lint`, and `npm run format:check` all pass.
 Append one row per decision to `.audit/B2B3/ledger.tsv` with columns:
 timestamp, task, decision, why, evidence, result. Use a fixed timestamp string;
 do not call a clock.
+
+## This run is non-interactive
+
+Nobody can answer you. Decide, implement, verify, and report. Do not end your
+turn with a question.
+
+## Required report
+
+Write `.audit/B2B3/T2-report.md` recording, for each of the two files:
+
+- what the test claimed to cover
+- the real implementation you found, with file and line
+- your proof the old test was worthless: what you broke, and that the test still
+  passed
+- what you did: rewrote it, or deleted it, and why
+- the four verification runs, with their results
+
+Restore anything you broke. Confirm in the report that the tree is clean of your
+temporary edits, and show the command output proving it.
