@@ -1,0 +1,61 @@
+Extract the jobs and queues domain into `shared/schema/jobs.ts`.
+
+Nine modules already exist: identity, brands, content, prompts, competitors,
+perception, chatbot, factAgent, siteHealth. Follow their pattern exactly. Move
+tables with the zod builders and type aliases beneath them, re-export from the
+barrel with `export *`, keep imports one directional.
+
+## What moves
+
+Seven tables covering anything that queues, leases or drains work. An audit confirmed 11 concurrency defects and the read-modify-write races cluster in these tables, which is why they belong together.
+
+These tables are not contiguous. Locate each one; line numbers have shifted with
+every extraction. A comment block above a table belongs to that table.
+
+Tables: `llmJobs`, `workflowRuns`, `outboxCommands`, `agentTasks`, `jobLeases`, `llmConcurrencySlots`, `scanJobs`
+
+## References
+
+`llmJobs`, `workflowRuns`, `outboxCommands` and `scanJobs` reference `brands` and `users`. `agentTasks` references `brands`. `jobLeases` and `llmConcurrencySlots` reference nothing. So this module imports from `./brands` and `./identity`. Note that `outboxCommands` uses types from `../outbox`, which is outside the schema directory; keep that import working.
+
+Any table you move that is still referenced by a foreign key from the barrel must
+remain importable there, the way the barrel already imports `brands`, `users`
+and `brandFactScrapeRuns`.
+
+Check for cycles before you finish. No module already extracted may import from
+jobs. If that would be required, stop and say so in the report rather than working
+around it.
+
+## Membership completeness
+
+The identity extraction left `insertUserSchema` behind and every gate still
+passed, because a declaration in the wrong file exports, compiles and
+type-checks. After moving, search `shared/schema.ts` for each table name and
+confirm the only remaining references are foreign keys from other tables.
+
+## Clean up after yourself, but only after yourself
+
+Delete every temporary file you create. Do not delete anything you did not
+create. Files under `.audit/B4/prompts/` are inputs, not temporary work.
+
+## What must not change
+
+No column, type, name or default changes. No new migration. No consumer edits.
+
+## Acceptance
+
+Run `node scripts/verifySchemaSplit.mjs`. All six gates must pass.
+
+If the SQL gate fails you changed the schema. Find what and fix it. Do not
+explain it away.
+
+## Report
+
+Write `.audit/B4/B4-14-jobs-report.md`: the tables you located, the membership check
+result, the import direction and cycle check, the gate output, and whether any
+consumer file changed.
+
+## This run is non-interactive
+
+Nobody can answer you. Decide, implement, verify, report. Do not end your turn
+with a question.
