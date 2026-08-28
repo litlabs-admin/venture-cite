@@ -131,9 +131,39 @@ describeIfLocal("content request database RLS", () => {
     );
     // The production direct role receives these admin grants in the controlled
     // release step. The local Supabase fixture must model that state explicitly.
-    await ownerPool.query(
-      "grant venturecite_request, venturecite_content_request, venturecite_outbox_worker to current_user with inherit false, set false, admin true",
+    //
+    // The grantee is read first and interpolated as a literal identifier.
+    // PostgreSQL 17.6 segfaults on `grant <role> to current_user` (signal 11,
+    // verified 2026-08-28 against the Supabase local image), which took the whole
+    // server into recovery mode and made every test in this file unrunnable.
+    // The grant is also skipped when the membership already carries admin option,
+    // which is the normal local state because this session created the roles.
+    const managedRequestRoles = [
+      "venturecite_request",
+      "venturecite_content_request",
+      "venturecite_outbox_worker",
+    ];
+    const heldWithAdmin = await ownerPool.query<{ rolname: string }>(
+      `select r.rolname
+         from pg_auth_members a
+         join pg_roles r on r.oid = a.roleid
+         join pg_roles m on m.oid = a.member
+        where m.rolname = current_user
+          and a.admin_option
+          and r.rolname = any($1::text[])`,
+      [managedRequestRoles],
     );
+    const alreadyHeld = new Set(heldWithAdmin.rows.map((row) => row.rolname));
+    const rolesToGrant = managedRequestRoles.filter((role) => !alreadyHeld.has(role));
+    if (rolesToGrant.length > 0) {
+      const granteeResult = await ownerPool.query<{ grantee: string }>(
+        "select current_user as grantee",
+      );
+      const grantee = granteeResult.rows[0].grantee;
+      await ownerPool.query(
+        `grant ${rolesToGrant.join(", ")} to "${grantee}" with inherit false, set false, admin true`,
+      );
+    }
     const testDatabaseUrl = process.env.TEST_DATABASE_URL;
     if (!testDatabaseUrl) throw new Error("TEST_DATABASE_URL is required for local RLS tests");
     const requestDatabaseUrl = new URL(testDatabaseUrl);
