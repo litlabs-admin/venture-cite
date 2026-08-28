@@ -1,0 +1,68 @@
+Stop the storage tests from bypassing the composition.
+
+## The problem
+
+Ten test files construct `new DatabaseStorage()` directly:
+
+  tests/unit/articlesAIGenerated.test.ts
+  tests/unit/brandFactScrapePagesStorage.test.ts
+  tests/unit/brandFactScrapeRunsStorage.test.ts
+  tests/unit/brandFactSheetConflictsQuery.test.ts
+  tests/unit/brandMonthlyCostCapsStorage.test.ts
+  tests/unit/contentJobCompletionTransaction.test.ts
+  tests/unit/geoSignalRuns.test.ts
+  tests/unit/mentionsStorage.test.ts
+  tests/unit/scrapeLockPinnedClient.test.ts
+  tests/integration/competitorGeoRankingUpsert.test.ts
+
+B5 is moving 315 methods out of that class into eleven domain modules, composed
+back together as the `storage` singleton exported from `server/storage.ts`. A
+test holding a bare `new DatabaseStorage()` loses every method that has moved, so
+each extraction breaks a different set of tests.
+
+Three of them currently carry ad hoc patches of the form
+`Object.assign(new DatabaseStorage(), jobsStorage)`, added by earlier dispatches.
+Those patches need replacing, not extending: seven more modules are coming and
+the same breakage would recur seven more times.
+
+## What to do
+
+Point every one of these tests at the composed `storage` singleton:
+
+    import { storage } from "../../server/storage";
+
+rather than constructing the class. Remove the ad hoc `Object.assign` patches and
+the now-unnecessary `DatabaseStorage` imports.
+
+Nine of the ten already mock `../../server/db`, so the composition builds against
+the mock at import time and behaves exactly as the class did.
+`tests/integration/competitorGeoRankingUpsert.test.ts` uses a real database and
+is gated behind `TEST_DATABASE_URL`; it needs the same change.
+
+## What must not change
+
+Do not change what any test asserts. Do not weaken, skip, or delete a test. This
+is a change of how the subject under test is obtained, nothing else. If a test
+fails after the change for a reason that is not the import, say so in your report
+and leave it failing rather than adjusting the assertion.
+
+Do not touch `server/` at all.
+
+## Acceptance
+
+    npm test -- --maxWorkers=1
+
+All tests that passed before must still pass. State the before and after counts.
+
+Then `npm run check`, `npm run lint`, `npm run format:check`.
+
+## Report
+
+Write `.audit/B5/B5-fix-tests-report.md`: the ten files, what changed in each,
+the before and after test counts, and any test that failed for a reason other
+than the import.
+
+## This run is non-interactive
+
+Nobody can answer you. Decide, implement, verify, report. Do not end your turn
+with a question.
