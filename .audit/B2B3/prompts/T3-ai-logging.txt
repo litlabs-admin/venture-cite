@@ -49,3 +49,30 @@ Then `npm run check`, `npm run lint`, and `npm run format:check` all pass.
 Append one row per decision to `.audit/B2B3/ledger.tsv` with columns:
 timestamp, task, decision, why, evidence, result. Use a fixed timestamp string;
 do not call a clock.
+
+## This run is non-interactive
+
+Nobody can answer you. There is no human in this session and no approval will
+arrive. Do not ask whether to proceed, do not propose a design and wait, do not
+end your turn with a question. Decide, implement, verify, and report what you
+did. If a choice is genuinely uncertain, pick the option you can defend, write
+the reasoning in the ledger, and continue.
+
+## The design is already agreed
+
+A previous run of this task produced the plan below. It is approved. Implement
+it. Do not re-derive it.
+
+- Add `AI_LOG_PAYLOADS=true` to enable request and response payload logs.
+- Keep payload logging disabled by default.
+- Log model, roles, limits, and duration in full.
+- Redact sensitive object keys, emails, bearer tokens, API keys, JWTs, and
+  secret assignments.
+- Limit prompt and response text to 2,000 characters.
+- Keep failure logs enabled without prompt or response text.
+- Send all records through Pino at `info` or `warn` level.
+- Extend Pino sanitation for AI payload fields before output.
+- Add a test that captures Pino output and rejects a secret-shaped prompt value.
+- Remove `aiLogger.ts` from the logging-hook allow-list.
+
+Write the test at `tests/unit/aiLoggerRedaction.test.ts`.

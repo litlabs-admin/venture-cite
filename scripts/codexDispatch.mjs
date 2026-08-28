@@ -32,6 +32,23 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const skillsRoot = path.join(repoRoot, ".agents", "skills");
 
+// Every dispatch carries this. A Codex agent that stops to ask for approval in a
+// non-interactive run burns its whole budget and produces nothing. That happened
+// on 2026-08-28: an agent spent 77,577 tokens on a correct design, then ended
+// its turn with "Approve this design, and I will start." Nobody was there.
+const NON_INTERACTIVE_NOTICE = [
+  "## This run is non-interactive",
+  "",
+  "Nobody can answer you. There is no human in this session and no approval will",
+  "arrive. Do not ask whether to proceed, do not propose a plan and wait, and do",
+  "not end your turn with a question. Decide, implement, verify, and report what",
+  "you did. If a choice is genuinely uncertain, pick the option you can defend,",
+  "write the reasoning down, and continue.",
+  "",
+  "---",
+  "",
+].join("\n");
+
 const MODELS = { luna: "gpt-5.6-luna", terra: "gpt-5.6-terra" };
 const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "ultra"]);
 
@@ -54,6 +71,11 @@ if (model === MODELS.luna && effort === "ultra") {
   throw new Error("Luna does not support ultra. Use terra.");
 }
 if (!args.prompt) throw new Error("--prompt is required.");
+if (!args.expect && !("no-expect" in args)) {
+  throw new Error(
+    "--expect is required so a run that writes nothing fails loudly. Pass --no-expect true only when the task genuinely produces no file.",
+  );
+}
 
 const skillNames = (args.skills ?? "")
   .split(",")
@@ -80,7 +102,7 @@ const preamble = skillSections.length
     ].join("\n")
   : "";
 
-const composed = `${preamble}${task}`;
+const composed = `${preamble}${NON_INTERACTIVE_NOTICE}${task}`;
 
 const child = spawn(
   "codex",

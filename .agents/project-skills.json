@@ -20,7 +20,12 @@
       "blast-radius"
     ],
     "writing": ["unslop", "technical-writing"],
-    "planning": ["wayfinder", "show-me-your-work", "principle-guard-the-context-window"],
+    "planning": [
+      "wayfinder",
+      "show-me-your-work",
+      "principle-guard-the-context-window",
+      "principle-never-block-on-the-human"
+    ],
     "design": [
       "architect",
       "codebase-design",

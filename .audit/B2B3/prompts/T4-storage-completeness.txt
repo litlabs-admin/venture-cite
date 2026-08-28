@@ -1,0 +1,54 @@
+Make it impossible to add a storage key that survives logout.
+
+## What already exists
+
+`client/src/lib/clientStorageKeys.ts` holds `USER_SCOPED_STORAGE_KEYS`.
+`client/src/lib/clientStorage.ts` clears every key in that registry, every key
+prefixed `venturecite-`, and a legacy list, while retaining the device theme.
+`tests/unit/clientStorage.test.ts` proves the registry is cleared.
+
+## The gap
+
+That test iterates the registry. It proves every registered key is cleared. It
+does not prove the registry is complete. A developer who adds
+`localStorage.setItem("vc_new_thing", ...)` in a page and never touches the
+registry introduces exactly the defect that was just fixed, and every test still
+passes.
+
+This is not hypothetical. It is how the six keys got there: the prefix
+convention was documented in a comment, and three different key shapes grew
+around it anyway.
+
+## What to build
+
+A test that reads the source and fails when it finds a storage write whose key
+is not accounted for.
+
+1. Scan `client/src` and `src` for writes to `localStorage` and `sessionStorage`.
+   Cover `setItem` and any wrapper the codebase uses, including
+   `usePersistedState`. Resolve the key argument to a literal where it is one,
+   and to the constant it references where it is not.
+2. For each key found, require that it is in `USER_SCOPED_STORAGE_KEYS`, starts
+   with the `venturecite-` prefix, is in the legacy list, or is in an explicit
+   retained list such as the theme.
+3. Fail with the file, the line, and the key when something is unaccounted for.
+
+Prove it works: add a temporary unregistered key write to a real page, show the
+test failing and naming that file and key, then remove it and show it passing.
+
+A key built from a template or a variable may be impossible to resolve. Report
+those as `UNRESOLVED` and fail only if you can determine they are user scoped.
+Say plainly in a comment what the scan cannot see, so the next reader knows the
+limit rather than trusting it blindly.
+
+## Acceptance
+
+`npx vitest run tests/unit/clientStorageCompleteness.test.ts` passes on the
+current tree and fails when an unregistered key write is added. Show both runs.
+
+Then `npm run check`, `npm run lint`, and `npm run format:check` all pass.
+
+## Record
+
+Append one row per decision to `.audit/B2B3/ledger.tsv`. Use a fixed timestamp
+string; do not call a clock.
