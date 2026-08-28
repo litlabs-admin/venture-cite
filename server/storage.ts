@@ -1025,6 +1025,7 @@ import { competitorsStorage } from "./storage/competitorsStorage";
 import { factAgentStorage } from "./storage/factAgentStorage";
 import { identityStorage } from "./storage/identityStorage";
 import { jobsStorage } from "./storage/jobsStorage";
+import { platformStorage } from "./storage/platformStorage";
 
 function databaseStorageObject(): Omit<
   IStorage,
@@ -1034,6 +1035,7 @@ function databaseStorageObject(): Omit<
   | keyof typeof factAgentStorage
   | keyof typeof identityStorage
   | keyof typeof jobsStorage
+  | keyof typeof platformStorage
 > {
   const databaseStorage = new DatabaseStorage();
   const prototype = Object.getPrototypeOf(databaseStorage);
@@ -1056,4 +1058,5 @@ export const storage: IStorage = {
   ...jobsStorage,
   ...brandsStorage,
   ...factAgentStorage,
+  ...platformStorage,
 };
