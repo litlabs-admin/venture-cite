@@ -16,12 +16,11 @@ verbatim into a plain object.
 
 ## What moves
 
-These 11 methods, from `server/databaseStorage.ts`:
+These 10 methods, from `server/databaseStorage.ts`:
 
   createBetaInviteCode
   createUser
   deleteBetaInviteCode
-  getActiveRunsByUser
   getAllBetaInviteCodes
   getBetaInviteCodeByCode
   getUser

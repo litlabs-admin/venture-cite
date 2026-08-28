@@ -1020,8 +1020,12 @@ export interface IStorage {
 
 import { DatabaseStorage } from "./databaseStorage";
 import { chatbotStorage } from "./storage/chatbotStorage";
+import { identityStorage } from "./storage/identityStorage";
 
-function databaseStorageObject(): Omit<IStorage, keyof typeof chatbotStorage> {
+function databaseStorageObject(): Omit<
+  IStorage,
+  keyof typeof chatbotStorage | keyof typeof identityStorage
+> {
   const databaseStorage = new DatabaseStorage();
   const prototype = Object.getPrototypeOf(databaseStorage);
 
@@ -1035,4 +1039,8 @@ function databaseStorageObject(): Omit<IStorage, keyof typeof chatbotStorage> {
   return databaseStorage;
 }
 
-export const storage: IStorage = { ...databaseStorageObject(), ...chatbotStorage };
+export const storage: IStorage = {
+  ...databaseStorageObject(),
+  ...chatbotStorage,
+  ...identityStorage,
+};

@@ -9,8 +9,7 @@
     "getBetaInviteCodeByCode",
     "useBetaInviteCode",
     "getAllBetaInviteCodes",
-    "deleteBetaInviteCode",
-    "getActiveRunsByUser"
+    "deleteBetaInviteCode"
   ],
   "citations": [
     "getCitations",
@@ -225,7 +224,8 @@
     "createRun",
     "getRun",
     "getActiveRuns",
-    "updateRun"
+    "updateRun",
+    "getActiveRunsByUser"
   ],
   "competitors": [
     "createCompetitor",

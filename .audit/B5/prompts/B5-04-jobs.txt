@@ -16,7 +16,7 @@ verbatim into a plain object.
 
 ## What moves
 
-These 18 methods, from `server/databaseStorage.ts`:
+These 19 methods, from `server/databaseStorage.ts`:
 
   claimAgentTask
   createAgentTask
@@ -26,6 +26,7 @@ These 18 methods, from `server/databaseStorage.ts`:
   failStaleScanJobs
   findSlicePendingRuns
   getActiveRuns
+  getActiveRunsByUser
   getActiveScanJobForBrand
   getActiveScanJobsForUser
   getAgentTaskById
