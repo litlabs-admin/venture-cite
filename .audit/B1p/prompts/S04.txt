@@ -1,0 +1,66 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S04.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+client/src/components/intelligence/HallucinationsTab.tsx
+client/src/components/intelligence/TrendsTab.tsx
+client/src/components/perception/ProbeMatrix.tsx
+client/src/components/prompts/AudiencesJourneyTable.tsx
+client/src/components/prompts/AudiencesOverviewTable.tsx
+client/src/components/prompts/AudiencesTab.tsx
+client/src/components/prompts/PhrasingsSection.tsx
+client/src/components/prompts/PromptByModelTable.tsx
+client/src/components/prompts/PromptsPageBody.tsx
+client/src/components/prompts/PromptsTable.tsx
+client/src/components/prompts/SetHealthDrawer.tsx
+client/src/components/prompts/SparklineCell.tsx
+client/src/components/prompts/TagChip.tsx
+client/src/components/prompts/TagsTab.tsx
+client/src/components/site-health/ChecksTable.tsx
+client/src/components/site-health/FindingDrawer.tsx
+client/src/components/site-health/FindingsTab.tsx
+client/src/components/site-health/FunnelStatRow.tsx
+client/src/components/site-health/HistoryTab.tsx
+client/src/components/site-health/PagesTab.tsx
+client/src/components/site-health/fixSnippets.tsx
+client/src/components/site-health/types.ts
+client/src/components/ui/accordion.tsx
+client/src/components/ui/alert-dialog.tsx
+client/src/components/ui/alert.tsx
+client/src/components/ui/aspect-ratio.tsx
+client/src/components/ui/avatar.tsx
+client/src/components/ui/badge.tsx
+client/src/components/ui/breadcrumb.tsx
+client/src/components/ui/button.tsx
+client/src/components/ui/card.tsx
+client/src/components/ui/checkbox.tsx
+client/src/components/ui/collapsible.tsx
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/components/dashboard-panels/Panel.tsx
+client/src/components/dashboard-panels/primitives.tsx
+client/src/components/dashboard-panels/useDashboardData.ts
+client/src/components/ui/dialog.tsx
+client/src/components/ui/dropdown-menu.tsx
+client/src/components/ui/empty-state.tsx
+client/src/components/ui/input.tsx
+client/src/components/ui/popover.tsx
+client/src/components/ui/select.tsx
+client/src/components/ui/sheet.tsx
+client/src/components/ui/table.tsx
+client/src/hooks/use-loading-messages.ts
+client/src/hooks/use-toast.ts
+client/src/hooks/usePrompts.ts
+client/src/lib/chartTheme.ts
+client/src/lib/queryClient.ts
+client/src/lib/urlSafety.ts
+client/src/lib/utils.ts
+shared/constants.ts
+shared/schema.ts
+shared/siteHealthFindings.ts
+
+Write your report to .audit/B1p/S04.md and nothing else. Do not modify any source file.

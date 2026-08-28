@@ -1,0 +1,58 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S12.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+server/app.ts
+server/auth.ts
+server/citationChecker.ts
+server/citationJudge.ts
+server/contentGenerationWorker.ts
+server/data/contentRequestArticleRepository.ts
+server/data/contentRequestData.ts
+server/data/contentRequestDistributionRepository.ts
+server/data/contentRequestJobRepository.ts
+server/data/contentRequestKeywordRepository.ts
+server/data/contentRequestRevisionRepository.ts
+server/data/requestBrandRepository.ts
+server/data/requestData.ts
+server/data/requestRepositoryTransaction.ts
+server/data/requestUserRepository.ts
+server/data/restrictedRequestTransaction.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+server/db.ts
+server/instrument.ts
+server/lib/advisoryLock.ts
+server/lib/aiLogger.ts
+server/lib/authRateKey.ts
+server/lib/brandMatcher.ts
+server/lib/circuitBreaker.ts
+server/lib/contentGenerationProvider.ts
+server/lib/factAgent/v2/vercelBudget.ts
+server/lib/leakedPassword.ts
+server/lib/llmBudget.ts
+server/lib/logger.ts
+server/lib/modelConfig.ts
+server/lib/requestActor.ts
+server/lib/responseAnalyzer.ts
+server/lib/sentryReport.ts
+server/lib/supabaseAuth.ts
+server/lib/trackedContentMatcher.ts
+server/lib/urlExtractor.ts
+server/lib/usageLimit.ts
+server/lib/visibilityMetrics.ts
+server/lib/welcomeEmail.ts
+server/lib/workflowEngine.ts
+server/log.ts
+server/routes.ts
+server/storage.ts
+server/supabase.ts
+server/webhookHandlers.ts
+shared/passwordPolicy.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S12.md and nothing else. Do not modify any source file.

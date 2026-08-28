@@ -1,0 +1,76 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S26.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+tests/unit/dashboardSiteHealthPerception.test.ts
+tests/unit/databaseMetadataAudit.test.ts
+tests/unit/databaseMetadataAuditTarget.test.ts
+tests/unit/databaseTlsPolicy.test.ts
+tests/unit/destructiveDatabaseTest.test.ts
+tests/unit/detectFactScrapeFailureRate.test.ts
+tests/unit/distributionBufferPost.test.ts
+tests/unit/emailRetry.test.ts
+tests/unit/emailVerification.test.ts
+tests/unit/environmentSafety.test.ts
+tests/unit/extractSnippet.test.ts
+tests/unit/factAgentSchema.test.ts
+tests/unit/factScrapeCacheStorage.test.ts
+tests/unit/factSheetCanonicalize.test.ts
+tests/unit/factSheetDedup.test.ts
+tests/unit/factSheetDiff.test.ts
+tests/unit/factSheetEnabledToggle.test.ts
+tests/unit/factSheetFactsAcceptDismiss.test.ts
+tests/unit/factSheetInjectionSanitizer.test.ts
+tests/unit/factSheetLangDetect.test.ts
+tests/unit/factSheetPersist.test.ts
+tests/unit/factSheetRobots.test.ts
+tests/unit/factSheetRunsCancel.test.ts
+tests/unit/factSheetRunsGet.test.ts
+tests/unit/factSheetRunsList.test.ts
+tests/unit/factSheetSecretRedactor.test.ts
+tests/unit/factSheetSseStream.test.ts
+tests/unit/factSheetSsrfLockedIp.test.ts
+tests/unit/factSheetValidators.test.ts
+tests/unit/faqScoring.test.ts
+tests/unit/geoSignalRuns.test.ts
+tests/unit/geoSignalsAnalyzePersistence.test.ts
+tests/unit/hackerNewsSource.test.ts
+tests/unit/highlightTermsRehype.test.ts
+tests/unit/homepageNavExtractor.test.ts
+tests/unit/hybridUrlDiscovery.test.ts
+tests/unit/hydrationWatchdog.test.ts
+tests/unit/jinaFallback.test.ts
+tests/unit/jobDebounce.test.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/lib/extractSnippet.ts
+client/src/lib/highlightTermsRehype.ts
+scripts/databaseMetadataAuditTarget.ts
+server/databaseStorage.ts
+server/lib/databaseMetadataAudit.ts
+server/lib/databaseTlsPolicy.ts
+server/lib/emailRetry.ts
+server/lib/environmentSafety.ts
+server/lib/factAgent/canonicalize.ts
+server/lib/factAgent/dedup.ts
+server/lib/factAgent/langDetect.ts
+server/lib/factAgent/persistFacts.ts
+server/lib/factAgent/promptInjectionSanitizer.ts
+server/lib/factAgent/robotsCache.ts
+server/lib/factAgent/secretRedactor.ts
+server/lib/factAgent/types.ts
+server/lib/factAgent/v2/homepageNavExtractor.ts
+server/lib/factAgent/v2/hybridUrlDiscovery.ts
+server/lib/factAgent/validators.ts
+server/lib/faqScoring.ts
+server/lib/ssrf.ts
+server/routes/factSheet.ts
+server/scheduler.ts
+shared/factAgent/schema.ts
+tests/helpers/destructiveDatabaseTest.ts
+
+Write your report to .audit/B1p/S26.md and nothing else. Do not modify any source file.

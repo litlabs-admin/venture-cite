@@ -1,0 +1,119 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V07. Write your report to .audit/B1p/verify/V07.md and nothing else.
+
+Files involved: server/routes/prompts.ts, client/src/hooks/useScrapeRunStream.ts, client/src/pages/community-engagement.tsx, client/src/pages/faq-manager.tsx, server/lib/factAgent/v2/factScrapeBackstop.ts, server/lib/wikipediaScanner.ts, server/routes/billing.ts, client/src/hooks/use-brand-selection.ts, client/src/components/dashboard/Pulse.tsx
+
+Examine each of the 10 findings below. Try to refute each one.
+
+--- finding F-S21-004 (from S21) ---
+Claimed severity: high
+Claimed location: server/routes/prompts.ts:1086
+
+F-S21-004 | high | correctness
+File: server/routes/prompts.ts:1086
+What the code does: The run route accepts a run when the brand has at least one tracked prompt. It does not check whether any tracked prompt is unpaused before calling `kickoffBrandPromptsRun`.
+Why it is wrong: The citation runner filters paused prompts and returns early when none remain. The pre-created run is not finalized on that early return.
+How it fails: Pause every tracked prompt, then start a run. The route returns a running run, but its row remains active with no rankings. The active-run guard can block later runs indefinitely.
+Confidence: high
+
+--- finding F-S21-005 (from S21) ---
+Claimed severity: high
+Claimed location: server/routes/prompts.ts:170
+
+F-S21-005 | high | concurrency
+File: server/routes/prompts.ts:170
+What the code does: Suggestion acceptance reads the tracked count, checks the cap, and performs the promotion later. Manual prompt creation uses the same read-then-write pattern at lines 240-262.
+Why it is wrong: The storage transaction does not recheck the count or the prompt status before updating the rows.
+How it fails: Two requests can both see nine tracked prompts and both promote suggestions, creating eleven tracked prompts when the cap is ten. Two archive requests can also both pass the minimum check and leave zero tracked prompts.
+Confidence: high
+
+--- finding F-S03-client-hooks-007 (from S03-client-hooks, S06) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useScrapeRunStream.ts:191
+
+F-S03-client-hooks-007 | high | availability
+File: client/src/hooks/useScrapeRunStream.ts:191-197
+What the code does: A stream EOF while the status is `streaming` recursively calls `consume` with an increased retry count.
+Why it is wrong: This branch has no retry limit and no delay.
+How it fails (concrete input or sequence): A proxy repeatedly closes the stream without a `done` event. The browser opens streams in an unbounded tight loop and never reaches the error state.
+Confidence: high
+
+--- finding F-S07-004 (from S07) ---
+Claimed severity: high
+Claimed location: client/src/pages/community-engagement.tsx:263
+
+F-S07-004 | high | concurrency
+File: client/src/pages/community-engagement.tsx:263
+What the code does: It saves generated content with the current `selectedBrandId`, while generated content and its form remain in component state.
+Why it is wrong: The state does not record or clear the brand that produced the content (`client/src/pages/community-engagement.tsx:90-103`).
+How it fails (concrete input or sequence): Generate a post for brand A, switch to brand B, and click Save as Draft. The request stores brand A's content under brand B (`client/src/pages/community-engagement.tsx:260-274`).
+Confidence: high
+
+--- finding F-S08-009 (from S08) ---
+Claimed severity: high
+Claimed location: client/src/pages/faq-manager.tsx:232
+
+F-S08-009 | high | correctness
+File: client/src/pages/faq-manager.tsx:232
+What the code does: The page converts a missing `aiSurfaceScore` to zero. It then displays zero, fail status, and low-score counts at lines 232-246, 502-509, and 849-875.
+Why it is wrong: The schema permits a null score, and manual FAQ creation does not provide a score at lines 133-139.
+How it fails: A new manual FAQ with no score lowers the average to 0%, shows a failing status, and appears in the low-score optimization list.
+Confidence: high
+
+--- finding F-S15-001 (from S15) ---
+Claimed severity: high
+Claimed location: server/lib/factAgent/v2/factScrapeBackstop.ts:58
+
+F-S15-001 | high | concurrency
+File: server/lib/factAgent/v2/factScrapeBackstop.ts:58-72
+What the code does: The backstop holds a PostgreSQL transaction advisory lock before it calls `runAggregate`.
+Why it is wrong: The full pipeline uses a row lease from `job_leases`, not this PostgreSQL advisory lock (`runFullScrape.ts:159-163`). The two paths do not exclude each other.
+How it fails: Let a full scrape stay stale for more than 60 seconds after it creates its run. The backstop aggregates and terminates that run while the full scrape still writes pages and facts. A new scrape can then start because the run is terminal.
+Confidence: high
+
+--- finding F-S18-007 (from S18) ---
+Claimed severity: high
+Claimed location: server/lib/wikipediaScanner.ts:58
+
+F-S18-007 | high | availability
+File: server/lib/wikipediaScanner.ts:58-89,190-208
+What the code does: It performs up to eight searches and 25 extract requests in series. Each request can wait 10 seconds.
+Why it is wrong: The route awaits the whole scan and has no deadline.
+How it fails: Slow Wikipedia responses can hold the request for at least 330 seconds before classification. The route then returns a timeout or a gateway error.
+Confidence: high
+
+--- finding F-S19-003 (from S19) ---
+Claimed severity: high
+Claimed location: server/routes/billing.ts:208
+
+F-S19-003 | high | correctness
+File: server/routes/billing.ts:208-230
+What the code does: The products route returns every active price attached to an active product with tier metadata.
+Why it is wrong: Checkout accepts only active USD monthly prices with one-month intervals and exact plan amounts at lines 67-81 and 299-324.
+How it fails: If an annual price with a matching amount appears first, the pricing page selects it, sends its ID, and receives `Invalid or inactive price`.
+Confidence: high
+
+--- finding V-04 (from INV01-storage-keys) ---
+Claimed severity: high
+Claimed location: client/src/hooks/use-brand-selection.ts:7
+
+V-04 | high
+
+Key: `vc_selected_brand_id`
+Written at: client/src/hooks/use-brand-selection.ts:7,30; client/src/hooks/use-persisted-state.ts:22-28
+Why logout misses it: The key does not match the prefix or either legacy name.
+How it fails (two users, one browser): User B can open User A's selected brand context.
+Confidence: high
+
+--- finding V-05 (from INV01-storage-keys) ---
+Claimed severity: high
+Claimed location: client/src/components/dashboard/Pulse.tsx:28
+
+V-05 | high
+
+Key: `venturecite-recs-dismissed:<userId>`
+Written at: client/src/components/dashboard/Pulse.tsx:28,101-104,123
+Why logout misses it: The password-reset sign-out at client/src/pages/reset-password.tsx:126-129 skips the cleanup. The main path also skips cleanup if either awaited call rejects.
+How it fails (two users, one browser): User B can inherit User A's dismissed recommendations after either sign-out path fails to clean storage.
+Confidence: high

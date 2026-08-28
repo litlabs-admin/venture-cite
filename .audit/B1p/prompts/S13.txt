@@ -1,0 +1,29 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S13.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+server/databaseStorage.ts
+server/db.ts
+server/emailService.ts
+server/env.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+server/lib/databaseTlsPolicy.ts
+server/lib/emailRetry.ts
+server/lib/environmentSafety.ts
+server/lib/leaderboardMerge.ts
+server/lib/logger.ts
+server/lib/migrationLedgerPolicy.ts
+server/lib/schedulerMode.ts
+server/lib/tourRegistry.ts
+server/lib/tourStateOps.ts
+server/lib/unsubscribeToken.ts
+server/outbox/contentCostOutboxAdapter.ts
+server/storage.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S13.md and nothing else. Do not modify any source file.

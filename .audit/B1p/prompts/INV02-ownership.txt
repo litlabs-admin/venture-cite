@@ -1,0 +1,52 @@
+You are checking ONE invariant across the whole repository. This is not a file
+review. Report only violations of the stated invariant, plus anything that makes
+the invariant unverifiable.
+
+## The invariant
+
+Every HTTP route that returns or mutates data belonging to a user or a brand enforces that the caller owns that data.
+
+Rationale: One tenant reading or writing another tenant's data is the worst failure this product can have.
+
+## Method
+
+1. Enumerate every route registration in server/. Search for app.get, app.post, app.put, app.patch, app.delete and router.* equivalents. There are about 261.
+2. For each, determine whether the handler returns or mutates user-scoped or brand-scoped data.
+3. Find the ownership mechanism. Read server/auth.ts and server/lib/ownership.ts and server/routes.ts to learn what is applied globally versus per route.
+4. For each data-returning route, decide whether ownership is enforced, and by what. Note routes that use their own Router() instance, because global middleware may not reach them.
+5. Report every route that returns or mutates scoped data without an enforced ownership check.
+
+## Output
+
+Write exactly one file: .audit/B1p/INV02-ownership.md. Nothing else. Do not modify any source file.
+
+Use this shape:
+
+# INV02-ownership route ownership checks
+
+## The rule as implemented
+File: path:line
+Rule: <exact description>
+
+## Complete inventory
+| Item | Defined at | Satisfies invariant? | Evidence |
+|---|---|---|---|
+
+## Violations
+### V-01 | critical|high|medium|low
+Item:
+Defined at: path:line
+Why it violates the invariant:
+How it fails (concrete sequence):
+Confidence: high|medium|low
+
+## UNDETERMINED
+- <question> - needs <what>
+
+Be exhaustive on the inventory step. An item you fail to find is a violation you
+fail to report. If you find zero violations, say so and show the inventory that
+proves it. Do not report an item as a violation without checking the rule against
+it; a false positive costs a reviewer real time.
+
+Documentation and comments are not evidence. Check the code.
+Write plainly. No em dashes. No filler.

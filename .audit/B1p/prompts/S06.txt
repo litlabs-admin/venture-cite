@@ -1,0 +1,82 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S06.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+client/src/hooks/useScrapeRunStream.ts
+client/src/hooks/useTourReplay.ts
+client/src/hooks/useTourState.ts
+client/src/lib/authStore.ts
+client/src/lib/calendly.ts
+client/src/lib/chartTheme.ts
+client/src/lib/clientStorage.ts
+client/src/lib/diff.ts
+client/src/lib/extractSnippet.ts
+client/src/lib/formatRelativeTime.ts
+client/src/lib/highlightTermsRehype.ts
+client/src/lib/linkTarget.ts
+client/src/lib/llmJobs.ts
+client/src/lib/onboardingSteps.ts
+client/src/lib/openChatbotPrompt.ts
+client/src/lib/pageExplainers.ts
+client/src/lib/platformColors.ts
+client/src/lib/queryClient.ts
+client/src/lib/sentry.ts
+client/src/lib/spineStages.ts
+client/src/lib/stripTrackingParams.ts
+client/src/lib/supabase.ts
+client/src/lib/theme.ts
+client/src/lib/urlSafety.ts
+client/src/lib/utils.ts
+client/src/main.tsx
+client/src/pages/act.tsx
+client/src/pages/admin-scrape-inspector.tsx
+client/src/pages/admin-scrape-runs.tsx
+client/src/pages/ai-visibility.tsx
+client/src/pages/articles.tsx
+client/src/pages/brand-fact-sheet.tsx
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/components/AIGeneratedPill.tsx
+client/src/components/PageHeader.tsx
+client/src/components/SpineShell.tsx
+client/src/components/articles/DistributeDialog.tsx
+client/src/components/articles/ViewEditDialog.tsx
+client/src/components/dashboard-panels/Panel.tsx
+client/src/components/dashboard-panels/primitives.tsx
+client/src/components/fact-sheet/ConflictPair.tsx
+client/src/components/fact-sheet/DomainGroupHeader.tsx
+client/src/components/fact-sheet/FactRow.tsx
+client/src/components/fact-sheet/ManualPasteCard.tsx
+client/src/components/fact-sheet/PauseToggle.tsx
+client/src/components/fact-sheet/ScrapeFailureState.tsx
+client/src/components/fact-sheet/ScrapePagesPanel.tsx
+client/src/components/fact-sheet/domainIcons.ts
+client/src/components/foundations/EmptyState.tsx
+client/src/components/ui/accordion.tsx
+client/src/components/ui/alert-dialog.tsx
+client/src/components/ui/alert.tsx
+client/src/components/ui/badge.tsx
+client/src/components/ui/button.tsx
+client/src/components/ui/checkbox.tsx
+client/src/components/ui/dialog.tsx
+client/src/components/ui/empty-state.tsx
+client/src/components/ui/error-state.tsx
+client/src/components/ui/input.tsx
+client/src/components/ui/label.tsx
+client/src/components/ui/progress.tsx
+client/src/components/ui/select.tsx
+client/src/components/ui/skeleton.tsx
+client/src/components/ui/table.tsx
+client/src/components/ui/tabs.tsx
+client/src/components/ui/tooltip.tsx
+client/src/hooks/use-brand-selection.ts
+client/src/hooks/use-persisted-state.ts
+client/src/hooks/use-toast.ts
+client/src/tours/types.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S06.md and nothing else. Do not modify any source file.

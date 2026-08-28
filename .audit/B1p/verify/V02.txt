@@ -1,0 +1,118 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V02. Write your report to .audit/B1p/verify/V02.md and nothing else.
+
+Files involved: server/citationChecker.ts, client/src/pages/internal/Board.tsx
+
+Examine each of the 9 findings below. Try to refute each one.
+
+--- finding F-S02-server-jobs-003 (from S02-server-jobs) ---
+Claimed severity: high
+Claimed location: server/citationChecker.ts:322
+
+F-S02-server-jobs-003 | high | correctness
+File: server/citationChecker.ts:322-330, 703-717, 879-896, 1117-1137, 1252-1266
+What the code does: A failed platform request sets `fetchError`, then the worker still writes a geo-ranking row with `isCited` set to zero. Any run with one saved row receives `status: "succeeded"`.
+Why it is wrong: A failed request is not evidence that the platform did not cite the brand.
+How it fails: If a provider key is missing or both request attempts fail, the run stores a not-cited result. The run reports a lower citation rate or a false successful zero-rate result.
+Confidence: high
+
+--- finding F-S02-server-jobs-005 (from S02-server-jobs) ---
+Claimed severity: high
+Claimed location: server/citationChecker.ts:461
+
+F-S02-server-jobs-005 | high | correctness
+File: server/citationChecker.ts:461-467, 1367-1418
+What the code does: `kickoffBrandPromptsRun` creates a running row before calling `runBrandPrompts`. `runBrandPrompts` returns early when no runnable prompts exist, before it reads or updates the supplied `runId`.
+Why it is wrong: The early return does not finalize the row created by the kickoff.
+How it fails: When every stored prompt is paused, kickoff returns an active `runId` but leaves its row running. Later kickoffs hit the one-active-run constraint, and later advance calls take the same early return.
+Confidence: high
+
+--- finding F-S12-002 (from S12) ---
+Claimed severity: high
+Claimed location: server/citationChecker.ts:437
+
+F-S12-002 | high | usage limit enforcement
+File: server/citationChecker.ts:437-444
+
+What the code does: The citation run checks the user budget once before it queues all prompt and platform tasks.
+
+Why it is wrong: The run can perform many provider calls after that single check. The provider call path records spend at `server/citationChecker.ts:363-371`, but it does not check the remaining budget.
+
+How it fails: A user near the daily limit starts a run with many prompt and platform pairs. The initial check passes. The run then completes calls that exceed the limit because later calls do not recheck the budget.
+
+Confidence: high
+
+--- finding F-S12-004 (from S12) ---
+Claimed severity: high
+Claimed location: server/citationChecker.ts:1252
+
+F-S12-004 | high | run status correctness
+File: server/citationChecker.ts:1252-1274
+
+What the code does: The final citation run status becomes `succeeded` whenever the run inserts at least one check row.
+
+Why it is wrong: A failed provider check still creates a ranking row at `server/citationChecker.ts:1117-1135`. The final status does not inspect those failure rows.
+
+How it fails: A provider outage creates failure rows for the requested pairs. `totalChecks` is greater than zero. The run reaches `succeeded` with zero citations and no error message, although every check failed.
+
+Confidence: high
+
+--- finding F-S12-005 (from S12) ---
+Claimed severity: high
+Claimed location: server/citationChecker.ts:617
+
+F-S12-005 | high | resume correctness
+File: server/citationChecker.ts:617-648
+
+What the code does: Resume mode skips every existing prompt and platform pair.
+
+Why it is wrong: The code does not distinguish a successful result from a row created after a failed fetch. Failed fetches still create rows at `server/citationChecker.ts:703-712` and `server/citationChecker.ts:1117-1135`.
+
+How it fails: A temporary timeout stores a failure row for a pair. The next advance operation marks the pair as already complete and skips it. The run never retries that pair, so the temporary failure becomes permanent run data.
+
+Confidence: high
+
+--- finding F-S08-001 (from S08) ---
+Claimed severity: critical
+Claimed location: client/src/pages/internal/Board.tsx:45
+
+F-S08-001 | critical | concurrency
+File: client/src/pages/internal/Board.tsx:45
+What the code does: `saveBoard` sends the complete local ticket list. A debounced effect calls it after each local change at lines 100-107.
+Why it is wrong: The server replaces the shared board from the complete request list. The request has no version check.
+How it fails: User A and User B load the same list. User A saves change A. User B saves a stale list with change B. User B removes change A from the shared board.
+Confidence: high
+
+--- finding F-S08-002 (from S08) ---
+Claimed severity: critical
+Claimed location: client/src/pages/internal/Board.tsx:34
+
+F-S08-002 | critical | data persistence
+File: client/src/pages/internal/Board.tsx:34
+What the code does: `loadBoard` returns `null` when the stored ticket array is empty. The mount logic then keeps the seed tickets and marks the board ready at lines 84-91.
+Why it is wrong: An empty board is a valid saved state. The client treats it as missing data.
+How it fails: A user deletes the last ticket. The server stores `[]`. A reload reads `[]`, restores the seed tickets, and saves them again.
+Confidence: high
+
+--- finding F-S08-004 (from S08) ---
+Claimed severity: high
+Claimed location: client/src/pages/internal/Board.tsx:367
+
+F-S08-004 | high | security
+File: client/src/pages/internal/Board.tsx:367
+What the code does: The board renders each ticket link directly as an anchor `href`. The create form and JSON import accept arbitrary link strings at lines 154-160 and 522-529.
+Why it is wrong: The page does not apply the available URL safety helper before rendering the link.
+How it fails: An imported or entered `data:text/html,...` link renders as clickable content. A user can open attacker-controlled HTML from the shared board.
+Confidence: high
+
+--- finding F-S08-005 (from S08) ---
+Claimed severity: high
+Claimed location: client/src/pages/internal/Board.tsx:154
+
+F-S08-005 | high | correctness
+File: client/src/pages/internal/Board.tsx:154
+What the code does: JSON import accepts every array as `Ticket[]` without validating its items.
+Why it is wrong: Invalid values reach render code that expects ticket objects.
+How it fails: Importing `[null]` sets `tickets` to `[null]`. The filter at lines 115-123 reads `t.column` and throws a `TypeError`.
+Confidence: high

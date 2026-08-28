@@ -1,0 +1,73 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V01. Write your report to .audit/B1p/verify/V01.md and nothing else.
+
+Files involved: client/src/hooks/useChatbot.ts
+
+Examine each of the 6 findings below. Try to refute each one.
+
+--- finding F-S03-client-hooks-005 (from S03-client-hooks) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useChatbot.ts:66
+
+F-S03-client-hooks-005 | high | concurrency
+File: client/src/hooks/useChatbot.ts:66-83, 161-203, 228-250, 294-298
+What the code does: Selecting a thread changes `activeThreadId`, but it does not abort the current stream. Stream deltas append to the current `messages` state.
+Why it is wrong: A stream for one thread can update the transcript for another selected thread.
+How it fails (concrete input or sequence): The user starts a reply in thread A, opens history, and selects thread B before the stream ends. A later delta from A appends to B's local transcript. The UI then shows A's reply in B.
+Confidence: high
+
+--- finding F-S03-client-hooks-004 (from S03-client-hooks) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useChatbot.ts:279
+
+F-S03-client-hooks-004 | high | correctness
+File: client/src/hooks/useChatbot.ts:279-285
+What the code does: `regenerate` removes the last user message from local state, then calls `send` from the same render.
+Why it is wrong: `send` still captures the old message array and builds the request from it.
+How it fails (concrete input or sequence): A thread contains a user message and an assistant reply. The user clicks regenerate. The request contains the old assistant reply and a second copy of the user message.
+Confidence: high
+
+--- finding F-S05-002 (from S05) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useChatbot.ts:42
+
+F-S05-002 | high | correctness
+File: client/src/hooks/useChatbot.ts:42-59, 294-298
+What the code does: The hook loads every user thread and selects the newest thread without checking `brandId`.
+Why it is wrong: The hook accepts a current brand, but it does not filter or validate the selected thread for that brand.
+How it fails: Brand B can open the latest thread from Brand A. The next message sends Brand B context into the Brand A thread.
+Confidence: high
+
+--- finding F-S05-003 (from S05) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useChatbot.ts:182
+
+F-S05-003 | high | correctness
+File: client/src/hooks/useChatbot.ts:182-183, 279-285
+What the code does: `regenerate` removes the prior user turn, then immediately calls `send`.
+Why it is wrong: `send` still closes over the old `messages` array before React applies `setMessages`.
+How it fails: A transcript `[user, assistant, user, assistant]` becomes `[user, assistant, user, assistant, user]` in the next request.
+Confidence: high
+
+--- finding F-S05-004 (from S05) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useChatbot.ts:91
+
+F-S05-004 | high | correctness
+File: client/src/hooks/useChatbot.ts:91-116, 268-270
+What the code does: The hook refreshes the thread list after sending, but it does not invalidate the active messages query.
+Why it is wrong: The messages query keeps its 30-second fresh cache after the server stores the new message.
+How it fails: Switching away and back within 30 seconds restores the old cached transcript and removes the sent turn from the screen.
+Confidence: high
+
+--- finding F-S05-005 (from S05) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useChatbot.ts:161
+
+F-S05-005 | high | concurrency
+File: client/src/hooks/useChatbot.ts:161-203, 222-270, 294-298
+What the code does: `selectThread` changes the active thread while an SSE send can still run.
+Why it is wrong: The stream callback appends output to shared `messages` state without checking its original thread.
+How it fails: Select thread B during a stream for thread A. Remaining output appears in B, while the server stores it in A.
+Confidence: high

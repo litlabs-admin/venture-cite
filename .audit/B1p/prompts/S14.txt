@@ -1,0 +1,82 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S14.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+server/index.ts
+server/instrument.ts
+server/lib/advisoryLock.ts
+server/lib/agentTaskExecutor.ts
+server/lib/agentTaskSchemas.ts
+server/lib/aiLogger.ts
+server/lib/asyncHandler.ts
+server/lib/audienceGenerator.ts
+server/lib/audit.ts
+server/lib/authRateKey.ts
+server/lib/billingEmails.ts
+server/lib/brandActivation.ts
+server/lib/brandGenerationContext.ts
+server/lib/brandMatcher.ts
+server/lib/brandNameAmbiguity.ts
+server/lib/brandNameFilter.ts
+server/lib/brandPresenceGate.ts
+server/lib/brandProfilePrompt.ts
+server/lib/bufferPost.ts
+server/lib/canonicalUrl.ts
+server/lib/chatbotBudget.ts
+server/lib/chatbotKnowledge.ts
+server/lib/circuitBreaker.ts
+server/lib/citationReconciliation.ts
+server/lib/competitorDiscovery.ts
+server/lib/competitorRelevance.ts
+server/lib/contentGenerationProvider.ts
+server/lib/crawlerAccess.ts
+server/lib/databaseMetadataAudit.ts
+server/lib/databaseTlsPolicy.ts
+server/lib/emailRetry.ts
+server/lib/environmentSafety.ts
+server/lib/factAgent/canonicalize.ts
+server/lib/factAgent/dedup.ts
+server/lib/factAgent/langDetect.ts
+server/lib/factAgent/persistFacts.ts
+server/lib/factAgent/promptInjectionSanitizer.ts
+server/lib/factAgent/robotsCache.ts
+server/lib/factAgent/secretRedactor.ts
+server/lib/factAgent/types.ts
+server/lib/factAgent/v2/aggregate.ts
+server/lib/factAgent/v2/brandProfileWriteback.ts
+server/lib/factAgent/v2/domainAllowlist.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+server/app.ts
+server/db.ts
+server/emailService.ts
+server/lib/factAgent/v2/openrouterClient.ts
+server/lib/factAgent/v2/vercelBudget.ts
+server/lib/genericIndustry.ts
+server/lib/listicleScanner.ts
+server/lib/llmParse.ts
+server/lib/llmPricing.ts
+server/lib/localFlowSafety.ts
+server/lib/logger.ts
+server/lib/modelConfig.ts
+server/lib/onboardingAutopilot.ts
+server/lib/originConcurrency.ts
+server/lib/perceptionRun.ts
+server/lib/runMentionScan.ts
+server/lib/safeParseJson.ts
+server/lib/sentryReport.ts
+server/lib/ssrf.ts
+server/lib/statusTransitions.ts
+server/lib/tokenCipher.ts
+server/scheduler.ts
+server/setupProducts.ts
+server/storage.ts
+server/vite.ts
+shared/factAgent/schema.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S14.md and nothing else. Do not modify any source file.

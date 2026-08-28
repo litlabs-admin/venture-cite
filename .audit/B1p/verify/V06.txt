@@ -1,0 +1,117 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V06. Write your report to .audit/B1p/verify/V06.md and nothing else.
+
+Files involved: client/src/pages/brand-fact-sheet.tsx, client/src/pages/content.tsx, server/lib/factAgent/v2/sourceStatic.ts, server/lib/suggestionGenerator.ts, server/routes/content.ts
+
+Examine each of the 10 findings below. Try to refute each one.
+
+--- finding F-S06-001 (from S06) ---
+Claimed severity: high
+Claimed location: client/src/pages/brand-fact-sheet.tsx:636
+
+F-S06-001 | high | correctness
+File: client/src/pages/brand-fact-sheet.tsx:636
+What the code does: It passes an empty callback to the visible manual-fill action.
+Why it is wrong: The action does not open a form, change state, or dismiss the card.
+How it fails (concrete input or sequence): When a scrape returns zero facts, the user clicks "fill fields manually" and nothing happens.
+Confidence: high
+
+--- finding F-S06-002 (from S06) ---
+Claimed severity: high
+Claimed location: client/src/pages/brand-fact-sheet.tsx:621
+
+F-S06-002 | high | correctness
+File: client/src/pages/brand-fact-sheet.tsx:621
+What the code does: It catches paste failures and keeps the unchanged zero-facts view.
+Why it is wrong: The comment says `apiRequest` logs the error, but `client/src/lib/queryClient.ts:61-69` only throws it.
+How it fails (concrete input or sequence): A paste request returns an error. The user receives no error message and sees no state change.
+Confidence: high
+
+--- finding F-S07-006 (from S07) ---
+Claimed severity: high
+Claimed location: client/src/pages/content.tsx:532
+
+F-S07-006 | high | correctness
+File: client/src/pages/content.tsx:532
+What the code does: It creates every new article with `brands[0].id`.
+Why it is wrong: The page already tracks the active article's selected `brandId`, but the new-article mutation ignores it.
+How it fails (concrete input or sequence): In an account with brands A and B, open a B article and click New Article. The server creates the new draft for brand A (`server/routes/articles.ts:125-132`).
+Confidence: high
+
+--- finding F-S07-007 (from S07) ---
+Claimed severity: high
+Claimed location: client/src/pages/content.tsx:798
+
+F-S07-007 | high | correctness
+File: client/src/pages/content.tsx:798
+What the code does: It calls `friendlyErrorMessage` with `null` instead of the failed job's error kind.
+Why it is wrong: The function's specific `openai_429`, `timeout`, `budget`, and other branches never run (`client/src/pages/content.tsx:92-110`).
+How it fails (concrete input or sequence): Any failed generation displays only "Last generation failed. Edit and try again." even when the server classified a quota refund or a daily budget failure.
+Confidence: high
+
+--- finding F-S15-004 (from S15) ---
+Claimed severity: high
+Claimed location: server/lib/factAgent/v2/sourceStatic.ts:318
+
+F-S15-004 | high | correctness
+File: server/lib/factAgent/v2/sourceStatic.ts:318-379
+What the code does: The static source calls the LLM before it extracts JSON-LD facts.
+Why it is wrong: The code returns `failed` immediately when the LLM call fails at lines 329-344. The JSON-LD pre-pass at lines 369-379 never runs in that case, despite the stated fallback behavior.
+How it fails: A page with valid Organization JSON-LD returns zero facts when the LLM provider fails. The same page would produce deterministic facts if the pre-pass ran before the LLM call.
+Confidence: high
+
+--- finding F-S15-007 (from S15) ---
+Claimed severity: high
+Claimed location: server/lib/factAgent/v2/sourceStatic.ts:145
+
+F-S15-007 | high | availability
+File: server/lib/factAgent/v2/sourceStatic.ts:145-149
+What the code does: The static source always asks its injected fetcher to use a 10,000 ms timeout.
+Why it is wrong: The tier-aware page timeout is computed separately as `PAGE_FETCH_TIMEOUT_MS` in `vercelBudget.ts:45-46`. The static source does not use that value.
+How it fails: On a Hobby budget, a slow page can consume the full function budget before Jina or the LLM runs. The function can time out before it writes the page result.
+Confidence: high
+
+--- finding F-S18-001 (from S18) ---
+Claimed severity: high
+Claimed location: server/lib/suggestionGenerator.ts:199
+
+F-S18-001 | high | correctness
+File: server/lib/suggestionGenerator.ts:199-200
+What the code does: It requires `OPENAI_API_KEY` before calling `getOpenrouterClient()`.
+Why it is wrong: The client uses `OPENROUTER_API_KEY`, so the guard checks the wrong provider.
+How it fails: A deployment with only `OPENROUTER_API_KEY` always returns an error and saves no suggestions.
+Confidence: high
+
+--- finding F-S18-002 (from S18) ---
+Claimed severity: high
+Claimed location: server/lib/suggestionGenerator.ts:211
+
+F-S18-002 | high | data loss
+File: server/lib/suggestionGenerator.ts:211-225
+What the code does: It archives all suggested prompts before the first LLM call.
+Why it is wrong: It does not restore them when the call fails.
+How it fails: A provider timeout archives the current suggestions, then returns an error and leaves the user with no suggestions.
+Confidence: high
+
+--- finding F-S19-005 (from S19) ---
+Claimed severity: high
+Claimed location: server/routes/content.ts:747
+
+F-S19-005 | high | resource control
+File: server/routes/content.ts:747-788
+What the code does: The popular-topics route calls OpenAI for each request without `aiLimitMiddleware`.
+Why it is wrong: Authenticated callers have no per-user limit on this model-backed endpoint.
+How it fails: One caller repeatedly requests the endpoint and consumes shared OpenAI quota and money.
+Confidence: high
+
+--- finding F-S19-006 (from S19) ---
+Claimed severity: high
+Claimed location: server/routes/content.ts:603
+
+F-S19-006 | high | concurrency
+File: server/routes/content.ts:603-648
+What the code does: Auto-Improve reads article content, calls the model, then performs an unconditional update when `expectedVersion` is absent.
+Why it is wrong: The model output can use an old article snapshot.
+How it fails: A user edits the article while the model runs, omits `expectedVersion`, and the later improve update overwrites the edit.
+Confidence: high

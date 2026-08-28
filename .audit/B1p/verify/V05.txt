@@ -1,0 +1,119 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V05. Write your report to .audit/B1p/verify/V05.md and nothing else.
+
+Files involved: client/src/pages/ai-visibility.tsx, client/src/hooks/useMentions.ts, server/lib/workflowEngine.ts, client/src/components/geo-tools/MentionsFilters.tsx, client/src/components/perception/ProbeMatrix.tsx
+
+Examine each of the 10 findings below. Try to refute each one.
+
+--- finding V-06 (from INV01-storage-keys, S06) ---
+Claimed severity: high
+Claimed location: client/src/pages/ai-visibility.tsx:832
+
+V-06 | high
+
+Key: `venturecite-visibility-visited`
+Written at: client/src/pages/ai-visibility.tsx:832
+Why logout misses it: The password-reset sign-out at client/src/pages/reset-password.tsx:126-129 skips the cleanup. The main path also skips cleanup if either awaited call rejects.
+How it fails (two users, one browser): User B can inherit User A's visited-state flag after either sign-out path fails to clean storage.
+Confidence: high
+
+--- finding V-01 (from INV01-storage-keys) ---
+Claimed severity: high
+Claimed location: client/src/pages/ai-visibility.tsx:820
+
+V-01 | high
+
+Key: `vc_visibility_engine`
+Written at: client/src/pages/ai-visibility.tsx:820-823; client/src/hooks/use-persisted-state.ts:22-28
+Why logout misses it: The main cleanup matches only `venturecite-` and two legacy names.
+How it fails (two users, one browser): User B inherits User A's selected AI engine.
+Confidence: high
+
+--- finding F-S03-client-hooks-008 (from S03-client-hooks, S05) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useMentions.ts:30
+
+F-S03-client-hooks-008 | high | correctness
+File: client/src/hooks/useMentions.ts:30-39, 68-77, 124-135, 181-186
+What the code does: The hook exposes `newSinceLastScan`, stores it in the URL, and sends it as a query parameter.
+Why it is wrong: The mentions list contract does not use this parameter, so the selected filter does not change the returned rows.
+How it fails (concrete input or sequence): The user selects `New since last scan`. The hook requests `newSinceLastScan=true`, but the list endpoint applies the other filters only. The list still contains old mentions.
+Confidence: high
+
+--- finding F-S03-client-hooks-009 (from S03-client-hooks) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useMentions.ts:271
+
+F-S03-client-hooks-009 | high | correctness
+File: client/src/hooks/useMentions.ts:271-279
+What the code does: The cooldown result compares `cooldownNextAt` with the current time inside `useMemo`.
+Why it is wrong: No timer or query update causes a render when the date passes.
+How it fails (concrete input or sequence): A scan request returns a cooldown time. The user stays on the page until that time passes. The button remains disabled because `scanCooldown` does not recompute until another state change.
+Confidence: high
+
+--- finding F-S18-005 (from S18) ---
+Claimed severity: high
+Claimed location: server/lib/workflowEngine.ts:615
+
+F-S18-005 | high | concurrency
+File: server/lib/workflowEngine.ts:615-645
+What the code does: `cancelRun` changes tasks and the workflow run without acquiring `withRunLock`.
+Why it is wrong: It races with `advanceRun`, which writes state without a status guard.
+How it fails: Cancellation can set a pending run to cancelled, then an in-flight advance can write `status = running` and resurrect the run.
+Confidence: high
+
+--- finding F-S18-004 (from S18) ---
+Claimed severity: high
+Claimed location: server/lib/workflowEngine.ts:338
+
+F-S18-004 | high | concurrency
+File: server/lib/workflowEngine.ts:338-365
+What the code does: It creates agent tasks, then records their IDs and the running state in a separate update.
+Why it is wrong: The task creation and run-state update do not share a transaction or recovery marker.
+How it fails: A crash after task creation leaves the run pending. The next tick creates another set of tasks and can repeat paid work.
+Confidence: high
+
+--- finding F-S03-001 (from S03) ---
+Claimed severity: high
+Claimed location: client/src/components/geo-tools/MentionsFilters.tsx:238
+
+F-S03-001 | high | correctness
+File: client/src/components/geo-tools/MentionsFilters.tsx:238-250
+What the code does: The button toggles the `newSinceLastScan` filter and marks it as active.
+Why it is wrong: The client serializes this filter, but the route and storage query omit it (client/src/hooks/useMentions.ts:68-77,175-196; server/routes/mentions.ts:164-174; server/databaseStorage.ts:4946-5095).
+How it fails (concrete input or sequence): Click `New since last scan`. The request changes, but the returned mentions do not exclude older records (client/src/hooks/useMentions.ts:175-196).
+Confidence: high
+
+--- finding F-S03-002 (from S03) ---
+Claimed severity: high
+Claimed location: client/src/components/geo-tools/MentionsFilters.tsx:161
+
+F-S03-002 | high | correctness
+File: client/src/components/geo-tools/MentionsFilters.tsx:161-179
+What the code does: The date input sends the selected `to` value as `YYYY-MM-DD`.
+Why it is wrong: The server parses that value at midnight, then applies an inclusive timestamp comparison (server/routes/mentions.ts:170-171; server/databaseStorage.ts:5011-5023).
+How it fails (concrete input or sequence): Select `2026-08-28`. A mention discovered on `2026-08-28` at noon fails the `to` filter (client/src/components/geo-tools/MentionsFilters.tsx:172-179; server/routes/mentions.ts:170-171).
+Confidence: high
+
+--- finding F-S04-001 (from S04) ---
+Claimed severity: high
+Claimed location: client/src/components/perception/ProbeMatrix.tsx:314
+
+F-S04-001 | high | security
+File: client/src/components/perception/ProbeMatrix.tsx:314
+What the code does: It assigns each server-provided probe source directly to an anchor `href`.
+Why it is wrong: The component does not restrict the URL scheme to `http` or `https`.
+How it fails (concrete input or sequence): A source with `javascript:alert(document.cookie)` runs script when a user clicks the source.
+Confidence: high
+
+--- finding F-S04-002 (from S04) ---
+Claimed severity: high
+Claimed location: client/src/components/perception/ProbeMatrix.tsx:74
+
+F-S04-002 | high | correctness
+File: client/src/components/perception/ProbeMatrix.tsx:74-112
+What the code does: It sends every status except `pending` and `failed` to the score branch, then converts a null score to `0`.
+Why it is wrong: The probe model also permits status `asked`, which means the answer exists but scoring has not finished.
+How it fails (concrete input or sequence): A cell with `{ status: "asked", score: null, noInformation: false }` displays a red `0.0` score instead of a pending state.
+Confidence: high

@@ -1,0 +1,84 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S27.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+tests/unit/jobLease.test.ts
+tests/unit/keywordResearchProvenance.test.ts
+tests/unit/kpiMentionsTile.test.tsx
+tests/unit/leaderboardRank.test.ts
+tests/unit/listiclesSummary.test.ts
+tests/unit/llmBudget.test.ts
+tests/unit/llmJobsOutbox.test.ts
+tests/unit/llmParse.test.ts
+tests/unit/localE2EDatabaseAccess.test.ts
+tests/unit/localFlowSafety.test.ts
+tests/unit/logger.test.ts
+tests/unit/logoProxyFallback.test.ts
+tests/unit/manualPasteCard.test.tsx
+tests/unit/mentionQueryBuilder.test.ts
+tests/unit/mentionScanDeadline.test.ts
+tests/unit/mentionTone.test.ts
+tests/unit/mentionsRoutes.test.ts
+tests/unit/mentionsStorage.test.ts
+tests/unit/metricsSnapshotAggregate.test.ts
+tests/unit/migrationLedgerPolicy.test.ts
+tests/unit/migrationRelease.test.ts
+tests/unit/migrationRunnerChecksum.test.ts
+tests/unit/migrationRunnerNoTransaction.test.ts
+tests/unit/money.test.ts
+tests/unit/nitroBootScheduler.test.ts
+tests/unit/nitroBootStartupFailure.test.ts
+tests/unit/onboardingAutopilotClaim.test.ts
+tests/unit/openAiLlmJobAdapter.test.ts
+tests/unit/outboxRepository.test.ts
+tests/unit/outboxWorker.test.ts
+tests/unit/pageContentAnalysis.test.ts
+tests/unit/pageText.test.ts
+tests/unit/perceptionPage.test.tsx
+tests/unit/perceptionProbes.test.ts
+tests/unit/perceptionScorer.test.ts
+tests/unit/persistFactsMerge.test.ts
+tests/unit/planBeforeBrandGate.test.ts
+tests/unit/platformDetect.test.ts
+tests/unit/pricingCurrentPlan.test.ts
+tests/unit/pricingTiers.test.ts
+tests/unit/probeMatrix.test.tsx
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/components/dashboard-panels/KpiStrip.tsx
+client/src/components/dashboard-panels/ListiclesPanel.tsx
+client/src/components/dashboard-panels/useDashboardData.ts
+client/src/components/fact-sheet/ManualPasteCard.tsx
+client/src/components/perception/ProbeMatrix.tsx
+client/src/pages/perception.tsx
+scripts/migrationRelease.ts
+server/databaseStorage.ts
+server/lib/advisoryLock.ts
+server/lib/llmParse.ts
+server/lib/llmPricing.ts
+server/lib/localFlowSafety.ts
+server/lib/logger.ts
+server/lib/mentionQueryBuilder.ts
+server/lib/migrationChecksums.ts
+server/lib/migrationLedgerPolicy.ts
+server/lib/migrationRunner.ts
+server/lib/pageContentAnalysis.ts
+server/lib/pageText.ts
+server/lib/perceptionProbeQuestions.ts
+server/lib/perceptionScorer.ts
+server/lib/platformDetect.ts
+server/outbox/openAiLlmJobAdapter.ts
+server/outbox/outboxRepository.ts
+server/outbox/outboxWorker.ts
+server/scheduler.ts
+shared/factAgent/schema.ts
+shared/money.ts
+shared/outbox.ts
+shared/schema.ts
+tests/e2e/support/local-database-access.ts
+
+Write your report to .audit/B1p/S27.md and nothing else. Do not modify any source file.

@@ -1,0 +1,69 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S07.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+client/src/pages/brands.tsx
+client/src/pages/citations.tsx
+client/src/pages/community-engagement.tsx
+client/src/pages/competitors.tsx
+client/src/pages/content.tsx
+client/src/pages/crawler-check.tsx
+client/src/pages/diagnose.tsx
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/components/AIGeneratedPill.tsx
+client/src/components/BrandFormFields.tsx
+client/src/components/BrandScopedTab.tsx
+client/src/components/DeleteBrandDialog.tsx
+client/src/components/SpineShell.tsx
+client/src/components/citations/HistoryTab.tsx
+client/src/components/citations/PromptsTab.tsx
+client/src/components/citations/ResultsTab.tsx
+client/src/components/content/BeginnerTips.tsx
+client/src/components/content/BrandCombobox.tsx
+client/src/components/content/DraftToolbar.tsx
+client/src/components/content/IndustryCombobox.tsx
+client/src/components/content/KeywordChips.tsx
+client/src/components/content/MarkdownEditor.tsx
+client/src/components/content/UsageWidget.tsx
+client/src/components/dashboard-panels/Panel.tsx
+client/src/components/foundations/StatusDot.tsx
+client/src/components/foundations/index.ts
+client/src/components/intelligence/HallucinationsTab.tsx
+client/src/components/ui/accordion.tsx
+client/src/components/ui/alert-dialog.tsx
+client/src/components/ui/alert.tsx
+client/src/components/ui/badge.tsx
+client/src/components/ui/button.tsx
+client/src/components/ui/dialog.tsx
+client/src/components/ui/dropdown-menu.tsx
+client/src/components/ui/empty-state.tsx
+client/src/components/ui/error-state.tsx
+client/src/components/ui/form.tsx
+client/src/components/ui/input.tsx
+client/src/components/ui/label.tsx
+client/src/components/ui/progress.tsx
+client/src/components/ui/select.tsx
+client/src/components/ui/skeleton.tsx
+client/src/components/ui/tabs.tsx
+client/src/components/ui/textarea.tsx
+client/src/components/ui/tooltip.tsx
+client/src/hooks/use-brand-selection.ts
+client/src/hooks/use-loading-messages.ts
+client/src/hooks/use-persisted-state.ts
+client/src/hooks/use-toast.ts
+client/src/hooks/useActiveCitationRuns.ts
+client/src/hooks/useArticleAutoSave.ts
+client/src/hooks/useCitationLiveRefresh.ts
+client/src/hooks/usePrompts.ts
+client/src/lib/queryClient.ts
+client/src/lib/urlSafety.ts
+client/src/lib/utils.ts
+shared/constants.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S07.md and nothing else. Do not modify any source file.

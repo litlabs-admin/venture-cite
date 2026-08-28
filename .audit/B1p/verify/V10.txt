@@ -1,0 +1,132 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V10. Write your report to .audit/B1p/verify/V10.md and nothing else.
+
+Files involved: client/src/pages/landing/sections/LearnResearch/AiSearchAreaChart.tsx, client/src/pages/prompt-detail.tsx, client/src/pages/settings.tsx, scripts/assertMigrationsApplied.mjs, scripts/releaseEnvironmentPreflight.ts, server/citationJudge.ts, server/contentGenerationWorker.ts, server/data/contentRequestArticleRepository.ts, server/lib/aiLogger.ts, server/lib/chatbotBudget.ts
+
+Examine each of the 10 findings below. Try to refute each one.
+
+--- finding F-S09-001 (from S09) ---
+Claimed severity: high
+Claimed location: client/src/pages/landing/sections/LearnResearch/AiSearchAreaChart.tsx:48
+
+F-S09-001 | high | responsive layout
+File: client/src/pages/landing/sections/LearnResearch/AiSearchAreaChart.tsx:48; client/src/pages/landing/sections/LearnResearch/LearnResearch.tsx:43-44
+What the code does: The chart uses a fixed 1054 pixel SVG width. Its parent hides overflow.
+Why it is wrong: A narrow viewport cannot display the complete chart.
+How it fails (concrete input or sequence): At a 390 pixel viewport, the panel clips the chart after the visible panel width.
+Confidence: high
+
+--- finding F-S10-001 (from S10) ---
+Claimed severity: high
+Claimed location: client/src/pages/prompt-detail.tsx:344
+
+F-S10-001 | high | security
+File: client/src/pages/prompt-detail.tsx:344-350
+File: client/src/pages/prompt-diagnose.tsx:229-237
+What the code does: It places stored source URLs directly in anchor `href` attributes.
+Why it is wrong: Stored citation URLs are external data. The render path does not enforce `http` or `https`.
+How it fails: A stored `javascript:` URL becomes a clickable script URL. Clicking it can execute script in the user's browser.
+Confidence: high
+
+--- finding F-S10-002 (from S10) ---
+Claimed severity: high
+Claimed location: client/src/pages/settings.tsx:1093
+
+F-S10-002 | high | privacy
+File: client/src/pages/settings.tsx:1093-1104
+Supporting file: server/routes/userAccount.ts:123-131
+Supporting file: server/citationChecker.ts:1117-1120
+What the code does: It promises every account citation in the JSON export and starts `/api/user/export`.
+Why it is wrong: The export query selects `geoRankings` only by article IDs. Prompt citation rows have `articleId: null` and a `brandPromptId`.
+How it fails: An account with prompt citation checks downloads an export without those prompt citation rankings.
+Confidence: high
+
+--- finding F-S11-001 (from S11) ---
+Claimed severity: high
+Claimed location: scripts/assertMigrationsApplied.mjs:29
+
+F-S11-001 | high | security
+File: scripts/assertMigrationsApplied.mjs:29-41
+What the code does: The script accepts DATABASE_URL and creates a PostgreSQL client with `ssl: false`.
+Why it is wrong: The client disables TLS for a database connection.
+How it fails (concrete input or sequence): Run the migration check with a production database URL that permits non-TLS connections. The script sends database credentials and queries without certificate verification.
+Confidence: high
+
+--- finding F-S11-002 (from S11) ---
+Claimed severity: high
+Claimed location: scripts/releaseEnvironmentPreflight.ts:258
+
+F-S11-002 | high | release safety
+File: scripts/releaseEnvironmentPreflight.ts:258-274
+What the code does: The bootstrap preflight validates only DATABASE_CA_CERT_PATH and DATABASE_DIRECT_URL.
+Why it is wrong: It does not validate DATABASE_URL or compare the two database targets.
+How it fails (concrete input or sequence): Set DATABASE_DIRECT_URL to a valid different database and run a production bootstrap. The preflight passes, and the migration runner switches DATABASE_URL to the different target.
+Confidence: high
+
+--- finding F-S12-003 (from S12) ---
+Claimed severity: high
+Claimed location: server/citationJudge.ts:91
+
+F-S12-003 | high | usage accounting
+File: server/citationJudge.ts:91-113
+
+What the code does: The citation judge sends a direct OpenAI request and returns the parsed result.
+
+Why it is wrong: This request does not call the required budget assertion or spend recording functions. The normal citation path calls the judge at `server/citationChecker.ts:394-396`.
+
+How it fails: Each normal citation check performs a main provider call and a judge call. The main call records spend. The judge call does not. User usage and cost records undercount the actual provider usage.
+
+Confidence: high
+
+--- finding F-S12-006 (from S12) ---
+Claimed severity: high
+Claimed location: server/contentGenerationWorker.ts:81
+
+F-S12-006 | high | job reliability
+File: server/contentGenerationWorker.ts:81-103
+
+What the code does: The worker throws a timeout when the remaining slice deadline reaches zero.
+
+Why it is wrong: `runArticleSlice` treats the timeout as a terminal error at `server/contentGenerationWorker.ts:334-392`. Only an explicit deadline result at `server/contentGenerationWorker.ts:433-435` returns the job to a running state.
+
+How it fails: Database work or a provider call consumes the slice deadline. The timeout exception reaches the failure handler. The worker marks the job slice as failed instead of deferring it for the next lease.
+
+Confidence: high
+
+--- finding F-S12-007 (from S12) ---
+Claimed severity: high
+Claimed location: server/data/contentRequestArticleRepository.ts:58
+
+F-S12-007 | high | cross-brand data integrity
+File: server/data/contentRequestArticleRepository.ts:58-81,203-236
+
+What the code does: The article patch type permits `brandId`, and both update methods write the patch without removing that field.
+
+Why it is wrong: The generation worker identifies the active job by article and job identifiers. It does not verify that the article still belongs to the job brand during completion at `server/databaseStorage.ts:1623-1692`.
+
+How it fails: A user owns two brands. A job generates content for an article under Brand A. The user changes the article `brandId` to Brand B while the job runs. The job can then write Brand A content into the article that now belongs to Brand B.
+
+Confidence: high
+
+--- finding F-S14-001 (from S14) ---
+Claimed severity: high
+Claimed location: server/lib/aiLogger.ts:29
+
+F-S14-001 | high | security
+File: server/lib/aiLogger.ts:29
+What the code does: The wrapper writes complete AI request messages, response text, and error data to stdout.
+Why it is wrong: The output is not redacted, and the project requires the logger for server logs.
+How it fails (concrete input or sequence): Any attached AI client logs user prompts, brand facts, or email data for every call. `truncate` limits length but does not remove sensitive values.
+Confidence: high
+
+--- finding F-S14-002 (from S14) ---
+Claimed severity: high
+Claimed location: server/lib/chatbotBudget.ts:35
+
+F-S14-002 | high | concurrency
+File: server/lib/chatbotBudget.ts:35
+What the code does: The budget check reads token and message totals before the request runs. A separate UPSERT records usage after the request.
+Why it is wrong: The check does not reserve quota atomically with usage recording.
+How it fails (concrete input or sequence): Two concurrent requests both read totals below the cap. Both call the model. Both record usage after spending, so the user can exceed the hourly or daily limit.
+Confidence: high

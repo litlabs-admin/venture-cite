@@ -1,0 +1,51 @@
+You are checking ONE invariant across the whole repository. This is not a file
+review. Report only violations of the stated invariant, plus anything that makes
+the invariant unverifiable.
+
+## The invariant
+
+Every write path that reads a value and then writes a value derived from it is safe when two users, two requests, or two workers run it at the same time.
+
+Rationale: This product must serve many users at once. A lost update or a double charge is a real user-visible failure.
+
+## Method
+
+1. Find every read-modify-write sequence in server/. Look for a select followed by an update or insert that depends on the selected value, counters, quota and limit checks, status transitions, slot claims, and queue or outbox draining.
+2. For each, determine the protection: a transaction with an appropriate isolation level, a row lock such as select for update, a unique constraint, an advisory lock, an atomic SQL expression, or a compare and set.
+3. Report every sequence with no protection, and state the interleaving that breaks it.
+4. Note separately any operation that is not idempotent under retry, since this system retries jobs.
+
+## Output
+
+Write exactly one file: .audit/B1p/INV05-concurrency.md. Nothing else. Do not modify any source file.
+
+Use this shape:
+
+# INV05-concurrency concurrent write safety
+
+## The rule as implemented
+File: path:line
+Rule: <exact description>
+
+## Complete inventory
+| Item | Defined at | Satisfies invariant? | Evidence |
+|---|---|---|---|
+
+## Violations
+### V-01 | critical|high|medium|low
+Item:
+Defined at: path:line
+Why it violates the invariant:
+How it fails (concrete sequence):
+Confidence: high|medium|low
+
+## UNDETERMINED
+- <question> - needs <what>
+
+Be exhaustive on the inventory step. An item you fail to find is a violation you
+fail to report. If you find zero violations, say so and show the inventory that
+proves it. Do not report an item as a violation without checking the rule against
+it; a false positive costs a reviewer real time.
+
+Documentation and comments are not evidence. Check the code.
+Write plainly. No em dashes. No filler.

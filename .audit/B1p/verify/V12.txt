@@ -1,0 +1,117 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V12. Write your report to .audit/B1p/verify/V12.md and nothing else.
+
+Files involved: server/lib/runMentionScan.ts, server/lib/weeklyDigestEmitter.ts, server/lib/usageLimit.ts, server/routes/board.ts, server/routes/brands.ts, server/routes/assistant.ts, server/routes/cron.ts, server/routes/factSheet.ts, server/routes/enterpriseInquiry.ts, server/routes/factSheetV2.ts
+
+Examine each of the 10 findings below. Try to refute each one.
+
+--- finding F-S17-003 (from S17) ---
+Claimed severity: high
+Claimed location: server/lib/runMentionScan.ts:16
+
+F-S17-003 | high | correctness
+File: server/lib/runMentionScan.ts:16
+What the code does: The function reads the job and updates it to `running` before entering its `try` block.
+Why it is wrong: A failure in `getScanJob` or the initial `updateScanJob` escapes the function and cannot mark the job as failed.
+How it fails (concrete input or sequence): A database outage during the initial read or status update rejects the promise. The queued job remains queued, while detached callers only receive a rejected promise.
+Confidence: high
+
+--- finding F-S18-003 (from S18) ---
+Claimed severity: high
+Claimed location: server/lib/weeklyDigestEmitter.ts:64
+
+F-S18-003 | high | concurrency
+File: server/lib/weeklyDigestEmitter.ts:64-69,170-180
+What the code does: It checks the cooldown, sends the email, and updates the cooldown in separate operations.
+Why it is wrong: Concurrent emitters can pass the same cooldown check.
+How it fails: Two terminal brand runs can call this function together and send two identical weekly digest emails before either update commits.
+Confidence: high
+
+--- finding F-S18-006 (from S18) ---
+Claimed severity: high
+Claimed location: server/lib/usageLimit.ts:148
+
+F-S18-006 | high | correctness
+File: server/lib/usageLimit.ts:148-167
+What the code does: It refunds the current user counter for any refundable job with a null refund marker.
+Why it is wrong: The job query does not check `quota_reservation_period`.
+How it fails: A prior-month job can fail after the monthly reset and decrement the current month's usage.
+Confidence: high
+
+--- finding F-S19-001 (from S19) ---
+Claimed severity: high
+Claimed location: server/routes/board.ts:137
+
+F-S19-001 | high | security and data integrity
+File: server/routes/board.ts:137-142
+What the code does: The PUT routes accept a complete board and write it to shared `system_state` storage.
+Why it is wrong: The routes have no route-level authentication, and the project exposes these PUT paths publicly.
+How it fails: An anonymous caller sends a valid ticket list and replaces the engineering or selected internal board.
+Confidence: high
+
+--- finding F-S19-002 (from S19) ---
+Claimed severity: high
+Claimed location: server/routes/brands.ts:407
+
+F-S19-002 | high | security and data integrity
+File: server/routes/brands.ts:407-420
+What the code does: The update schema allows every insert-brand column except `userId`, then passes the result to the update repository.
+Why it is wrong: The schema includes worker state, soft-delete fields, and `version`, but the request repository only intends editable brand fields.
+How it fails: An authenticated user sends `{"version":0,"autopilotStatus":"completed"}` and changes internal state through the brand update API.
+Confidence: high
+
+--- finding F-S19-004 (from S19) ---
+Claimed severity: high
+Claimed location: server/routes/assistant.ts:208
+
+F-S19-004 | high | concurrency
+File: server/routes/assistant.ts:208-224
+What the code does: The route checks the chatbot budget and inserts the user message in separate operations.
+Why it is wrong: The check does not reserve a message slot or token capacity.
+How it fails: Concurrent requests all pass before usage rows or messages change, then all call the model and exceed the hourly or daily cap.
+Confidence: high
+
+--- finding F-S19-007 (from S19) ---
+Claimed severity: high
+Claimed location: server/routes/cron.ts:332
+
+F-S19-007 | high | concurrency and resource control
+File: server/routes/cron.ts:332-365 and 484-492
+What the code does: Each authorized cron request creates an orchestrator and starts the auto-citation and brand-activation sweeps.
+Why it is wrong: The route has no distributed lock for the complete orchestrator, and brand activation reads and writes its weekly ledger without a claim.
+How it fails: Two cron requests read an empty ledger for the same brand and both run the expensive weekly scans and model calls.
+Confidence: high
+
+--- finding F-S20-001 (from S20) ---
+Claimed severity: high
+Claimed location: server/routes/factSheet.ts:282
+
+F-S20-001 | high | correctness
+File: server/routes/factSheet.ts:282-314
+What the code does: The SSE loop emits rows only when each row ID is lexically greater than the saved page or fact cursor.
+Why it is wrong: Page and fact IDs use random UUID values, not an insertion order. A later row can have a smaller ID.
+How it fails (concrete input or sequence): The first poll saves the largest UUID. A later page or fact with a smaller UUID never passes the comparison and never reaches the client.
+Confidence: high
+
+--- finding F-S20-002 (from S20) ---
+Claimed severity: high
+Claimed location: server/routes/enterpriseInquiry.ts:78
+
+F-S20-002 | high | reliability
+File: server/routes/enterpriseInquiry.ts:78-97
+What the code does: The route sends the inquiry email, catches delivery errors, and always returns `{ success: true }`.
+Why it is wrong: The route has no database or durable queue fallback. A delivery error loses the only copy of the inquiry.
+How it fails (concrete input or sequence): Resend is unavailable or unconfigured. The helper throws, the catch logs the error, and the caller receives a false success response.
+Confidence: high
+
+--- finding F-S20-003 (from S20) ---
+Claimed severity: high
+Claimed location: server/routes/factSheetV2.ts:678
+
+F-S20-003 | high | data integrity
+File: server/routes/factSheetV2.ts:678-701
+What the code does: The route awaits `persistPasteFacts` but ignores its result before recording a completed log and returning success.
+Why it is wrong: The persistence helper catches database errors and returns `{ inserted: 0 }` instead of throwing.
+How it fails (concrete input or sequence): The delete or insert transaction fails. The route records `status: "done"`, reports the extracted count, and leaves the run without the new facts.
+Confidence: high

@@ -1,0 +1,70 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S19.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+server/routes/articles.ts
+server/routes/assistant.ts
+server/routes/billing.ts
+server/routes/board.ts
+server/routes/brands.ts
+server/routes/buffer.ts
+server/routes/community.ts
+server/routes/content.ts
+server/routes/contentTypes.ts
+server/routes/cron.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+server/auth.ts
+server/citationChecker.ts
+server/contentGenerationWorker.ts
+server/data/contentRequestData.ts
+server/data/requestBrandRepository.ts
+server/data/requestData.ts
+server/db.ts
+server/lib/asyncHandler.ts
+server/lib/audit.ts
+server/lib/brandActivation.ts
+server/lib/brandGenerationContext.ts
+server/lib/brandProfilePrompt.ts
+server/lib/bufferPost.ts
+server/lib/chatbotBudget.ts
+server/lib/chatbotKnowledge.ts
+server/lib/citationReconciliation.ts
+server/lib/contentGenerationProvider.ts
+server/lib/factAgent/v2/factScrapeBackstop.ts
+server/lib/factAgent/v2/openrouterClient.ts
+server/lib/factAgent/v2/runFactSheetRefresh.ts
+server/lib/factAgent/v2/vercelBudget.ts
+server/lib/factAgent/v2/weeklySummary.ts
+server/lib/faqScoring.ts
+server/lib/llmJobs.ts
+server/lib/llmPricing.ts
+server/lib/localFlowSafety.ts
+server/lib/logger.ts
+server/lib/modelConfig.ts
+server/lib/onboardingAutopilot.ts
+server/lib/openrouterClient.ts
+server/lib/ownership.ts
+server/lib/pageText.ts
+server/lib/pagination.ts
+server/lib/perceptionProbes.ts
+server/lib/rateLimitBuckets.ts
+server/lib/requestActor.ts
+server/lib/routesShared.ts
+server/lib/sentryReport.ts
+server/lib/ssrf.ts
+server/lib/tokenCipher.ts
+server/lib/tourCleanup.ts
+server/lib/trackedContentMatcher.ts
+server/lib/usageLimit.ts
+server/outbox/contentCostOutboxDrain.ts
+server/scheduler.ts
+server/setupProducts.ts
+server/storage.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S19.md and nothing else. Do not modify any source file.

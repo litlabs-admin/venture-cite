@@ -1,0 +1,70 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V13. Write your report to .audit/B1p/verify/V13.md and nothing else.
+
+Files involved: server/routes/userAccount.ts, server/routes/onboarding.ts, src/routes/internal-page.tsx, shared/factAgent/schema.ts, tests/unit/citationChecker.kickoff.test.ts
+
+Examine each of the 5 findings below. Try to refute each one.
+
+--- finding F-S21-006 (from S21) ---
+Claimed severity: high
+Claimed location: server/routes/userAccount.ts:86
+
+F-S21-006 | high | data handling
+File: server/routes/userAccount.ts:86
+What the code does: `buildUserExport` exports the user row, brands, seven selected child-table groups, and rankings linked through articles.
+Why it is wrong: The function claims to pull every row owned by the user, but it does not query article revisions, distributions, keyword research, prompt tags, prompt audiences, phrasing tests, visibility progress, notification preferences, chatbot threads, chatbot messages, or workflow runs.
+How it fails: A user creates one of these records and downloads an export. The export does not contain that user's record.
+Confidence: high
+
+--- finding F-S21-007 (from S21) ---
+Claimed severity: high
+Claimed location: server/routes/onboarding.ts:159
+
+F-S21-007 | high | correctness
+File: server/routes/onboarding.ts:159
+What the code does: One request can fetch the homepage for ten seconds, call the LLM for up to 25 seconds, fetch a sitemap for eight seconds, fetch three sitemap pages for up to eight seconds each, and call the LLM again for up to 25 seconds.
+Why it is wrong: These sequential limits allow about 92 seconds. The Vercel function configuration allows 60 seconds at `vite.config.ts:121-123`. The route has no overall deadline.
+How it fails: A thin site with three matching sitemap pages and slow upstream responses can exceed the function limit. The platform can close the SSE stream before the route sends its `error` or `end` event.
+Confidence: high
+
+--- finding F-S22-001 (from S22) ---
+Claimed severity: high
+Claimed location: src/routes/internal-page.tsx:21
+
+F-S22-001 | high | security
+File: `src/routes/internal-page.tsx:21-30`
+
+What the code does: The route exposes `/internal-page` without an authentication or administrator wrapper. The board handlers also register direct GET and PUT routes without middleware at `server/routes/board.ts:131-165`. The KPI handler registers a direct GET route at `server/routes/internalKpis.ts:15-18`.
+
+Why it is wrong: Any caller can read internal board data, replace shared board data, and read business aggregates. The write handler stores the submitted ticket array in shared `system_state` at `server/routes/board.ts:117-126`. The KPI response includes user counts, tier counts, paying-user counts, article counts, prompt counts, and citation counts at `server/routes/internalKpis.ts:32-68` and `server/routes/internalKpis.ts:86-100`.
+
+How it fails (concrete input or sequence): An unauthenticated caller sends `GET /api/board/marketing` and receives the shared marketing board because `server/routes/board.ts:145-154` has no auth check. The caller then sends a valid ticket array with `PUT /api/board/marketing`, and the handler replaces that board at `server/routes/board.ts:156-165` and `server/routes/board.ts:117-126`. The same caller sends `GET /api/internal/kpis` and receives internal aggregate metrics at `server/routes/internalKpis.ts:15-18` and `server/routes/internalKpis.ts:86-100`.
+
+Confidence: high
+
+--- finding F-S22-002 (from S22) ---
+Claimed severity: high
+Claimed location: shared/factAgent/schema.ts:416
+
+F-S22-002 | high | correctness
+File: `shared/factAgent/schema.ts:416-427`
+
+What the code does: The Zod value payload accepts optional `sources` and `alternatives` fields at `shared/factAgent/schema.ts:313-321`. The strict JSON Schema accepts only `n`, `items`, and `otherLabel` at `shared/factAgent/schema.ts:416-427`. The extraction prompt sends this generated schema to the model at `server/lib/factAgent/v2/extractionPrompt.ts:110-116`.
+
+Why it is wrong: The provider schema rejects the v2 provenance fields that the application type accepts. `additionalProperties: false` at `shared/factAgent/schema.ts:416-419` makes the mismatch strict. A model that follows the provider schema cannot return source entries or alternative values.
+
+How it fails (concrete input or sequence): A fact response containing `valuePayload.sources` or `valuePayload.alternatives` is valid for `ValuePayloadSchema` at `shared/factAgent/schema.ts:313-328`, but it violates the generated schema at `shared/factAgent/schema.ts:416-427`. A strict model call therefore rejects that response. A model that follows the generated schema returns no provenance fields, so the v2 fact has no source or alternative data.
+
+Confidence: high
+
+--- finding F-S25-001 (from S25) ---
+Claimed severity: high
+Claimed location: tests/unit/citationChecker.kickoff.test.ts:1
+
+F-S25-001 | high | correctness
+File: tests/unit/citationChecker.kickoff.test.ts:1-8,64-74
+What the code does: The test leaves the prompt list empty and measures kickoff time below 200 milliseconds.
+Why it is wrong: Empty prompts make `runBrandPrompts` return immediately. The production kickoff awaits the run at `server/citationChecker.ts:1417-1418`.
+How it fails (concrete input or sequence): A runnable prompt can make kickoff wait for the 30-second slice, while this test still passes.
+Confidence: high

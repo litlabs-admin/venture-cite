@@ -1,0 +1,8 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S02-server-jobs.
+
+Read every one of these files completely, word for word, in full. Do not sample:
+server/scheduler.ts server/contentGenerationWorker.ts server/citationChecker.ts server/citationJudge.ts
+
+Write your report to .audit/B1p/S02-server-jobs.md and nothing else. Do not modify any source file.

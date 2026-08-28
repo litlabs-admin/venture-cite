@@ -1,0 +1,138 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V11. Write your report to .audit/B1p/verify/V11.md and nothing else.
+
+Files involved: server/lib/brandActivation.ts, server/lib/factAgent/v2/hybridUrlDiscovery.ts, server/lib/factAgent/v2/sourceUserEnrich.ts, server/lib/factAgent/v2/runFullScrape.ts, server/lib/factAgent/v2/structuredDataExtractor.ts, server/lib/llmJobs.ts, server/lib/onboardingAutopilot.ts, server/lib/perceptionProbes.ts, server/lib/ssrf.ts, server/lib/promptGenerator.ts
+
+Examine each of the 10 findings below. Try to refute each one.
+
+--- finding F-S14-003 (from S14) ---
+Claimed severity: high
+Claimed location: server/lib/brandActivation.ts:97
+
+F-S14-003 | high | concurrency
+File: server/lib/brandActivation.ts:97
+What the code does: Each activation call reads one ledger, runs every due job, then writes the ledger after each job.
+Why it is wrong: The function has no per-brand lease or atomic claim for a due job.
+How it fails (concrete input or sequence): Two calls read the same due ledger before either write. Both run the same mention, listicle, perception, or competitor job. This duplicates scans and model spend.
+Confidence: high
+
+--- finding F-S15-002 (from S15) ---
+Claimed severity: high
+Claimed location: server/lib/factAgent/v2/hybridUrlDiscovery.ts:170
+
+F-S15-002 | high | security
+File: server/lib/factAgent/v2/hybridUrlDiscovery.ts:170-190
+What the code does: The Jina fallback accepts a link when its hostname ends with the last two labels of the brand hostname.
+Why it is wrong: This check has no label boundary and does not use the registered-domain helper.
+How it fails: For `example.com`, a Jina link to `https://evil-example.com/about` passes `endsWith("example.com")`. The ranker can select it, and the scrape can ingest facts from that unrelated domain.
+Confidence: high
+
+--- finding F-S15-003 (from S15) ---
+Claimed severity: high
+Claimed location: server/lib/factAgent/v2/sourceUserEnrich.ts:217
+
+F-S15-003 | high | correctness
+File: server/lib/factAgent/v2/sourceUserEnrich.ts:217-227
+What the code does: The user-enrich path accepts every fact that passes `FactsResponseSchema` and returns its `factKey` unchanged.
+Why it is wrong: `FactsResponseSchema` allows any string key. The v2 controlled vocabulary requires a valid `(domain, factKey)` pair. This path does not call `isAllowedFactKey` before persistence.
+How it fails: A valid model response with `offerings.product` or `offerings.products` reaches `persistUserFacts`, which writes that key unchanged at `persistUserFacts.ts:56-65`. It does not consolidate with the allowed `offerings.productLine` key.
+Confidence: high
+
+--- finding F-S15-005 (from S15) ---
+Claimed severity: high
+Claimed location: server/lib/factAgent/v2/runFullScrape.ts:356
+
+F-S15-005 | high | data loss
+File: server/lib/factAgent/v2/runFullScrape.ts:356-376
+What the code does: The full pipeline ignores the result of `persistFacts` and logs the extractor fact count as the static source fact count.
+Why it is wrong: `persistFacts` catches write errors and returns partial counters at `server/lib/factAgent/persistFacts.ts:385-399`. The run does not compare those counters with `outcome.facts.length`.
+How it fails: A write failure can leave no new scraped rows while the log reports a successful nonzero extraction. The aggregate then uses that log count for terminal status. The run can complete with missing facts.
+Confidence: high
+
+--- finding F-S15-006 (from S15) ---
+Claimed severity: high
+Claimed location: server/lib/factAgent/v2/structuredDataExtractor.ts:109
+
+F-S15-006 | high | correctness
+File: server/lib/factAgent/v2/structuredDataExtractor.ts:109-119
+What the code does: The JSON-LD walker recursively visits every nested object and extracts every nested Organization node at lines 377-380.
+Why it is wrong: A page can contain an Organization for an external publisher, parent, or author. The walker does not require the node to be the page brand or to match `sourceUrl`.
+How it fails: A brand article with a nested publisher Organization named `External Media Ltd` emits `identity.name = External Media Ltd`. The static source persists that fact as a first-party fact with confidence 1.0.
+Confidence: high
+
+--- finding F-S16-001 (from S16) ---
+Claimed severity: high
+Claimed location: server/lib/llmJobs.ts:308
+
+F-S16-001 | high | concurrency
+
+File: server/lib/llmJobs.ts:308-364
+
+What the code does: The function checks the job status, runs the finalizer, and then updates the job status.
+
+Why it is wrong: The status update does not claim the job before the finalizer runs.
+
+How it fails (concrete input or sequence): Two polls can read the same running job. Both finalizers can insert the same FAQ or keyword before one status update loses.
+
+The FAQ finalizer performs duplicate checking and insertion in separate operations (`server/routes/contentTypes.ts:108-125`).
+
+Confidence: high
+
+--- finding F-S16-002 (from S16) ---
+Claimed severity: high
+Claimed location: server/lib/onboardingAutopilot.ts:289
+
+F-S16-002 | high | concurrency
+
+File: server/lib/onboardingAutopilot.ts:289-323
+
+What the code does: The function advances an active citation run and starts a new run when the advance reports completion.
+
+Why it is wrong: Completing the existing run does not stop this function. The next call creates another citation run.
+
+How it fails (concrete input or sequence): An active run reaches its final slice. `advanceCitationRun` returns `done: true`. The function starts a second full onboarding citation sweep and pays for duplicate checks.
+
+`advanceCitationRun` already runs the existing run by its ID (`server/citationChecker.ts:1456-1466`). A call without `runId` creates a new run (`server/citationChecker.ts:478-491`).
+
+Confidence: high
+
+--- finding F-S16-003 (from S16) ---
+Claimed severity: high
+Claimed location: server/lib/perceptionProbes.ts:341
+
+F-S16-003 | high | concurrency
+
+File: server/lib/perceptionProbes.ts:341-396
+
+What the code does: The function selects pending probes, chooses the first platform, and processes that platform.
+
+Why it is wrong: The function has no per-run lock or atomic probe claim.
+
+How it fails (concrete input or sequence): A browser request and the cron backstop select the same pending platform. Both call the AI engine and judge before either request changes the probe rows.
+
+The browser and cron both call this function (`server/routes/dashboard.ts:1808-1813`, `server/routes/cron.ts:284-289`).
+
+Confidence: high
+
+--- finding F-S17-001 (from S17) ---
+Claimed severity: high
+Claimed location: server/lib/ssrf.ts:277
+
+F-S17-001 | high | security
+File: server/lib/ssrf.ts:277
+What the code does: `safeFetchTextWithLockedIp` validates a hostname, then fetches the original hostname without pinning the validated address.
+Why it is wrong: DNS can return a public address during validation and a private address during the fetch.
+How it fails (concrete input or sequence): An attacker-controlled hostname resolves publicly for `assertSafeUrl`, then resolves to a private service before `fetch`. The helper returns the private response to its caller.
+Confidence: high
+
+--- finding F-S17-002 (from S17) ---
+Claimed severity: high
+Claimed location: server/lib/promptGenerator.ts:364
+
+F-S17-002 | high | correctness
+File: server/lib/promptGenerator.ts:364
+What the code does: The function archives all tracked prompts, creates a generation, and inserts replacement prompts in separate operations.
+Why it is wrong: A database failure during one insert leaves the old prompts archived and the new generation incomplete.
+How it fails (concrete input or sequence): `createBrandPrompt` fails after the first replacement insert. The brand then has only a partial tracked set, and the API returns an error.
+Confidence: high

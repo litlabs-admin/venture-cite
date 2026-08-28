@@ -1,0 +1,85 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S09.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+client/src/pages/internal/seedTasks.ts
+client/src/pages/internal/types.ts
+client/src/pages/keyword-research.tsx
+client/src/pages/landing/faviconUrl.ts
+client/src/pages/landing/hooks/useCountUp.ts
+client/src/pages/landing/hooks/useScrollReveal.ts
+client/src/pages/landing/index.tsx
+client/src/pages/landing/sections/ClosingCta/ClosingCta.tsx
+client/src/pages/landing/sections/ClosingCta/DomainCaptureForm.tsx
+client/src/pages/landing/sections/Footer/Footer.tsx
+client/src/pages/landing/sections/Footer/FooterColumn.tsx
+client/src/pages/landing/sections/Footer/icons.tsx
+client/src/pages/landing/sections/Footer/index.ts
+client/src/pages/landing/sections/Hero/AiLogoRow.tsx
+client/src/pages/landing/sections/Hero/DomainCaptureForm.tsx
+client/src/pages/landing/sections/Hero/Hero.tsx
+client/src/pages/landing/sections/Hero/icons.tsx
+client/src/pages/landing/sections/HeroBento/ActionsPanel.tsx
+client/src/pages/landing/sections/HeroBento/ConversationsPanel.tsx
+client/src/pages/landing/sections/HeroBento/CrawlersPanel.tsx
+client/src/pages/landing/sections/HeroBento/HeroBento.tsx
+client/src/pages/landing/sections/HeroBento/RankingsList.tsx
+client/src/pages/landing/sections/HeroBento/TopChrome.tsx
+client/src/pages/landing/sections/HeroBento/VisibilityChartPanel.tsx
+client/src/pages/landing/sections/HeroBento/chartData.ts
+client/src/pages/landing/sections/HeroBento/data.ts
+client/src/pages/landing/sections/HeroBento/icons.tsx
+client/src/pages/landing/sections/LearnResearch/AiSearchAreaChart.tsx
+client/src/pages/landing/sections/LearnResearch/DataTileGrid.tsx
+client/src/pages/landing/sections/LearnResearch/LearnResearch.tsx
+client/src/pages/landing/sections/LearnResearch/ResourceCard.tsx
+client/src/pages/landing/sections/LearnResearch/chartData.ts
+client/src/pages/landing/sections/LearnResearch/data.ts
+client/src/pages/landing/sections/LearnResearch/icons.tsx
+client/src/pages/landing/sections/Nav/MobileMenu.tsx
+client/src/pages/landing/sections/Nav/Nav.tsx
+client/src/pages/landing/sections/Nav/data.ts
+client/src/pages/landing/sections/Nav/icons.tsx
+client/src/pages/landing/sections/Philosophy/ActionChecklist.tsx
+client/src/pages/landing/sections/Philosophy/AiLogoGrid.tsx
+client/src/pages/landing/sections/Philosophy/ChatTranscriptDemo.tsx
+client/src/pages/landing/sections/Philosophy/Philosophy.tsx
+client/src/pages/landing/sections/Philosophy/PlaybookCard.tsx
+client/src/pages/landing/sections/Philosophy/StatBar.tsx
+client/src/pages/landing/sections/Philosophy/icons.tsx
+client/src/pages/landing/sections/Platform/BuiltForStrip.tsx
+client/src/pages/landing/sections/Platform/ImproveMockup.tsx
+client/src/pages/landing/sections/Platform/MockupBackdrop.tsx
+client/src/pages/landing/sections/Platform/Platform.tsx
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/components/BrandLogo.tsx
+client/src/components/dashboard-panels/Panel.tsx
+client/src/components/ui/alert.tsx
+client/src/components/ui/badge.tsx
+client/src/components/ui/button.tsx
+client/src/components/ui/empty-state.tsx
+client/src/components/ui/error-state.tsx
+client/src/components/ui/progress.tsx
+client/src/components/ui/select.tsx
+client/src/components/ui/skeleton.tsx
+client/src/components/ui/tooltip.tsx
+client/src/hooks/use-brand-selection.ts
+client/src/hooks/use-loading-messages.ts
+client/src/hooks/use-persisted-state.ts
+client/src/hooks/use-toast.ts
+client/src/lib/llmJobs.ts
+client/src/lib/queryClient.ts
+client/src/pages/landing/sections/Platform/TrackMockup.tsx
+client/src/pages/landing/sections/Platform/UnderstandMockup.tsx
+client/src/pages/landing/sections/Platform/icons.tsx
+client/src/pages/landing/sections/Revenue/Revenue.tsx
+client/src/pages/landing/sections/SectionHeader/SectionHeader.tsx
+client/src/pages/landing/sections/WhyNow/WhyNow.tsx
+shared/schema.ts
+
+Write your report to .audit/B1p/S09.md and nothing else. Do not modify any source file.

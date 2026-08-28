@@ -1,0 +1,8 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S01-server-core.
+
+Read every one of these files completely, word for word, in full. Do not sample:
+server/app.ts server/auth.ts server/db.ts server/env.ts server/index.ts server/instrument.ts server/log.ts server/nitroBoot.ts server/nitroConditionalRequests.ts server/routes.ts server/stripeClient.ts server/supabase.ts server/vite.ts 
+
+Write your report to .audit/B1p/S01-server-core.md and nothing else. Do not modify any source file.

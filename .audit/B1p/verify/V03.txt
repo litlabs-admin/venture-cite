@@ -1,0 +1,95 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V03. Write your report to .audit/B1p/verify/V03.md and nothing else.
+
+Files involved: client/src/pages/geo-signals.tsx, server/scheduler.ts
+
+Examine each of the 8 findings below. Try to refute each one.
+
+--- finding F-S08-003 (from S08) ---
+Claimed severity: critical
+Claimed location: client/src/pages/geo-signals.tsx:1351
+
+F-S08-003 | critical | data integrity
+File: client/src/pages/geo-signals.tsx:1351
+What the code does: The apply dialog stores optimized content without the source article ID. The confirm handler uses the current article ID at lines 1787-1821.
+Why it is wrong: The selected article can change while the dialog remains open.
+How it fails: User A opens Apply for optimized content. The user selects User B's article and confirms. The client sends User A's content with User B's ID.
+Confidence: high
+
+--- finding F-S08-006 (from S08) ---
+Claimed severity: high
+Claimed location: client/src/pages/geo-signals.tsx:496
+
+F-S08-006 | high | data integrity
+File: client/src/pages/geo-signals.tsx:496
+What the code does: The optimize mutation callback uses the current render's `articleKey` when it stores the result. The callback does not capture the article key used for the request.
+Why it is wrong: The selected article can change before the asynchronous request completes.
+How it fails: User A starts optimization and selects User B's article before the response returns. The result can enter User B's signal state and later overwrite User B's content.
+Confidence: high
+
+--- finding F-S08-007 (from S08) ---
+Claimed severity: high
+Claimed location: client/src/pages/geo-signals.tsx:426
+
+F-S08-007 | high | correctness
+File: client/src/pages/geo-signals.tsx:426
+What the code does: The URL effect fills the audit URL only when the field is empty. It does not clear the value when the selected article changes.
+Why it is wrong: The audit action submits the current URL at lines 1435-1459, even when that URL came from a previous article.
+How it fails: Select article A and then article B without editing the field. The audit for B submits article A's URL.
+Confidence: high
+
+--- finding F-S08-008 (from S08) ---
+Claimed severity: high
+Claimed location: client/src/pages/geo-signals.tsx:878
+
+F-S08-008 | high | correctness
+File: client/src/pages/geo-signals.tsx:878
+What the code does: The Analyze Signals button is disabled only when no article exists or a request is pending. Its handler returns when article content is empty at lines 695-707. The pipeline button has the same mismatch at lines 1051-1063.
+Why it is wrong: Articles with nullable content can appear in the article list.
+How it fails: Select an article with empty content. The buttons appear enabled, but clicking them sends no request and shows no explanation.
+Confidence: high
+
+--- finding F-S02-server-jobs-002 (from S02-server-jobs, S21) ---
+Claimed severity: high
+Claimed location: server/scheduler.ts:208
+
+F-S02-server-jobs-002 | high | security
+File: server/scheduler.ts:208-215, 247-277; shared/schema.ts:60-64
+What the code does: The auto-citation selector excludes soft-deleted brands and filters owners only by `access_tier`.
+Why it is wrong: The selector does not exclude users with `deleted_at` set. User deletion keeps the user row during the grace period.
+How it fails: A paying user can request account deletion while the brand remains live during the grace period. The selector can still send citation requests before purge.
+Confidence: high
+
+--- finding F-S02-server-jobs-006 (from S02-server-jobs, S21) ---
+Claimed severity: high
+Claimed location: server/scheduler.ts:39
+
+F-S02-server-jobs-006 | high | availability
+File: server/scheduler.ts:39-180; server/routes/cron.ts:168-182, 502-503; server/lib/jobDebounce.ts:103-108
+What the code does: The weekly report loops through eligible users and brands and calls full citation runs without a deadline argument. The orchestrator gives this step a 20-second deadline, but the callback ignores it.
+Why it is wrong: The step can continue after its budget and after the function approaches its 60-second limit.
+How it fails: A report with enough users or brands can time out after sending some emails. A retry can resend those emails because the job completion marker is written only after the whole job returns.
+Confidence: high
+
+--- finding F-S02-server-jobs-001 (from S02-server-jobs) ---
+Claimed severity: high
+Claimed location: server/scheduler.ts:194
+
+F-S02-server-jobs-001 | high | correctness
+File: server/scheduler.ts:194-215, 247-312; shared/schema.ts:312
+What the code does: `selectBrandsForCitationScan` runs `SELECT b.*` and casts each raw row to a camelCase brand type. `isBrandDueForCitation` reads `lastAutoCitationAt`.
+Why it is wrong: PostgreSQL returns the column as `last_auto_citation_at`. The TypeScript cast does not rename the property.
+How it fails: A completed run writes `last_auto_citation_at`. The next hourly tick reads `undefined`, treats the brand as new, and runs it again.
+Confidence: high
+
+--- finding F-S21-002 (from S21) ---
+Claimed severity: high
+Claimed location: server/scheduler.ts:65
+
+F-S21-002 | high | privacy
+File: server/scheduler.ts:65
+What the code does: The weekly report selects users with `weeklyReportEnabled = 1` and a recent `updatedAt`. The auto-citation selector at line 208 filters the owner tier but not `users.deleted_at`.
+Why it is wrong: The account deletion route sets `users.deletedAt` and `deletionScheduledFor` but leaves weekly reporting enabled. These jobs must exclude users during the deletion grace period.
+How it fails: A user who requests deletion can receive a weekly report. The user's active brands can also continue paid auto-citation work before the purge runs.
+Confidence: high

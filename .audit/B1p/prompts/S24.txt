@@ -1,0 +1,56 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S24.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+tests/integration/localOutboxMigration.test.ts
+tests/integration/localRoleCleanup.ts
+tests/integration/requestRlsFoundation.test.ts
+tests/integration/tourEvents.test.ts
+tests/integration/tourRetention.test.ts
+tests/integration/toursRoutes.test.ts
+tests/integration/v2AggregateSmoke.test.ts
+tests/integration/v2EndToEndSmoke.test.ts
+tests/integration/v2PlanSmoke.test.ts
+tests/integration/v2ScrapeOneSmoke.test.ts
+tests/integration/v2SearchLlmSmoke.test.ts
+tests/integration/v2UserEnrichSmoke.test.ts
+tests/leakedPassword.test.ts
+tests/migrations/spec2Migrations.test.ts
+tests/passwordPolicy.test.ts
+tests/setup.ts
+tests/supabaseKey.test.ts
+tests/unit/EducationAssistant.test.tsx
+tests/unit/MentionsTab.test.tsx
+tests/unit/ResultsTimeline.test.tsx
+tests/unit/activationBanner.test.tsx
+tests/unit/articlesAIGenerated.test.ts
+tests/unit/assistantChat.test.ts
+tests/unit/authRateKey.test.ts
+tests/unit/autoCitationDeadline.test.ts
+tests/unit/autopilotRetry.test.ts
+tests/unit/billingCheckoutSafety.test.ts
+tests/unit/billingPortalSession.test.ts
+tests/unit/billingSubscriptionGuards.test.ts
+tests/unit/boardRoutes.test.ts
+tests/unit/brandActivation.test.ts
+tests/unit/brandFactScrapePagesStorage.test.ts
+tests/unit/brandFactScrapeRunsStorage.test.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/components/EducationAssistant.tsx
+client/src/components/dashboard/ResultsTimeline.tsx
+client/src/components/geo-tools/MentionsTab.tsx
+server/databaseStorage.ts
+server/lib/authRateKey.ts
+server/lib/leakedPassword.ts
+server/lib/supabaseKey.ts
+server/routes/board.ts
+shared/passwordPolicy.ts
+shared/schema.ts
+tests/helpers/destructiveDatabaseTest.ts
+
+Write your report to .audit/B1p/S24.md and nothing else. Do not modify any source file.

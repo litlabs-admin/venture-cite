@@ -1,0 +1,8 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S03-client-hooks.
+
+Read every one of these files completely, word for word, in full. Do not sample:
+client/src/hooks/use-auth.ts client/src/hooks/use-brand-selection.ts client/src/hooks/use-loading-messages.ts client/src/hooks/use-mobile.tsx client/src/hooks/use-persisted-state.ts client/src/hooks/use-toast.ts client/src/hooks/useActiveCitationRuns.ts client/src/hooks/useArticleAutoSave.ts client/src/hooks/useBrandActivation.ts client/src/hooks/useChatbot.ts client/src/hooks/useCitationLiveRefresh.ts client/src/hooks/useMentions.ts client/src/hooks/usePrompts.ts client/src/hooks/useScrapeRunStream.ts client/src/hooks/useTourReplay.ts client/src/hooks/useTourState.ts 
+
+Write your report to .audit/B1p/S03-client-hooks.md and nothing else. Do not modify any source file.

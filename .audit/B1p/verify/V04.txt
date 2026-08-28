@@ -1,0 +1,147 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V04. Write your report to .audit/B1p/verify/V04.md and nothing else.
+
+Files involved: client/src/hooks/useArticleAutoSave.ts, server/databaseStorage.ts, server/auth.ts, client/src/hooks/use-auth.ts
+
+Examine each of the 10 findings below. Try to refute each one.
+
+--- finding F-S03-client-hooks-002 (from S03-client-hooks, S05) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useArticleAutoSave.ts:48
+
+F-S03-client-hooks-002 | high | correctness
+File: client/src/hooks/useArticleAutoSave.ts:48-57, 74-78
+What the code does: `flush` removes the queued patch before the request. The catch handler swallows the request error without restoring the patch.
+Why it is wrong: A failed network request loses the only copy of the pending change.
+How it fails (concrete input or sequence): A user edits a draft. The debounced PUT fails because the network is unavailable. The user stops editing. No later patch retries the lost change, so the server keeps the old value.
+Confidence: high
+
+--- finding F-S03-client-hooks-003 (from S03-client-hooks, S05) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useArticleAutoSave.ts:34
+
+F-S03-client-hooks-003 | high | concurrency
+File: client/src/hooks/useArticleAutoSave.ts:34-42, 44-57, 83-98
+What the code does: Timers and the queued patch stay shared across renders. Each timer calls a `flush` closure that captured the article ID from its render.
+Why it is wrong: Changing the active article does not cancel or isolate pending work from the previous article.
+How it fails (concrete input or sequence): A user edits article A and changes to article B before the debounce fires. The old timer can flush the shared queue through article A's closure. The request can write article B's fields to article A and use article B's expected version.
+Confidence: high
+
+--- finding F-S05-007 (from S05) ---
+Claimed severity: high
+Claimed location: client/src/hooks/useArticleAutoSave.ts:28
+
+F-S05-007 | high | correctness
+File: client/src/hooks/useArticleAutoSave.ts:28-42, 51-73
+What the code does: The hook sends `expectedVersion` and updates its version reference only when `onVersionBumped` exists.
+Why it is wrong: `onVersionBumped` is optional, but the version reference still controls every later request.
+How it fails: A caller omitting the callback sends the initial version forever. The second successful save receives a 409 conflict.
+Confidence: high
+
+--- finding F-S13-001 (from S13) ---
+Claimed severity: high
+Claimed location: server/databaseStorage.ts:3425
+
+F-S13-001 | high | correctness
+File: server/databaseStorage.ts:3425, 3946-3950; shared/schema.ts:1664-1669
+
+What the code does:
+
+`getBrandFacts` filters rows by `brandId` and `isActive = 1`. `dismissFact` sets only `dismissedAt`.
+
+Why it is wrong:
+
+The read does not exclude dismissed facts. The schema stores dismissal separately from the active flag.
+
+How it fails (concrete input or sequence):
+
+A user dismisses fact X. The next brand fact read still returns fact X. A dismissed high-priority row can also hide an active row during deduplication.
+
+Confidence: high
+
+--- finding F-S13-002 (from S13) ---
+Claimed severity: high
+Claimed location: server/databaseStorage.ts:3885
+
+F-S13-002 | high | correctness
+File: server/databaseStorage.ts:3885-3906; server/routes/intelligence.ts:375-383
+
+What the code does:
+
+`getBrandFactSheetConflicts` maps only `user` and `scraped` source values. The manual fact route writes `user_manual`.
+
+Why it is wrong:
+
+The conflict query cannot place a `user_manual` row in its user map. The same file assigns `user_manual` the highest fact priority.
+
+How it fails (concrete input or sequence):
+
+A user creates a manual fact that conflicts with a scraped fact. The conflict query returns no pair for that fact key. The user cannot resolve that conflict through the conflict flow.
+
+Confidence: high
+
+--- finding F-S13-003 (from S13) ---
+Claimed severity: high
+Claimed location: server/databaseStorage.ts:3916
+
+F-S13-003 | high | concurrency
+File: server/databaseStorage.ts:3916-3943
+
+What the code does:
+
+`acceptFact` updates the selected row. It then runs a separate update for conflicting rows when dismissal is enabled.
+
+Why it is wrong:
+
+The two writes have no transaction or conditional selection that protects the choice from another writer.
+
+How it fails (concrete input or sequence):
+
+Two requests accept opposite facts for the same key. Each request can accept one row and dismiss the other row. Both rows can then have `acceptedAt` and `dismissedAt`, so no single choice remains.
+
+Confidence: high
+
+--- finding F-S01-server-core-001 (from S01-server-core, S12) ---
+Claimed severity: critical
+Claimed location: server/auth.ts:231
+
+F-S01-server-core-001 | critical | security
+File: server/auth.ts:231-256
+What the code does: The public allowlist includes PUT requests for the shared boards. The API guard skips authentication for every allowlisted method and path.
+Why it is wrong: The board route replaces the complete shared board in system_state on each PUT (server/routes/board.ts:104-123). The route has no authentication middleware.
+How it fails: An unauthenticated visitor sends a valid tickets array to PUT /api/board. The request passes the allowlist and erases or replaces the internal roadmap.
+Confidence: high
+
+--- finding F-S01-server-core-002 (from S01-server-core) ---
+Claimed severity: high
+Claimed location: server/auth.ts:44
+
+F-S01-server-core-002 | high | correctness
+File: server/auth.ts:44-58, 99-110
+What the code does: isAuthenticated returns immediately when req.user already exists. The preceding attachUserIfPresent middleware sets req.user for valid Bearer tokens (server/auth.ts:262-286; server/routes.ts:79-88).
+Why it is wrong: The early return skips the lazy workflow tick, request user context, and Sentry user assignment. The lazy tick is the replacement for the removed global workflow cron.
+How it fails: Every normal authenticated API request reaches isAuthenticated with an existing user and returns at line 58. No request calls maybeTickActiveRunsForUser, so active workflow runs do not advance through this mechanism.
+Confidence: high
+
+--- finding F-S03-client-hooks-001 (from S03-client-hooks) ---
+Claimed severity: critical
+Claimed location: client/src/hooks/use-auth.ts:27
+
+F-S03-client-hooks-001 | critical | security
+File: client/src/hooks/use-auth.ts:27-31, 52-58
+What the code does: `fetchUser` returns `null` after a 401. The query cache clears only after the explicit logout mutation succeeds.
+Why it is wrong: A session expiry does not clear cached data from the previous user.
+How it fails (concrete input or sequence): User A's session expires. User B signs in within the cache lifetime. Cached brand, article, and citation queries can render User A's data before their next request completes.
+Confidence: high
+
+--- finding F-S05-013 (from S05) ---
+Claimed severity: high
+Claimed location: client/src/hooks/use-auth.ts:34
+
+F-S05-013 | high | security
+File: client/src/hooks/use-auth.ts:34-41, 52-59
+What the code does: Logout waits for session clearing and the logout request before clearing local storage or the query cache.
+Why it is wrong: Any rejection exits `logoutUser` before the cleanup calls and prevents the success redirect.
+How it fails: A failed logout request leaves prior cached tenant data and VentureCite storage available in the current browser session.
+Confidence: high

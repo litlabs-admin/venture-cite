@@ -1,0 +1,118 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V09. Write your report to .audit/B1p/verify/V09.md and nothing else.
+
+Files involved: client/src/components/geo-tools/ScanStatusPanel.tsx, client/src/components/geo-tools/BofuContentSheet.tsx, client/src/components/intelligence/CompetitorsTab.tsx, client/src/components/prompts/PromptsTable.tsx, client/src/components/ui/toaster.tsx, client/src/pages/brands.tsx, client/src/pages/citations.tsx, client/src/pages/crawler-check.tsx, client/src/pages/internal/Dashboard.tsx, client/src/pages/glossary.tsx
+
+Examine each of the 10 findings below. Try to refute each one.
+
+--- finding F-S03-006 (from S03) ---
+Claimed severity: high
+Claimed location: client/src/components/geo-tools/ScanStatusPanel.tsx:141
+
+F-S03-006 | high | correctness
+File: client/src/components/geo-tools/ScanStatusPanel.tsx:141-165
+What the code does: The completed-source chip treats every status except missing or rate-limited as successful.
+Why it is wrong: The source status type also permits `error` and `pending` (client/src/components/geo-tools/ScanStatusPanel.tsx:34-40).
+How it fails (concrete input or sequence): Complete a scan with a source status of `error`. The panel shows a success check and a zero count (client/src/components/geo-tools/ScanStatusPanel.tsx:141-165).
+Confidence: high
+
+--- finding F-S03-007 (from S03) ---
+Claimed severity: high
+Claimed location: client/src/components/geo-tools/BofuContentSheet.tsx:142
+
+F-S03-007 | high | validation
+File: client/src/components/geo-tools/BofuContentSheet.tsx:142-153
+What the code does: The published URL field accepts any non-empty text.
+Why it is wrong: The field has no URL validation, and the save handler marks non-empty text as published (client/src/components/geo-tools/BofuContentSheet.tsx:241-251).
+How it fails (concrete input or sequence): Enter `not a URL` and enable `Mark as published`. The UI stores a published state, but URL tracking skips the invalid value (server/routes/contentTypes.ts:588-615; server/routes/contentTypes.ts:161-164).
+Confidence: high
+
+--- finding F-S03-008 (from S03) ---
+Claimed severity: high
+Claimed location: client/src/components/intelligence/CompetitorsTab.tsx:38
+
+F-S03-008 | high | error handling
+File: client/src/components/intelligence/CompetitorsTab.tsx:38-57
+What the code does: The component reads competitor query data but does not read query errors.
+Why it is wrong: Failed queries produce the same undefined data as successful empty queries, and the render branches do not check errors (client/src/components/intelligence/CompetitorsTab.tsx:251-275,323-347).
+How it fails (concrete input or sequence): Return HTTP 500 from a competitor request. The page shows an empty competitor or leaderboard state without retry guidance (client/src/components/intelligence/CompetitorsTab.tsx:38-57,251-275,323-347).
+Confidence: high
+
+--- finding F-S04-003 (from S04) ---
+Claimed severity: high
+Claimed location: client/src/components/prompts/PromptsTable.tsx:464
+
+F-S04-003 | high | correctness
+File: client/src/components/prompts/PromptsTable.tsx:464-468
+File: client/src/components/prompts/PromptsPageBody.tsx:303
+What the code does: The bulk Archive action calls `onArchive` once for every selected row, while the parent stores only one prompt for confirmation.
+Why it is wrong: The action appears to archive all selected prompts but the callback supports one prompt only.
+How it fails (concrete input or sequence): Select two prompts, click Archive, and confirm. The last selected prompt is archived, while the other prompt remains tracked.
+Confidence: high
+
+--- finding F-S05-001 (from S05) ---
+Claimed severity: high
+Claimed location: client/src/components/ui/toaster.tsx:11
+
+F-S05-001 | high | correctness
+File: client/src/components/ui/toaster.tsx:11-29
+What the code does: `Toaster` renders the toast state from `useToast`.
+Why it is wrong: No client file imports or renders `Toaster`. The toast state therefore has no DOM renderer.
+How it fails: Any call to `toast()` updates memory and listeners at `use-toast.ts:128-133`, but the user sees no toast.
+Confidence: high
+
+--- finding F-S07-001 (from S07) ---
+Claimed severity: high
+Claimed location: client/src/pages/brands.tsx:232
+
+F-S07-001 | high | correctness
+File: client/src/pages/brands.tsx:232
+What the code does: It parses the manual-create response, then checks `newBrand.id` at line 242.
+Why it is wrong: The API returns the new brand under `data` (`server/routes/brands.ts:370`).
+How it fails (concrete input or sequence): A valid manual brand is created, but the page skips the fact-sheet redirect and automatic scrape.
+Confidence: high
+
+--- finding F-S07-002 (from S07) ---
+Claimed severity: high
+Claimed location: client/src/pages/citations.tsx:69
+
+F-S07-002 | high | correctness
+File: client/src/pages/citations.tsx:69
+What the code does: It handles an already-running 409 response inside the mutation success callback.
+Why it is wrong: `apiRequest` throws for non-2xx responses before `useRunPrompts` can return status or body (`client/src/hooks/usePrompts.ts:790-797`, `client/src/lib/queryClient.ts:39-57`).
+How it fails (concrete input or sequence): Two tabs start a run. The second tab receives the server's 409 (`server/routes/prompts.ts:1116-1121`), shows the generic error toast at line 111, and does not join the existing run.
+Confidence: high
+
+--- finding F-S07-003 (from S07) ---
+Claimed severity: high
+Claimed location: client/src/pages/crawler-check.tsx:74
+
+F-S07-003 | high | correctness
+File: client/src/pages/crawler-check.tsx:74
+What the code does: It keeps the previous `checkResult` when a new crawler check starts or fails.
+Why it is wrong: The result view returns after the failed mutation without clearing the result state (`client/src/pages/crawler-check.tsx:217-225`).
+How it fails (concrete input or sequence): Check site A successfully, then check site B. If site B fails, the page shows site A's result while the input contains site B.
+Confidence: high
+
+--- finding F-S08-010 (from S08) ---
+Claimed severity: high
+Claimed location: client/src/pages/internal/Dashboard.tsx:37
+
+F-S08-010 | high | correctness
+File: client/src/pages/internal/Dashboard.tsx:37
+What the code does: Refresh sets the state to loading but keeps the previous KPI object. A failed refresh sets only the state to failed at lines 43-48.
+Why it is wrong: The page still renders the old KPI object at lines 118-211 while the failure panel is shown.
+How it fails: A successful load shows counts K1. A later refresh fails. The page reports failure but also presents stale K1 as live production counts.
+Confidence: high
+
+--- finding F-S08-011 (from S08) ---
+Claimed severity: high
+Claimed location: client/src/pages/glossary.tsx:40
+
+F-S08-011 | high | correctness
+File: client/src/pages/glossary.tsx:40
+What the code does: The glossary links `GEO Opportunities` to `/geo-opportunities`.
+Why it is wrong: The application route is `/opportunities`. No route handles `/geo-opportunities`.
+How it fails: Clicking the glossary entry opens the not-found page instead of the opportunities page.
+Confidence: high

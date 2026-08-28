@@ -1,0 +1,59 @@
+You are checking ONE invariant across the whole client codebase. This is not a
+file review. Do not report general code quality. Report only violations of the
+stated invariant, plus anything that makes the invariant unverifiable.
+
+## The invariant
+
+Every key this application writes to `localStorage` or `sessionStorage` is
+removed when a user logs out.
+
+Rationale: two people share a browser. If a key written for user A survives
+user B's login, user B sees or acts on user A's state.
+
+## Method
+
+1. Find every write to `localStorage` and `sessionStorage` in `client/` and
+   `src/`. Include indirect writes through any wrapper or hook, and follow the
+   wrapper to the real key. Search for `setItem`, `removeItem`, and any helper
+   that takes a key name.
+2. Collect the complete set of key names, including keys built from a template or
+   a prefix plus a variable.
+3. Find the logout path. Determine exactly which keys it removes and by what
+   rule (exact name, prefix match, full clear).
+4. For each key from step 2, decide whether step 3 removes it. Show the rule you
+   applied.
+5. Report every key that survives logout.
+
+## Output
+
+Write exactly one file: `.audit/B1p/INV01-storage-keys.md`. Nothing else. Do not
+modify any source file.
+
+```
+# INV01 storage keys cleared at logout
+
+## The logout rule
+File: path:line
+Rule: <exact description of what it removes>
+
+## Every persisted key found
+| Key | Written at | Cleared by logout? | Evidence |
+|---|---|---|---|
+
+## Violations
+### V-01 | <severity>
+Key:
+Written at: path:line
+Why logout misses it:
+How it fails (two users, one browser):
+Confidence: high|medium|low
+
+## UNDETERMINED
+- <question> — needs <what>
+```
+
+Be exhaustive on step 1. A key you fail to find is a violation you fail to
+report. If you find zero violations, say so plainly and show the table that
+proves it.
+
+Write plainly. No em dashes. No filler.

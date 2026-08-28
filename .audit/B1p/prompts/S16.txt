@@ -1,0 +1,78 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S16.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+server/lib/faqScoring.ts
+server/lib/genericIndustry.ts
+server/lib/geoSignalsScoring.ts
+server/lib/hallucinationDetector.ts
+server/lib/headingDetect.ts
+server/lib/jobDebounce.ts
+server/lib/jsonLdExtract.ts
+server/lib/leaderboardMerge.ts
+server/lib/leakedPassword.ts
+server/lib/listicleScanner.ts
+server/lib/llmBudget.ts
+server/lib/llmConcurrency.ts
+server/lib/llmJobs.ts
+server/lib/llmParse.ts
+server/lib/llmPricing.ts
+server/lib/localFlowSafety.ts
+server/lib/logger.ts
+server/lib/logoScraper.ts
+server/lib/logoStorage.ts
+server/lib/mentionQueryBuilder.ts
+server/lib/mentionScanner.ts
+server/lib/metricsSnapshot.ts
+server/lib/migrationChecksums.ts
+server/lib/migrationLedgerPolicy.ts
+server/lib/migrationRunner.ts
+server/lib/modelConfig.ts
+server/lib/notificationPrefs.ts
+server/lib/onboardingAutopilot.ts
+server/lib/openrouterClient.ts
+server/lib/originConcurrency.ts
+server/lib/ownership.ts
+server/lib/pageContentAnalysis.ts
+server/lib/pageText.ts
+server/lib/pagination.ts
+server/lib/perceptionProbeQuestions.ts
+server/lib/perceptionProbes.ts
+server/lib/perceptionRun.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+server/citationChecker.ts
+server/db.ts
+server/lib/advisoryLock.ts
+server/lib/aiLogger.ts
+server/lib/brandActivation.ts
+server/lib/brandMatcher.ts
+server/lib/brandNameAmbiguity.ts
+server/lib/canonicalUrl.ts
+server/lib/competitorDiscovery.ts
+server/lib/factAgent/v2/openrouterClient.ts
+server/lib/factAgent/v2/pageExtractors.ts
+server/lib/factAgent/v2/runFullScrape.ts
+server/lib/factAgent/v2/vercelBudget.ts
+server/lib/perceptionScorer.ts
+server/lib/promptGenerator.ts
+server/lib/routesShared.ts
+server/lib/safeParseJson.ts
+server/lib/scanReport.ts
+server/lib/sentimentBatcher.ts
+server/lib/sentryReport.ts
+server/lib/sourceHealth.ts
+server/lib/sources/hackerNewsSource.ts
+server/lib/sources/redditSource.ts
+server/lib/ssrf.ts
+server/outbox/contentCostOutboxDrain.ts
+server/storage.ts
+server/supabase.ts
+shared/constants.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S16.md and nothing else. Do not modify any source file.

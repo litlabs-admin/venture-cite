@@ -1,0 +1,60 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S23.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+src/routes/webhooks/$.ts
+src/server/expressBridge.ts
+tests/component/PageHeaderHelp.test.tsx
+tests/component/PreviewParam.test.tsx
+tests/component/SuppressFlow.test.tsx
+tests/component/TourOrchestrator.test.tsx
+tests/e2e-optional/platformDetectLive.test.ts
+tests/e2e/article-flow.spec.ts
+tests/e2e/auth-login.spec.ts
+tests/e2e/auth-signup.spec.ts
+tests/e2e/auth.setup.ts
+tests/e2e/billing.spec.ts
+tests/e2e/brand-deletion-safety.spec.ts
+tests/e2e/content-generation-fake.spec.ts
+tests/e2e/distribution-flow.spec.ts
+tests/e2e/form-validation.spec.ts
+tests/e2e/legacy-redirects.spec.ts
+tests/e2e/public-pages.spec.ts
+tests/e2e/raw-html.spec.ts
+tests/e2e/settings-theme.spec.ts
+tests/e2e/spine-navigation.spec.ts
+tests/e2e/support/auth.ts
+tests/e2e/support/bearer-token.ts
+tests/e2e/support/global-teardown.ts
+tests/e2e/support/local-database-access.ts
+tests/e2e/support/local-fixtures.ts
+tests/e2e/support/selectors.ts
+tests/e2e/support/tour.ts
+tests/e2e/tours.spec.ts
+tests/e2e/url-state.spec.ts
+tests/e2e/welcome-brand.spec.ts
+tests/fixtures/tourState.ts
+tests/helpers/destructiveDatabaseTest.ts
+tests/helpers/supabaseMirror.ts
+tests/integration/competitorGeoRankingUpsert.test.ts
+tests/integration/contentRequestRls.test.ts
+tests/integration/llmConcurrency.test.ts
+tests/integration/localClaimMigrations.test.ts
+tests/integration/localContentCostIdempotency.test.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/components/PageHeaderHelp.tsx
+client/src/tours/engine/TourOrchestrator.tsx
+client/src/tours/engine/eligibility.ts
+client/src/tours/types.ts
+server/app.ts
+server/lib/platformDetect.ts
+server/lib/requestRoleMembership.ts
+shared/schema.ts
+tests/integration/localRoleCleanup.ts
+
+Write your report to .audit/B1p/S23.md and nothing else. Do not modify any source file.

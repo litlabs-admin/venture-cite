@@ -1,0 +1,51 @@
+You are checking ONE invariant across the whole repository. This is not a file
+review. Report only violations of the stated invariant, plus anything that makes
+the invariant unverifiable.
+
+## The invariant
+
+Every column declared in shared/schema.ts exists in the migrations, and every column created by the migrations is declared in shared/schema.ts.
+
+Rationale: A column in the code but not the database throws at runtime. A column in the database but not the code is either dead or silently unused. Both have already happened in this repository.
+
+## Method
+
+1. Parse every pgTable definition in shared/schema.ts. Build the full table and column inventory.
+2. Parse every file in migrations/. Track create table, add column, drop column, and rename in order, to compute the final schema.
+3. Compare the two inventories in both directions.
+4. Report every column in one and not the other, and every type mismatch you can determine.
+
+## Output
+
+Write exactly one file: .audit/B1p/INV04-schema-drift.md. Nothing else. Do not modify any source file.
+
+Use this shape:
+
+# INV04-schema-drift schema and migration agreement
+
+## The rule as implemented
+File: path:line
+Rule: <exact description>
+
+## Complete inventory
+| Item | Defined at | Satisfies invariant? | Evidence |
+|---|---|---|---|
+
+## Violations
+### V-01 | critical|high|medium|low
+Item:
+Defined at: path:line
+Why it violates the invariant:
+How it fails (concrete sequence):
+Confidence: high|medium|low
+
+## UNDETERMINED
+- <question> - needs <what>
+
+Be exhaustive on the inventory step. An item you fail to find is a violation you
+fail to report. If you find zero violations, say so and show the inventory that
+proves it. Do not report an item as a violation without checking the rule against
+it; a false positive costs a reviewer real time.
+
+Documentation and comments are not evidence. Check the code.
+Write plainly. No em dashes. No filler.

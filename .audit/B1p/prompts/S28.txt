@@ -1,0 +1,89 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S28.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+tests/unit/promptDiagnoseRivals.test.ts
+tests/unit/promptGeneratorCap.test.ts
+tests/unit/promptScoreHistory.test.ts
+tests/unit/promptShape.test.ts
+tests/unit/purchasablePlan.test.ts
+tests/unit/rankingInsertRoundTrip.test.ts
+tests/unit/rateLimitBuckets.test.ts
+tests/unit/recommendationsEngine.test.ts
+tests/unit/redditSource.test.ts
+tests/unit/releaseEnvironmentPreflight.test.ts
+tests/unit/requestRepositories.test.ts
+tests/unit/requestRlsMigrationShape.test.ts
+tests/unit/requestRoleMembership.test.ts
+tests/unit/resendWebhook.test.ts
+tests/unit/rlsInitplanMigrationShape.test.ts
+tests/unit/runMentionScan.test.ts
+tests/unit/safeParseJson.test.ts
+tests/unit/schedulerEnvironment.test.ts
+tests/unit/schedulerMode.test.ts
+tests/unit/schedulerOrchestratorParity.test.ts
+tests/unit/scrapeLockPinnedClient.test.ts
+tests/unit/sentimentBatcher.test.ts
+tests/unit/sentryPrivacy.test.ts
+tests/unit/settingsPlanSwitch.test.ts
+tests/unit/siteHealth.test.ts
+tests/unit/siteHealthFindings.test.ts
+tests/unit/siteHealthPage.test.tsx
+tests/unit/siteHealthPanel.test.tsx
+tests/unit/sourceHealth.test.ts
+tests/unit/ssrf.test.ts
+tests/unit/statusTransitions.test.ts
+tests/unit/stripeSubscriptionDeleted.test.ts
+tests/unit/stripeTestModeBanner.test.ts
+tests/unit/stripeWebhookClaim.test.ts
+tests/unit/stripeWebhookCoverage.test.ts
+tests/unit/structuredDataExtractor.test.ts
+tests/unit/tokenCipher.test.ts
+tests/unit/tourCompletionPersists.test.ts
+tests/unit/tourCopyResolver.test.ts
+tests/unit/tourEligibility.test.ts
+tests/unit/tourEligibilityGating.test.ts
+tests/unit/tourEventBuffer.test.ts
+tests/unit/tourEventsOwnership.test.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/components/dashboard-panels/PromptsRow.tsx
+client/src/pages/site-health.tsx
+client/src/tours/engine/copyResolver.ts
+client/src/tours/engine/eligibility.ts
+client/src/tours/engine/eventBuffer.ts
+client/src/tours/engine/shepherdAdapter.ts
+client/src/tours/global-welcome.tour.ts
+client/src/tours/types.ts
+scripts/releaseEnvironmentPreflight.ts
+server/data/requestBrandRepository.ts
+server/data/requestData.ts
+server/data/requestUserRepository.ts
+server/databaseStorage.ts
+server/instrument.ts
+server/lib/advisoryLock.ts
+server/lib/factAgent/v2/structuredDataExtractor.ts
+server/lib/promptScoreHistory.ts
+server/lib/promptShape.ts
+server/lib/recommendationsEngine.ts
+server/lib/requestActor.ts
+server/lib/requestRoleMembership.ts
+server/lib/resendWebhook.ts
+server/lib/runMentionScan.ts
+server/lib/safeParseJson.ts
+server/lib/schedulerMode.ts
+server/lib/sentimentBatcher.ts
+server/lib/sourceHealth.ts
+server/lib/sources/redditSource.ts
+server/lib/ssrf.ts
+server/lib/statusTransitions.ts
+shared/constants.ts
+shared/schema.ts
+shared/siteHealthFindings.ts
+tests/helpers/supabaseMirror.ts
+
+Write your report to .audit/B1p/S28.md and nothing else. Do not modify any source file.

@@ -1,0 +1,71 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S21.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+server/routes/onboarding.ts
+server/routes/prompts.ts
+server/routes/publications.ts
+server/routes/tours.ts
+server/routes/unsubscribe.ts
+server/routes/userAccount.ts
+server/scheduler.ts
+server/setupProducts.ts
+server/storage.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+server/auth.ts
+server/citationChecker.ts
+server/data/requestData.ts
+server/data/requestUserRepository.ts
+server/databaseStorage.ts
+server/db.ts
+server/emailService.ts
+server/lib/advisoryLock.ts
+server/lib/audienceGenerator.ts
+server/lib/audit.ts
+server/lib/authRateKey.ts
+server/lib/brandMatcher.ts
+server/lib/brandProfilePrompt.ts
+server/lib/competitorDiscovery.ts
+server/lib/factAgent/v2/openrouterClient.ts
+server/lib/jobDebounce.ts
+server/lib/listicleScanner.ts
+server/lib/llmPricing.ts
+server/lib/logger.ts
+server/lib/logoScraper.ts
+server/lib/logoStorage.ts
+server/lib/modelConfig.ts
+server/lib/notificationPrefs.ts
+server/lib/onboardingAutopilot.ts
+server/lib/ownership.ts
+server/lib/pageText.ts
+server/lib/phrasingGenerator.ts
+server/lib/promptDiagnose.ts
+server/lib/promptGenerator.ts
+server/lib/promptScoreHistory.ts
+server/lib/promptSetHealthAuditor.ts
+server/lib/requestActor.ts
+server/lib/routesShared.ts
+server/lib/runMentionScan.ts
+server/lib/sentryReport.ts
+server/lib/ssrf.ts
+server/lib/suggestionGenerator.ts
+server/lib/supabaseAuth.ts
+server/lib/tourCleanup.ts
+server/lib/tourRegistry.ts
+server/lib/unsubscribeToken.ts
+server/lib/usageLimit.ts
+server/lib/weeklyDigestEmitter.ts
+server/lib/workflowEngine.ts
+server/stripeClient.ts
+server/supabase.ts
+shared/constants.ts
+shared/passwordPolicy.ts
+shared/schema.ts
+shared/validateDomain.ts
+
+Write your report to .audit/B1p/S21.md and nothing else. Do not modify any source file.

@@ -1,0 +1,64 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S08.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+client/src/pages/faq-manager.tsx
+client/src/pages/forgot-password.tsx
+client/src/pages/geo-signals.tsx
+client/src/pages/geo-tools.tsx
+client/src/pages/glossary.tsx
+client/src/pages/home.tsx
+client/src/pages/internal-page.tsx
+client/src/pages/internal/Board.tsx
+client/src/pages/internal/Dashboard.tsx
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/components/BrandLogo.tsx
+client/src/components/dashboard-panels/ActionsStrip.tsx
+client/src/components/dashboard-panels/ActivationBanner.tsx
+client/src/components/dashboard-panels/BottomRow.tsx
+client/src/components/dashboard-panels/GapsRow.tsx
+client/src/components/dashboard-panels/KpiStrip.tsx
+client/src/components/dashboard-panels/Panel.tsx
+client/src/components/dashboard-panels/PlatformStrip.tsx
+client/src/components/dashboard-panels/PromptsRow.tsx
+client/src/components/dashboard-panels/RankingsPanel.tsx
+client/src/components/dashboard-panels/VisibilityChart.tsx
+client/src/components/dashboard-panels/useDashboardData.ts
+client/src/components/foundations/StatusDot.tsx
+client/src/components/foundations/index.ts
+client/src/components/geo-tools/BofuContentSheet.tsx
+client/src/components/ui/alert.tsx
+client/src/components/ui/badge.tsx
+client/src/components/ui/button.tsx
+client/src/components/ui/collapsible.tsx
+client/src/components/ui/command.tsx
+client/src/components/ui/dialog.tsx
+client/src/components/ui/empty-state.tsx
+client/src/components/ui/error-state.tsx
+client/src/components/ui/input.tsx
+client/src/components/ui/label.tsx
+client/src/components/ui/popover.tsx
+client/src/components/ui/progress.tsx
+client/src/components/ui/scroll-area.tsx
+client/src/components/ui/select.tsx
+client/src/components/ui/separator.tsx
+client/src/components/ui/skeleton.tsx
+client/src/components/ui/tabs.tsx
+client/src/components/ui/textarea.tsx
+client/src/hooks/use-brand-selection.ts
+client/src/hooks/use-toast.ts
+client/src/hooks/useCitationLiveRefresh.ts
+client/src/hooks/usePrompts.ts
+client/src/lib/llmJobs.ts
+client/src/lib/queryClient.ts
+client/src/lib/urlSafety.ts
+client/src/pages/internal/seedTasks.ts
+client/src/pages/internal/types.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S08.md and nothing else. Do not modify any source file.

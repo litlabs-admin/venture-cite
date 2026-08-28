@@ -1,0 +1,70 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S25.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+tests/unit/brandFactSheetConflictsQuery.test.ts
+tests/unit/brandFactSheetMigrationShape.test.ts
+tests/unit/brandMatcher.test.ts
+tests/unit/brandMonthlyCostCapsStorage.test.ts
+tests/unit/brandNameAmbiguity.test.ts
+tests/unit/brandNameFilter.test.ts
+tests/unit/brandPresenceGate.test.ts
+tests/unit/brandRequestRoutes.test.ts
+tests/unit/bufferConnect.test.ts
+tests/unit/canonicalUrl.test.ts
+tests/unit/chatbotBudget.test.ts
+tests/unit/chatbotThreads.test.ts
+tests/unit/checkoutCatalogGate.test.ts
+tests/unit/circuitBreaker.test.ts
+tests/unit/citationChecker.kickoff.test.ts
+tests/unit/citationChecker.matcherAuthority.test.ts
+tests/unit/citationCheckerBatchInsert.test.ts
+tests/unit/citationCronUnconditional.test.ts
+tests/unit/citationReconciliation.test.ts
+tests/unit/clientStorage.test.ts
+tests/unit/competitorDetectionsCap.test.ts
+tests/unit/competitorLeaderboardTier.test.ts
+tests/unit/competitorRelevanceBand.test.ts
+tests/unit/contentCancel.test.ts
+tests/unit/contentCostOutboxAdapter.test.ts
+tests/unit/contentCostOutboxDrain.test.ts
+tests/unit/contentGenerationProvider.test.ts
+tests/unit/contentGenerationResponses.test.ts
+tests/unit/contentJobCompletionTransaction.test.ts
+tests/unit/contentRequestData.test.ts
+tests/unit/cronOrchestrator.test.ts
+tests/unit/cronPublicAuth.test.ts
+tests/unit/dashboardCitationTrend.test.ts
+tests/unit/dashboardCitedUrls.test.ts
+tests/unit/dashboardGapMatrix.test.ts
+tests/unit/dashboardPreDataState.test.ts
+tests/unit/dashboardRecommendationInputs.test.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/lib/clientStorage.ts
+server/citationChecker.ts
+server/citationJudge.ts
+server/data/contentRequestData.ts
+server/databaseStorage.ts
+server/lib/brandMatcher.ts
+server/lib/brandNameAmbiguity.ts
+server/lib/brandNameFilter.ts
+server/lib/brandPresenceGate.ts
+server/lib/canonicalUrl.ts
+server/lib/circuitBreaker.ts
+server/lib/citationReconciliation.ts
+server/lib/competitorRelevance.ts
+server/lib/contentGenerationProvider.ts
+server/lib/leaderboardMerge.ts
+server/lib/requestActor.ts
+server/outbox/contentCostOutboxDrain.ts
+server/outbox/outboxRepository.ts
+server/outbox/outboxWorker.ts
+server/routes/brands.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S25.md and nothing else. Do not modify any source file.

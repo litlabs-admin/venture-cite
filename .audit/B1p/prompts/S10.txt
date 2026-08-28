@@ -1,0 +1,93 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S10.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+client/src/pages/landing/sections/Platform/TrackMockup.tsx
+client/src/pages/landing/sections/Platform/UnderstandMockup.tsx
+client/src/pages/landing/sections/Platform/icons.tsx
+client/src/pages/landing/sections/Revenue/AiTrafficPanel.tsx
+client/src/pages/landing/sections/Revenue/Revenue.tsx
+client/src/pages/landing/sections/Revenue/RevenueAttributionPanel.tsx
+client/src/pages/landing/sections/Revenue/icons.tsx
+client/src/pages/landing/sections/SectionHeader/SectionHeader.tsx
+client/src/pages/landing/sections/WhyNow/MarqueeRow.tsx
+client/src/pages/landing/sections/WhyNow/WhyNow.tsx
+client/src/pages/landing/ui/Popover.tsx
+client/src/pages/login.tsx
+client/src/pages/monitor.tsx
+client/src/pages/not-found.tsx
+client/src/pages/perception.tsx
+client/src/pages/pricing.tsx
+client/src/pages/privacy.tsx
+client/src/pages/prompt-detail.tsx
+client/src/pages/prompt-diagnose.tsx
+client/src/pages/prompts.tsx
+client/src/pages/register.tsx
+client/src/pages/report.tsx
+client/src/pages/reset-password.tsx
+client/src/pages/settings.tsx
+client/src/pages/setup.tsx
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/components/BrandLogo.tsx
+client/src/components/BrandScopedTab.tsx
+client/src/components/CalendlyInline.tsx
+client/src/components/PageHeader.tsx
+client/src/components/SafeMarkdown.tsx
+client/src/components/SpineShell.tsx
+client/src/components/ThemeProvider.tsx
+client/src/components/ThemeToggle.tsx
+client/src/components/TrialGate.tsx
+client/src/components/articles/BufferConnectDialog.tsx
+client/src/components/dashboard-panels/Panel.tsx
+client/src/components/dashboard-panels/primitives.tsx
+client/src/components/dashboard-panels/useDashboardData.ts
+client/src/components/dashboard/CitedUrlsCard.tsx
+client/src/components/geo-tools/MentionsTab.tsx
+client/src/components/intelligence/TrendsTab.tsx
+client/src/components/perception/ProbeMatrix.tsx
+client/src/components/prompts/AudiencesTab.tsx
+client/src/components/prompts/PhrasingsSection.tsx
+client/src/components/prompts/PromptByModelTable.tsx
+client/src/components/prompts/PromptsPageBody.tsx
+client/src/components/prompts/TagChip.tsx
+client/src/components/prompts/TagsTab.tsx
+client/src/components/ui/alert-dialog.tsx
+client/src/components/ui/alert.tsx
+client/src/components/ui/badge.tsx
+client/src/components/ui/button.tsx
+client/src/components/ui/dialog.tsx
+client/src/components/ui/empty-state.tsx
+client/src/components/ui/error-state.tsx
+client/src/components/ui/input.tsx
+client/src/components/ui/label.tsx
+client/src/components/ui/select.tsx
+client/src/components/ui/skeleton.tsx
+client/src/components/ui/switch.tsx
+client/src/components/ui/tabs.tsx
+client/src/components/ui/textarea.tsx
+client/src/hooks/use-auth.ts
+client/src/hooks/use-brand-selection.ts
+client/src/hooks/use-toast.ts
+client/src/hooks/usePrompts.ts
+client/src/hooks/useTourState.ts
+client/src/lib/authStore.ts
+client/src/lib/calendly.ts
+client/src/lib/formatRelativeTime.ts
+client/src/lib/pageExplainers.ts
+client/src/lib/queryClient.ts
+client/src/lib/sentry.ts
+client/src/lib/supabase.ts
+client/src/lib/urlSafety.ts
+client/src/pages/landing/faviconUrl.ts
+client/src/pages/landing/hooks/useScrollReveal.ts
+client/src/pages/landing/sections/Platform/MockupBackdrop.tsx
+shared/constants.ts
+shared/passwordPolicy.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S10.md and nothing else. Do not modify any source file.

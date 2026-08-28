@@ -1,0 +1,65 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S15.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+server/lib/factAgent/v2/eventLog.ts
+server/lib/factAgent/v2/extractionPrompt.ts
+server/lib/factAgent/v2/factScrapeBackstop.ts
+server/lib/factAgent/v2/homepageNavExtractor.ts
+server/lib/factAgent/v2/hybridUrlDiscovery.ts
+server/lib/factAgent/v2/hydrationSanitizer.ts
+server/lib/factAgent/v2/jinaFallback.ts
+server/lib/factAgent/v2/llmFailover.ts
+server/lib/factAgent/v2/openrouterClient.ts
+server/lib/factAgent/v2/pageExtractors.ts
+server/lib/factAgent/v2/pageGuards.ts
+server/lib/factAgent/v2/persistPasteFacts.ts
+server/lib/factAgent/v2/persistUserFacts.ts
+server/lib/factAgent/v2/planGuards.ts
+server/lib/factAgent/v2/reverifyFact.ts
+server/lib/factAgent/v2/rscExtractor.ts
+server/lib/factAgent/v2/runFactSheetRefresh.ts
+server/lib/factAgent/v2/runFullScrape.ts
+server/lib/factAgent/v2/sitemapDiscovery.ts
+server/lib/factAgent/v2/sourceSearch.ts
+server/lib/factAgent/v2/sourceStatic.ts
+server/lib/factAgent/v2/sourceUserEnrich.ts
+server/lib/factAgent/v2/structuredDataExtractor.ts
+server/lib/factAgent/v2/urlDiscovery.ts
+server/lib/factAgent/v2/urlRanker.ts
+server/lib/factAgent/v2/urlTierScoring.ts
+server/lib/factAgent/v2/vercelBudget.ts
+server/lib/factAgent/v2/weeklySummary.ts
+server/lib/factAgent/v2/wikidataExtractor.ts
+server/lib/factAgent/validators.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+server/db.ts
+server/lib/advisoryLock.ts
+server/lib/aiLogger.ts
+server/lib/factAgent/canonicalize.ts
+server/lib/factAgent/dedup.ts
+server/lib/factAgent/langDetect.ts
+server/lib/factAgent/persistFacts.ts
+server/lib/factAgent/promptInjectionSanitizer.ts
+server/lib/factAgent/robotsCache.ts
+server/lib/factAgent/secretRedactor.ts
+server/lib/factAgent/types.ts
+server/lib/factAgent/v2/aggregate.ts
+server/lib/factAgent/v2/brandProfileWriteback.ts
+server/lib/factAgent/v2/domainAllowlist.ts
+server/lib/genericIndustry.ts
+server/lib/llmConcurrency.ts
+server/lib/logger.ts
+server/lib/modelConfig.ts
+server/lib/siteHealthHistory.ts
+server/lib/ssrf.ts
+server/storage.ts
+shared/factAgent/schema.ts
+shared/schema.ts
+
+Write your report to .audit/B1p/S15.md and nothing else. Do not modify any source file.

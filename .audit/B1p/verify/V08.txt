@@ -1,0 +1,125 @@
+Read .audit/B1p/VERIFY-BRIEF.md first and follow it exactly.
+
+Your BATCH_ID is V08. Write your report to .audit/B1p/verify/V08.md and nothing else.
+
+Files involved: client/src/pages/register.tsx, server/env.ts, client/src/components/ScanCompletionListener.tsx, client/src/components/articles/ViewEditDialog.tsx, client/src/components/citations/PromptsTab.tsx, client/src/components/citations/PromptsTable.tsx, client/src/components/dashboard-panels/useDashboardData.ts, client/src/components/geo-tools/MentionsTab.tsx, client/src/components/geo-tools/MentionDetailSheet.tsx, client/src/components/geo-tools/MentionCard.tsx
+
+Examine each of the 10 findings below. Try to refute each one.
+
+--- finding V-09 (from INV01-storage-keys) ---
+Claimed severity: high
+Claimed location: client/src/pages/register.tsx:17
+
+V-09 | high
+
+Key: `venturecite:pending-verify-email`
+Written at: client/src/pages/register.tsx:17,63-69
+Why logout misses it: The key is in sessionStorage, but logout cleanup only scans localStorage.
+How it fails (two users, one browser): User B can see User A's pending verification email in the shared browser session.
+Confidence: high
+
+## UNDETERMINED
+
+- None.
+
+--- finding F-S01-server-core-003 (from S01-server-core) ---
+Claimed severity: high
+Claimed location: server/env.ts:80
+
+F-S01-server-core-003 | high | configuration
+File: server/env.ts:80, 194-197
+What the code does: The environment schema always requires OPENAI_API_KEY. The parser throws when the key is absent.
+Why it is wrong: The fake content provider explicitly supports running without an OpenAI key (server/lib/localFlowSafety.ts:27-29). The local example also selects the fake provider and tells users to keep provider keys empty (.env.example:92-99).
+How it fails: A local environment with CONTENT_GENERATION_PROVIDER=fake and no OPENAI_API_KEY fails startup during environment parsing. The documented fake-provider flow cannot start.
+Confidence: high
+
+--- finding F-S01-001 (from S01) ---
+Claimed severity: high
+Claimed location: client/src/components/ScanCompletionListener.tsx:64
+
+F-S01-001 | high | correctness
+File: client/src/components/ScanCompletionListener.tsx:64
+What the code does: The completed-scan toast navigates with `brand` set to the scanned brand ID.
+Why it is wrong: The brand-selection hook reads `brandId`, not `brand` (`client/src/hooks/use-brand-selection.ts:37-40`). The `/geo-tools` redirect forwards `brand` unchanged (`src/routes/-shared/searchSchemas.ts:144-152`).
+How it fails: Select Brand A, complete a scan for Brand B, then click View. The page opens the GEO Assets tab while the hook keeps Brand A selected.
+Confidence: high
+
+--- finding F-S01-002 (from S01) ---
+Claimed severity: high
+Claimed location: client/src/components/articles/ViewEditDialog.tsx:93
+
+F-S01-002 | high | correctness
+File: client/src/components/articles/ViewEditDialog.tsx:93
+What the code does: The save, improve, and restore mutations call `apiRequest`, then inspect `r.status === 409` to open the conflict dialog (`client/src/components/articles/ViewEditDialog.tsx:121-127`, `147-155`).
+Why it is wrong: `apiRequest` throws before returning any non-2xx response (`client/src/lib/queryClient.ts:55-69`). The 409 checks never run.
+How it fails: Another tab saves the article first. The server returns 409, the mutation calls the generic error toast at line 113, and the conflict dialog at lines 379-420 never opens.
+Confidence: high
+
+--- finding F-S02-001 (from S02) ---
+Claimed severity: high
+Claimed location: client/src/components/citations/PromptsTab.tsx:75
+
+F-S02-001 | high | correctness
+File: client/src/components/citations/PromptsTab.tsx:75-80,242-272
+Supporting file: client/src/pages/citations.tsx:374-375,564-570
+What the code does: It loads all prompts, but the empty-state branch uses the tracked-only `hasPrompts` prop.
+Why it is wrong: Archived prompts can exist while `hasPrompts` is false.
+How it fails: Archive the last tracked prompt. The tab shows only prompt generation, so the user cannot view or restore archived prompts.
+Confidence: high
+
+--- finding F-S02-002 (from S02) ---
+Claimed severity: high
+Claimed location: client/src/components/citations/PromptsTable.tsx:384
+
+F-S02-002 | high | correctness
+File: client/src/components/citations/PromptsTable.tsx:384-403
+Supporting file: client/src/components/citations/PromptsTab.tsx:94,305,326-332
+What the code does: The bulk action calls `onArchive` once for every selected row.
+Why it is wrong: The parent stores only one row in its `archiving` state and shows one confirmation dialog.
+How it fails: Select rows A and B, click Archive, and confirm. State ends with row B, so only row B sends the archive request.
+Confidence: high
+
+--- finding F-S02-003 (from S02) ---
+Claimed severity: high
+Claimed location: client/src/components/dashboard-panels/useDashboardData.ts:407
+
+F-S02-003 | high | correctness
+File: client/src/components/dashboard-panels/useDashboardData.ts:407-408,438-443
+Supporting file: client/src/components/dashboard-panels/RankingsPanel.tsx:127-135
+What the code does: It converts a missing leaderboard response into an empty row array and passes it to the rankings panel.
+Why it is wrong: It does not pass the query error to the panel.
+How it fails: If the first leaderboard request fails after retries, the panel stops loading and says "No competitors tracked yet".
+Confidence: high
+
+--- finding F-S03-003 (from S03) ---
+Claimed severity: high
+Claimed location: client/src/components/geo-tools/MentionsTab.tsx:136
+
+F-S03-003 | high | error handling
+File: client/src/components/geo-tools/MentionsTab.tsx:136-154
+What the code does: The component reads list data but does not read the query error state.
+Why it is wrong: The query exposes an error state, but this component ignores it and uses its empty-list branches (client/src/hooks/useMentions.ts:548-552; client/src/components/geo-tools/MentionsTab.tsx:462-532).
+How it fails (concrete input or sequence): Return HTTP 500 from the mentions request. The page shows `No mentions found yet` or `No scans yet` without retry guidance (client/src/components/geo-tools/MentionsTab.tsx:320-333,462-532).
+Confidence: high
+
+--- finding F-S03-004 (from S03) ---
+Claimed severity: high
+Claimed location: client/src/components/geo-tools/MentionDetailSheet.tsx:354
+
+F-S03-004 | high | correctness
+File: client/src/components/geo-tools/MentionDetailSheet.tsx:354-366
+What the code does: The status select shows every status for every non-terminal mention.
+Why it is wrong: The server rejects transitions that the card status menu does not allow (client/src/components/geo-tools/MentionCard.tsx:66-78; client/src/hooks/useMentions.ts:351-355).
+How it fails (concrete input or sequence): Open an `acknowledged` mention and select `new`. The server returns a transition error, and the sheet gives no error message (client/src/components/geo-tools/MentionDetailSheet.tsx:190-194; client/src/lib/queryClient.ts:125-131).
+Confidence: high
+
+--- finding F-S03-005 (from S03) ---
+Claimed severity: high
+Claimed location: client/src/components/geo-tools/MentionCard.tsx:429
+
+F-S03-005 | high | correctness
+File: client/src/components/geo-tools/MentionCard.tsx:429-435
+What the code does: The action menu offers `Mark false positive` for every status except `false_positive`.
+Why it is wrong: Terminal statuses cannot transition to `false_positive` (client/src/components/geo-tools/MentionCard.tsx:66-78; client/src/hooks/useMentions.ts:351-355).
+How it fails (concrete input or sequence): Open a `replied` or `ignored` card and select `Mark false positive`. The request fails silently (client/src/lib/queryClient.ts:125-131).
+Confidence: high

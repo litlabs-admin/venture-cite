@@ -1,0 +1,88 @@
+Read .audit/B1p/BRIEF.md first and follow it exactly.
+
+Your SLICE_ID is S29.
+
+AUDIT THESE FILES. Read every one completely, word for word, in full. Do not sample:
+tests/unit/tourOrchestratorGate.test.tsx
+tests/unit/tourRegistryParity.test.ts
+tests/unit/tourStateZod.test.ts
+tests/unit/trackedContentMatcher.test.ts
+tests/unit/unsubscribeToken.test.ts
+tests/unit/urlExtractor.test.ts
+tests/unit/urlRanker.test.ts
+tests/unit/useBrandActivation.test.tsx
+tests/unit/useMentions.test.tsx
+tests/unit/usePromptsGenerateCache.test.tsx
+tests/unit/userPasswordChange.test.ts
+tests/unit/userProfileUpdate.test.ts
+tests/unit/v2Aggregate.test.ts
+tests/unit/v2AggregateRoute.test.ts
+tests/unit/v2DomainAllowlist.test.ts
+tests/unit/v2ExtractionPrompt.test.ts
+tests/unit/v2FactScrapeBackstop.test.ts
+tests/unit/v2FactSheetRefresh.test.ts
+tests/unit/v2HydrationSanitizer.test.ts
+tests/unit/v2LifecycleStorage.test.ts
+tests/unit/v2LlmFailover.test.ts
+tests/unit/v2OpenrouterClient.test.ts
+tests/unit/v2PageExtractors.test.ts
+tests/unit/v2PageGuards.test.ts
+tests/unit/v2PasteRoute.test.ts
+tests/unit/v2PlanGuards.test.ts
+tests/unit/v2PlanRoute.test.ts
+tests/unit/v2RscExtractor.test.ts
+tests/unit/v2ScrapeOneRoute.test.ts
+tests/unit/v2SearchLlmRoute.test.ts
+tests/unit/v2SitemapDiscovery.test.ts
+tests/unit/v2SourceSearch.test.ts
+tests/unit/v2SourceStatic.test.ts
+tests/unit/v2SourceUserEnrich.test.ts
+tests/unit/v2UrlDiscovery.test.ts
+tests/unit/v2UrlTierScoring.test.ts
+tests/unit/v2UserEnrichRoute.test.ts
+tests/unit/v2WeeklySummary.test.ts
+tests/unit/visibilityMetrics.test.ts
+tests/unit/welcomeTourNotOnWelcomePage.test.ts
+tests/unit/wikidataExtractor.test.ts
+
+CONTEXT FILES. These are imported by the files above. Read them when you need to
+check a claim, resolve a type, or confirm what a helper actually does. Do not
+report findings whose primary location is one of these; that file belongs to
+another slice. Use them to judge the files you are auditing:
+client/src/hooks/useMentions.ts
+client/src/tours/engine/eligibility.ts
+client/src/tours/global-welcome.tour.ts
+client/src/tours/registry.ts
+client/src/tours/types.ts
+server/lib/factAgent/v2/aggregate.ts
+server/lib/factAgent/v2/domainAllowlist.ts
+server/lib/factAgent/v2/extractionPrompt.ts
+server/lib/factAgent/v2/factScrapeBackstop.ts
+server/lib/factAgent/v2/hydrationSanitizer.ts
+server/lib/factAgent/v2/llmFailover.ts
+server/lib/factAgent/v2/openrouterClient.ts
+server/lib/factAgent/v2/pageExtractors.ts
+server/lib/factAgent/v2/pageGuards.ts
+server/lib/factAgent/v2/planGuards.ts
+server/lib/factAgent/v2/rscExtractor.ts
+server/lib/factAgent/v2/runFactSheetRefresh.ts
+server/lib/factAgent/v2/sitemapDiscovery.ts
+server/lib/factAgent/v2/sourceSearch.ts
+server/lib/factAgent/v2/sourceStatic.ts
+server/lib/factAgent/v2/sourceUserEnrich.ts
+server/lib/factAgent/v2/urlDiscovery.ts
+server/lib/factAgent/v2/urlRanker.ts
+server/lib/factAgent/v2/urlTierScoring.ts
+server/lib/factAgent/v2/weeklySummary.ts
+server/lib/tourRegistry.ts
+server/lib/tourStateOps.ts
+server/lib/trackedContentMatcher.ts
+server/lib/urlExtractor.ts
+server/lib/visibilityMetrics.ts
+server/routes/factSheetV2.ts
+server/storage.ts
+shared/factAgent/schema.ts
+shared/schema.ts
+tests/helpers/destructiveDatabaseTest.ts
+
+Write your report to .audit/B1p/S29.md and nothing else. Do not modify any source file.

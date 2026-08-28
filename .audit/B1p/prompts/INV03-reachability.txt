@@ -1,0 +1,51 @@
+You are checking ONE invariant across the whole repository. This is not a file
+review. Report only violations of the stated invariant, plus anything that makes
+the invariant unverifiable.
+
+## The invariant
+
+Every page component rendered by a route is reachable from the running application through navigation, a link, a button, or a documented redirect.
+
+Rationale: Unreachable pages are either dead code to delete or working features nobody can find.
+
+## Method
+
+1. Enumerate every route defined under src/routes/ and every page component under client/src/pages/.
+2. Find the navigation definitions, including the sidebar, any tab strips, dashboard cards, and any programmatic navigate() calls.
+3. For each route, find at least one inbound path a user could follow. A redirect shim counts if something reaches the redirect.
+4. Report every route with no inbound path. State whether it looks abandoned or intentionally hidden.
+
+## Output
+
+Write exactly one file: .audit/B1p/INV03-reachability.md. Nothing else. Do not modify any source file.
+
+Use this shape:
+
+# INV03-reachability page reachability
+
+## The rule as implemented
+File: path:line
+Rule: <exact description>
+
+## Complete inventory
+| Item | Defined at | Satisfies invariant? | Evidence |
+|---|---|---|---|
+
+## Violations
+### V-01 | critical|high|medium|low
+Item:
+Defined at: path:line
+Why it violates the invariant:
+How it fails (concrete sequence):
+Confidence: high|medium|low
+
+## UNDETERMINED
+- <question> - needs <what>
+
+Be exhaustive on the inventory step. An item you fail to find is a violation you
+fail to report. If you find zero violations, say so and show the inventory that
+proves it. Do not report an item as a violation without checking the rule against
+it; a false positive costs a reviewer real time.
+
+Documentation and comments are not evidence. Check the code.
+Write plainly. No em dashes. No filler.
