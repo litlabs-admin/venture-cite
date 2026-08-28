@@ -15,7 +15,7 @@ vi.mock("../../server/db", () => ({
 }));
 
 import * as schema from "../../shared/schema";
-import { DatabaseStorage } from "../../server/databaseStorage";
+import { competitorsStorage } from "../../server/storage/competitorsStorage";
 
 function insertBuilder(row: unknown) {
   const builder = {
@@ -31,11 +31,11 @@ function insertBuilder(row: unknown) {
 }
 
 describe("ranking insert round trips", () => {
-  let storage: DatabaseStorage;
+  let storage: typeof competitorsStorage;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    storage = new DatabaseStorage();
+    storage = competitorsStorage;
     stubs.select.mockReturnValue({
       from: () => ({
         where: () => ({

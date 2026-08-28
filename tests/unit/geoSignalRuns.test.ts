@@ -39,7 +39,7 @@ vi.mock("../../server/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { DatabaseStorage } from "../../server/databaseStorage";
+import { storage } from "../../server/storage";
 
 function drizzleChain(rows: unknown[]) {
   function fn(..._args: unknown[]) {
@@ -68,10 +68,7 @@ function drizzleChain(rows: unknown[]) {
   return thenable;
 }
 
-let storage: DatabaseStorage;
-
 beforeEach(() => {
-  storage = new DatabaseStorage();
   stubs.capturedValues = null;
   stubs.selectRows = [];
   stubs.insertRows = [];

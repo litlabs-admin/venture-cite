@@ -1,7 +1,7 @@
 // Tests for the Mentions rebuild storage methods (Task 7).
 //
 // Strategy: mock `server/db` so no real DB is needed, then exercise the
-// DatabaseStorage methods directly. Each test injects the mock return value
+// storage methods directly. Each test injects the mock return value
 // that the underlying Drizzle/sql call would produce and asserts the method
 // returns the correct shape.
 //
@@ -41,7 +41,7 @@ vi.mock("../../server/lib/logger", () => ({
 }));
 
 // Import AFTER mocks are registered.
-import { DatabaseStorage } from "../../server/databaseStorage";
+import { storage } from "../../server/storage";
 
 // ── Fluent chain helper ────────────────────────────────────────────────────
 //
@@ -128,10 +128,7 @@ const makeMention = (overrides: Record<string, unknown> = {}) => ({
 
 // ── Test setup ─────────────────────────────────────────────────────────────
 
-let storage: DatabaseStorage;
-
 beforeEach(() => {
-  storage = new DatabaseStorage();
   vi.clearAllMocks();
 });
 

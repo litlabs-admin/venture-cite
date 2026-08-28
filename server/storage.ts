@@ -1019,6 +1019,7 @@ export interface IStorage {
 }
 
 import { DatabaseStorage } from "./databaseStorage";
+import { brandsStorage } from "./storage/brandsStorage";
 import { chatbotStorage } from "./storage/chatbotStorage";
 import { competitorsStorage } from "./storage/competitorsStorage";
 import { identityStorage } from "./storage/identityStorage";
@@ -1026,6 +1027,7 @@ import { jobsStorage } from "./storage/jobsStorage";
 
 function databaseStorageObject(): Omit<
   IStorage,
+  | keyof typeof brandsStorage
   | keyof typeof chatbotStorage
   | keyof typeof competitorsStorage
   | keyof typeof identityStorage
@@ -1050,4 +1052,5 @@ export const storage: IStorage = {
   ...identityStorage,
   ...competitorsStorage,
   ...jobsStorage,
+  ...brandsStorage,
 };

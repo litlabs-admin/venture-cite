@@ -14,7 +14,7 @@ vi.mock("../../server/db", () => ({
   pool: {},
 }));
 
-const { DatabaseStorage } = await import("../../server/databaseStorage");
+const { storage } = await import("../../server/storage");
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -78,7 +78,7 @@ describe("content job completion transaction", () => {
     );
 
     await expect(
-      new DatabaseStorage().completeContentJobSlice(
+      storage.completeContentJobSlice(
         "job-1",
         "token-1",
         { content: "# Article", title: "Article" },
@@ -124,7 +124,7 @@ describe("content job completion transaction", () => {
       work(tx),
     );
 
-    const complete = await new DatabaseStorage().completeContentJobSliceLegacy("job-1", "token-1", {
+    const complete = await storage.completeContentJobSliceLegacy("job-1", "token-1", {
       content: "# Article",
       title: "Article",
     });
@@ -153,14 +153,10 @@ describe("content job completion transaction", () => {
       work(tx),
     );
 
-    const complete = await new DatabaseStorage().completeContentJobSliceLegacy(
-      "job-1",
-      "old-token",
-      {
-        content: "# Article",
-        title: "Article",
-      },
-    );
+    const complete = await storage.completeContentJobSliceLegacy("job-1", "old-token", {
+      content: "# Article",
+      title: "Article",
+    });
 
     expect(complete).toBe(false);
     expect(stubs.update).toHaveBeenCalledTimes(1);
@@ -180,7 +176,7 @@ describe("content job completion transaction", () => {
     );
 
     await expect(
-      new DatabaseStorage().failContentJobSlice("job-1", "token-1", {
+      storage.failContentJobSlice("job-1", "token-1", {
         errorKind: "timeout",
         errorMessage: "Provider timeout",
       }),
@@ -193,9 +189,7 @@ describe("content job completion transaction", () => {
   it("resets only the article that still points at the cancelled job", async () => {
     stubs.execute.mockResolvedValue({ rows: [{ id: "article-1" }] });
 
-    await expect(
-      new DatabaseStorage().resetArticleForCancelledContentJob("job-cancelled"),
-    ).resolves.toBe(true);
+    await expect(storage.resetArticleForCancelledContentJob("job-cancelled")).resolves.toBe(true);
 
     const statement = sqlText(stubs.execute.mock.calls[0]?.[0]);
     expect(statement).toContain("WHERE job_id = $1");
@@ -205,9 +199,7 @@ describe("content job completion transaction", () => {
   it("renews the active token before a provider call", async () => {
     stubs.execute.mockResolvedValue({ rows: [{ id: "job-1" }] });
 
-    await expect(new DatabaseStorage().renewContentJobSliceLease("job-1", "token-1")).resolves.toBe(
-      true,
-    );
+    await expect(storage.renewContentJobSliceLease("job-1", "token-1")).resolves.toBe(true);
 
     const statement = sqlText(stubs.execute.mock.calls[0]?.[0]);
     expect(statement).toContain("advance_lease_expires_at = now()");
@@ -217,9 +209,7 @@ describe("content job completion transaction", () => {
   it("releases only the lease that still has the active token", async () => {
     stubs.execute.mockResolvedValue({ rows: [{ id: "job-1" }] });
 
-    await expect(
-      new DatabaseStorage().releaseContentJobSliceLease("job-1", "token-1"),
-    ).resolves.toBe(true);
+    await expect(storage.releaseContentJobSliceLease("job-1", "token-1")).resolves.toBe(true);
 
     const statement = sqlText(stubs.execute.mock.calls[0]?.[0]);
     expect(statement).toContain("advance_token = NULL");

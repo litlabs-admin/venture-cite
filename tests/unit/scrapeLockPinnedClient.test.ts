@@ -17,7 +17,7 @@ vi.mock("../../server/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn() },
 }));
 
-import { DatabaseStorage } from "../../server/databaseStorage";
+import { storage } from "../../server/storage";
 import { dynamicLockNamespaces, withDynamicAdvisoryLock } from "../../server/lib/advisoryLock";
 
 const releaseQuery = "delete from job_leases where lease_key = $1 and holder_token = $2";
@@ -83,8 +83,6 @@ describe("full fact-scrape lease", () => {
   });
 
   it("does not expose unpinned fact-scrape locks from storage", () => {
-    const storage = new DatabaseStorage();
-
     expect("tryAcquireScrapeLock" in storage).toBe(false);
     expect("releaseScrapeLock" in storage).toBe(false);
   });

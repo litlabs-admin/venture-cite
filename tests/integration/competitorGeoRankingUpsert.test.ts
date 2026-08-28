@@ -34,8 +34,7 @@ const databaseTest = configureDestructiveDatabaseTest(process.env);
 
 if (databaseTest.kind === "ready") {
   const { db } = await import("../../server/db");
-  const { DatabaseStorage } = await import("../../server/databaseStorage");
-  const storage = new DatabaseStorage();
+  const { storage } = await import("../../server/storage");
 
   const FIXTURE_PREFIX = "f03-cgr-upsert";
   const BRAND_ID = `${FIXTURE_PREFIX}-brand`;

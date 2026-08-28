@@ -22,14 +22,11 @@ const dbMock = vi.hoisted(() => {
 vi.mock("../../server/db", () => ({ db: dbMock.proxy }));
 vi.mock("../../shared/schema", () => new Proxy({}, { get: (_t, p) => p, has: () => true }));
 
-import { DatabaseStorage } from "../../server/databaseStorage";
+import { storage } from "../../server/storage";
 
 describe("brandFactSheet conflicts + accept/dismiss", () => {
-  let storage: DatabaseStorage;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    storage = new DatabaseStorage();
   });
 
   it("getBrandFactSheetConflicts pairs user+scraped rows on the same key", async () => {

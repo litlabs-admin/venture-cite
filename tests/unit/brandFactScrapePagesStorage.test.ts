@@ -23,14 +23,11 @@ const dbMock = vi.hoisted(() => {
 vi.mock("../../server/db", () => ({ db: dbMock.proxy }));
 vi.mock("../../shared/schema", () => new Proxy({}, { get: (_t, p) => p, has: () => true }));
 
-import { DatabaseStorage } from "../../server/databaseStorage";
+import { storage } from "../../server/storage";
 
 describe("brandFactScrapePages storage", () => {
-  let storage: DatabaseStorage;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    storage = new DatabaseStorage();
   });
 
   it("createScrapePage returns the inserted row", async () => {

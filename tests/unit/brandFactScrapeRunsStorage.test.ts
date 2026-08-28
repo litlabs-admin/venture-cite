@@ -37,14 +37,11 @@ vi.mock("../../shared/schema", () => {
   return new Proxy({}, handler);
 });
 
-import { DatabaseStorage } from "../../server/databaseStorage";
+import { storage } from "../../server/storage";
 
 describe("brandFactScrapeRuns storage", () => {
-  let storage: DatabaseStorage;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    storage = new DatabaseStorage();
   });
 
   it("createScrapeRun returns the inserted row", async () => {

@@ -40,7 +40,7 @@ vi.mock("../../server/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { DatabaseStorage } from "../../server/databaseStorage";
+import { storage } from "../../server/storage";
 
 // Drizzle-chain proxy that records the payload passed to .set() and
 // .values() into the shared stubs object, then keeps the chain awaitable.
@@ -77,10 +77,7 @@ function drizzleChain(rows: unknown[]) {
   return thenable;
 }
 
-let storage: DatabaseStorage;
-
 beforeEach(() => {
-  storage = new DatabaseStorage();
   stubs.capturedSet = null;
   stubs.capturedValues = null;
   vi.clearAllMocks();
@@ -116,7 +113,7 @@ describe("createArticle (manual POST /api/articles path)", () => {
       title: "User-authored",
       content: "I wrote this myself.",
       status: "ready",
-    } as unknown as Parameters<DatabaseStorage["createArticle"]>[0]);
+    } as unknown as Parameters<typeof storage.createArticle>[0]);
 
     expect(stubs.insert).toHaveBeenCalled();
     expect(stubs.capturedValues).not.toBeNull();
