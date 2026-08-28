@@ -23,32 +23,10 @@ import { users } from "./schema/identity";
 
 export * from "./schema/identity";
 
-export const citations = pgTable(
-  "citations",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
-    source: text("source"),
-    url: text("url"),
-    platform: text("platform"),
-    keywords: text("keywords").array(),
-    timestamp: timestamp("timestamp").defaultNow().notNull(),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("citations_user_id_idx").on(table.userId)],
-);
-
-export const analytics = pgTable("analytics", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  totalCitations: integer("total_citations").default(0).notNull(),
-  weeklyGrowth: numeric("weekly_growth", { precision: 5, scale: 2 }).default("0").notNull(),
-  avgPosition: numeric("avg_position", { precision: 5, scale: 2 }).default("0").notNull(),
-  monthlyTraffic: integer("monthly_traffic").default(0).notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const brands = pgTable(
@@ -115,6 +93,57 @@ export const brands = pgTable(
   (table) => [index("brands_user_id_idx").on(table.userId)],
 );
 
+export const insertBrandSchema = createInsertSchema(brands).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertBrand = z.infer<typeof insertBrandSchema>;
+export type Brand = typeof brands.$inferSelect;
+
+export const citations = pgTable(
+  "citations",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+    source: text("source"),
+    url: text("url"),
+    platform: text("platform"),
+    keywords: text("keywords").array(),
+    timestamp: timestamp("timestamp").defaultNow().notNull(),
+    metadata: jsonb("metadata"),
+  },
+  (table) => [index("citations_user_id_idx").on(table.userId)],
+);
+
+export const insertCitationSchema = createInsertSchema(citations).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertCitation = z.infer<typeof insertCitationSchema>;
+export type Citation = typeof citations.$inferSelect;
+
+export const analytics = pgTable("analytics", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  totalCitations: integer("total_citations").default(0).notNull(),
+  weeklyGrowth: numeric("weekly_growth", { precision: 5, scale: 2 }).default("0").notNull(),
+  avgPosition: numeric("avg_position", { precision: 5, scale: 2 }).default("0").notNull(),
+  monthlyTraffic: integer("monthly_traffic").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAnalyticsSchema = createInsertSchema(analytics).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertAnalytics = z.infer<typeof insertAnalyticsSchema>;
+export type Analytics = typeof analytics.$inferSelect;
+
 // Articles are the single source of truth for user-authored content.
 // The old `content_drafts` table is now part of
 // this one - see migration 0033. Lifecycle: draft → generating → ready
@@ -174,6 +203,16 @@ export const articles = pgTable(
   ],
 );
 
+export const insertArticleSchema = createInsertSchema(articles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  viewCount: true,
+  citationCount: true,
+});
+export type InsertArticle = z.infer<typeof insertArticleSchema>;
+export type Article = typeof articles.$inferSelect;
+
 // Per-revision history for Auto-Improve and manual edits. Each row is an
 // immutable snapshot of `articles.content` at the moment the revision was
 // created. The diff viewer renders newest-vs-current; restore copies an old
@@ -220,6 +259,13 @@ export const distributions = pgTable(
   },
   (table) => [index("distributions_article_id_idx").on(table.articleId)],
 );
+
+export const insertDistributionSchema = createInsertSchema(distributions).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDistribution = z.infer<typeof insertDistributionSchema>;
+export type Distribution = typeof distributions.$inferSelect;
 
 export const keywordResearch = pgTable(
   "keyword_research",
@@ -940,6 +986,12 @@ export const geoRankings = pgTable(
   ],
 );
 
+export const insertGeoRankingSchema = createInsertSchema(geoRankings).omit({
+  id: true,
+});
+export type InsertGeoRanking = z.infer<typeof insertGeoRankingSchema>;
+export type GeoRanking = typeof geoRankings.$inferSelect;
+
 export const brandVisibilitySnapshots = pgTable(
   "brand_visibility_snapshots",
   {
@@ -964,44 +1016,14 @@ export const brandVisibilitySnapshots = pgTable(
   (table) => [index("brand_visibility_snapshots_brand_id_idx").on(table.brandId)],
 );
 
-export const insertUserSchema = createInsertSchema(users).omit({
+export const insertBrandVisibilitySnapshotSchema = createInsertSchema(
+  brandVisibilitySnapshots,
+).omit({
   id: true,
-  createdAt: true,
-  updatedAt: true,
+  snapshotDate: true,
 });
-
-export const insertCitationSchema = createInsertSchema(citations).omit({
-  id: true,
-  timestamp: true,
-});
-
-export const insertAnalyticsSchema = createInsertSchema(analytics).omit({
-  id: true,
-  updatedAt: true,
-});
-
-export const insertArticleSchema = createInsertSchema(articles).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  viewCount: true,
-  citationCount: true,
-});
-
-export const insertDistributionSchema = createInsertSchema(distributions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertGeoRankingSchema = createInsertSchema(geoRankings).omit({
-  id: true,
-});
-
-export const insertBrandSchema = createInsertSchema(brands).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export type InsertBrandVisibilitySnapshot = z.infer<typeof insertBrandVisibilitySnapshotSchema>;
+export type BrandVisibilitySnapshot = typeof brandVisibilitySnapshots.$inferSelect;
 
 export const competitors = pgTable(
   "competitors",
@@ -1042,6 +1064,13 @@ export const competitors = pgTable(
   ],
 );
 
+export const insertCompetitorSchema = createInsertSchema(competitors).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCompetitor = z.infer<typeof insertCompetitorSchema>;
+export type Competitor = typeof competitors.$inferSelect;
+
 // Per-run, per-prompt competitor citation detail. Mirrors geo_rankings so
 // competitors are tracked with the same fidelity as the brand - one row
 // per (competitor × run × prompt × platform), containing whether the
@@ -1079,6 +1108,13 @@ export const competitorGeoRankings = pgTable(
   ],
 );
 
+export const insertCompetitorGeoRankingSchema = createInsertSchema(competitorGeoRankings).omit({
+  id: true,
+  checkedAt: true,
+});
+export type InsertCompetitorGeoRanking = z.infer<typeof insertCompetitorGeoRankingSchema>;
+export type CompetitorGeoRanking = typeof competitorGeoRankings.$inferSelect;
+
 export const competitorCitationSnapshots = pgTable(
   "competitor_citation_snapshots",
   {
@@ -1103,29 +1139,16 @@ export const competitorCitationSnapshots = pgTable(
   ],
 );
 
-export const insertCompetitorSchema = createInsertSchema(competitors).omit({
-  id: true,
-  createdAt: true,
-});
-
 export const insertCompetitorCitationSnapshotSchema = createInsertSchema(
   competitorCitationSnapshots,
 ).omit({
   id: true,
   snapshotDate: true,
 });
-
-export const insertCompetitorGeoRankingSchema = createInsertSchema(competitorGeoRankings).omit({
-  id: true,
-  checkedAt: true,
-});
-
-export const insertBrandVisibilitySnapshotSchema = createInsertSchema(
-  brandVisibilitySnapshots,
-).omit({
-  id: true,
-  snapshotDate: true,
-});
+export type InsertCompetitorCitationSnapshot = z.infer<
+  typeof insertCompetitorCitationSnapshotSchema
+>;
+export type CompetitorCitationSnapshot = typeof competitorCitationSnapshots.$inferSelect;
 
 // Listicle tracking - monitor "best of" articles for brand inclusion
 export const listicles = pgTable(
@@ -1160,6 +1183,14 @@ export const listicles = pgTable(
   (table) => [index("listicles_brand_id_idx").on(table.brandId)],
 );
 
+export const insertListicleSchema = createInsertSchema(listicles).omit({
+  id: true,
+  createdAt: true,
+  lastChecked: true,
+});
+export type InsertListicle = z.infer<typeof insertListicleSchema>;
+export type Listicle = typeof listicles.$inferSelect;
+
 // Wikipedia presence monitoring
 export const wikipediaMentions = pgTable(
   "wikipedia_mentions",
@@ -1182,6 +1213,14 @@ export const wikipediaMentions = pgTable(
   },
   (table) => [index("wikipedia_mentions_brand_id_idx").on(table.brandId)],
 );
+
+export const insertWikipediaMentionSchema = createInsertSchema(wikipediaMentions).omit({
+  id: true,
+  createdAt: true,
+  lastVerified: true,
+});
+export type InsertWikipediaMention = z.infer<typeof insertWikipediaMentionSchema>;
+export type WikipediaMention = typeof wikipediaMentions.$inferSelect;
 
 // BOFU content templates and generated content
 export const bofuContent = pgTable(
@@ -1214,6 +1253,14 @@ export const bofuContent = pgTable(
   (table) => [index("bofu_content_brand_id_idx").on(table.brandId)],
 );
 
+export const insertBofuContentSchema = createInsertSchema(bofuContent).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertBofuContent = z.infer<typeof insertBofuContentSchema>;
+export type BofuContent = typeof bofuContent.$inferSelect;
+
 // FAQ optimization tracking
 export const faqItems = pgTable(
   "faq_items",
@@ -1245,6 +1292,14 @@ export const faqItems = pgTable(
     index("faq_items_article_id_idx").on(table.articleId),
   ],
 );
+
+export const insertFaqItemSchema = createInsertSchema(faqItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertFaqItem = z.infer<typeof insertFaqItemSchema>;
+export type FaqItem = typeof faqItems.$inferSelect;
 
 // Brand mention tracking across platforms
 export const brandMentions = pgTable(
@@ -1285,6 +1340,13 @@ export const brandMentions = pgTable(
   (table) => [index("brand_mentions_brand_id_idx").on(table.brandId)],
 );
 
+export const insertBrandMentionSchema = createInsertSchema(brandMentions).omit({
+  id: true,
+  discoveredAt: true,
+});
+export type InsertBrandMention = z.infer<typeof insertBrandMentionSchema>;
+export type BrandMention = typeof brandMentions.$inferSelect;
+
 // Registry of brand-owned published URLs from
 // bofu_content + faq_items via a polymorphic source_type/source_id pair)
 // that the citation checker matches against. When the LLM in a citation
@@ -1318,39 +1380,12 @@ export const trackedContentUrls = pgTable(
   ],
 );
 
-export const insertListicleSchema = createInsertSchema(listicles).omit({
-  id: true,
-  createdAt: true,
-  lastChecked: true,
-});
-
-export const insertWikipediaMentionSchema = createInsertSchema(wikipediaMentions).omit({
-  id: true,
-  createdAt: true,
-  lastVerified: true,
-});
-
-export const insertBofuContentSchema = createInsertSchema(bofuContent).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertFaqItemSchema = createInsertSchema(faqItems).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertBrandMentionSchema = createInsertSchema(brandMentions).omit({
-  id: true,
-  discoveredAt: true,
-});
-
 export const insertTrackedContentUrlSchema = createInsertSchema(trackedContentUrls).omit({
   id: true,
   createdAt: true,
 });
+export type InsertTrackedContentUrl = z.infer<typeof insertTrackedContentUrlSchema>;
+export type TrackedContentUrl = typeof trackedContentUrls.$inferSelect;
 
 // Citation Quality Scoring
 export const citationQuality = pgTable(
@@ -1379,6 +1414,13 @@ export const citationQuality = pgTable(
   },
   (table) => [index("citation_quality_brand_id_idx").on(table.brandId)],
 );
+
+export const insertCitationQualitySchema = createInsertSchema(citationQuality).omit({
+  id: true,
+  scoredAt: true,
+});
+export type InsertCitationQuality = z.infer<typeof insertCitationQualitySchema>;
+export type CitationQuality = typeof citationQuality.$inferSelect;
 
 // Hallucination Detection - Track inaccurate AI claims
 export const brandHallucinations = pgTable(
@@ -1418,6 +1460,13 @@ export const brandHallucinations = pgTable(
     index("brand_hallucinations_ranking_id_idx").on(table.rankingId),
   ],
 );
+
+export const insertBrandHallucinationSchema = createInsertSchema(brandHallucinations).omit({
+  id: true,
+  detectedAt: true,
+});
+export type InsertBrandHallucination = z.infer<typeof insertBrandHallucinationSchema>;
+export type BrandHallucination = typeof brandHallucinations.$inferSelect;
 
 // Brand Fact Sheet - Source of truth for hallucination checking
 export const brandFactSheet = pgTable(
@@ -1472,6 +1521,17 @@ export const brandFactSheet = pgTable(
   ],
 );
 
+export const insertBrandFactSheetSchema = createInsertSchema(brandFactSheet).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastVerified: true,
+  acceptedAt: true,
+  dismissedAt: true,
+});
+export type InsertBrandFactSheet = z.infer<typeof insertBrandFactSheetSchema>;
+export type BrandFactSheet = typeof brandFactSheet.$inferSelect;
+
 // Metrics History - Track metrics snapshots over time for trend analysis
 export const metricsHistory = pgTable(
   "metrics_history",
@@ -1489,6 +1549,13 @@ export const metricsHistory = pgTable(
   },
   (table) => [index("metrics_history_brand_id_idx").on(table.brandId)],
 );
+
+export const insertMetricsHistorySchema = createInsertSchema(metricsHistory).omit({
+  id: true,
+  snapshotDate: true,
+});
+export type InsertMetricsHistory = z.infer<typeof insertMetricsHistorySchema>;
+export type MetricsHistory = typeof metricsHistory.$inferSelect;
 
 // Alert Settings - Configure notifications for metric changes
 export const alertSettings = pgTable(
@@ -1513,6 +1580,14 @@ export const alertSettings = pgTable(
   (table) => [index("alert_settings_brand_id_idx").on(table.brandId)],
 );
 
+export const insertAlertSettingsSchema = createInsertSchema(alertSettings).omit({
+  id: true,
+  createdAt: true,
+  lastTriggered: true,
+});
+export type InsertAlertSettings = z.infer<typeof insertAlertSettingsSchema>;
+export type AlertSettings = typeof alertSettings.$inferSelect;
+
 // Alert History - Track sent alerts
 export const alertHistory = pgTable(
   "alert_history",
@@ -1532,6 +1607,13 @@ export const alertHistory = pgTable(
   },
   (table) => [index("alert_history_brand_id_idx").on(table.brandId)],
 );
+
+export const insertAlertHistorySchema = createInsertSchema(alertHistory).omit({
+  id: true,
+  sentAt: true,
+});
+export type InsertAlertHistory = z.infer<typeof insertAlertHistorySchema>;
+export type AlertHistory = typeof alertHistory.$inferSelect;
 
 // Agent Tasks - Queue for automated GEO optimization tasks
 export const agentTasks = pgTable(
@@ -1582,6 +1664,14 @@ export const agentTasks = pgTable(
   ],
 );
 
+export const insertAgentTaskSchema = createInsertSchema(agentTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAgentTask = z.infer<typeof insertAgentTaskSchema>;
+export type AgentTask = typeof agentTasks.$inferSelect;
+
 export const workflowRuns = pgTable(
   "workflow_runs",
   {
@@ -1613,102 +1703,12 @@ export const workflowRuns = pgTable(
   ],
 );
 
-export const insertAlertSettingsSchema = createInsertSchema(alertSettings).omit({
-  id: true,
-  createdAt: true,
-  lastTriggered: true,
-});
-
-export const insertAlertHistorySchema = createInsertSchema(alertHistory).omit({
-  id: true,
-  sentAt: true,
-});
-
-export const insertAgentTaskSchema = createInsertSchema(agentTasks).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
 export const insertWorkflowRunSchema = createInsertSchema(workflowRuns).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
   completedAt: true,
 });
-
-export const insertMetricsHistorySchema = createInsertSchema(metricsHistory).omit({
-  id: true,
-  snapshotDate: true,
-});
-
-export const insertCitationQualitySchema = createInsertSchema(citationQuality).omit({
-  id: true,
-  scoredAt: true,
-});
-
-export const insertBrandHallucinationSchema = createInsertSchema(brandHallucinations).omit({
-  id: true,
-  detectedAt: true,
-});
-
-export const insertBrandFactSheetSchema = createInsertSchema(brandFactSheet).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  lastVerified: true,
-  acceptedAt: true,
-  dismissedAt: true,
-});
-
-export type InsertCitation = z.infer<typeof insertCitationSchema>;
-export type Citation = typeof citations.$inferSelect;
-export type InsertAnalytics = z.infer<typeof insertAnalyticsSchema>;
-export type Analytics = typeof analytics.$inferSelect;
-export type InsertArticle = z.infer<typeof insertArticleSchema>;
-export type Article = typeof articles.$inferSelect;
-export type InsertDistribution = z.infer<typeof insertDistributionSchema>;
-export type Distribution = typeof distributions.$inferSelect;
-export type InsertGeoRanking = z.infer<typeof insertGeoRankingSchema>;
-export type GeoRanking = typeof geoRankings.$inferSelect;
-export type InsertBrand = z.infer<typeof insertBrandSchema>;
-export type Brand = typeof brands.$inferSelect;
-export type InsertCompetitor = z.infer<typeof insertCompetitorSchema>;
-export type Competitor = typeof competitors.$inferSelect;
-export type InsertCompetitorCitationSnapshot = z.infer<
-  typeof insertCompetitorCitationSnapshotSchema
->;
-export type CompetitorCitationSnapshot = typeof competitorCitationSnapshots.$inferSelect;
-export type InsertCompetitorGeoRanking = z.infer<typeof insertCompetitorGeoRankingSchema>;
-export type CompetitorGeoRanking = typeof competitorGeoRankings.$inferSelect;
-export type InsertBrandVisibilitySnapshot = z.infer<typeof insertBrandVisibilitySnapshotSchema>;
-export type BrandVisibilitySnapshot = typeof brandVisibilitySnapshots.$inferSelect;
-export type InsertListicle = z.infer<typeof insertListicleSchema>;
-export type Listicle = typeof listicles.$inferSelect;
-export type InsertTrackedContentUrl = z.infer<typeof insertTrackedContentUrlSchema>;
-export type TrackedContentUrl = typeof trackedContentUrls.$inferSelect;
-export type InsertWikipediaMention = z.infer<typeof insertWikipediaMentionSchema>;
-export type WikipediaMention = typeof wikipediaMentions.$inferSelect;
-export type InsertBofuContent = z.infer<typeof insertBofuContentSchema>;
-export type BofuContent = typeof bofuContent.$inferSelect;
-export type InsertFaqItem = z.infer<typeof insertFaqItemSchema>;
-export type FaqItem = typeof faqItems.$inferSelect;
-export type InsertBrandMention = z.infer<typeof insertBrandMentionSchema>;
-export type BrandMention = typeof brandMentions.$inferSelect;
-export type InsertCitationQuality = z.infer<typeof insertCitationQualitySchema>;
-export type CitationQuality = typeof citationQuality.$inferSelect;
-export type InsertBrandHallucination = z.infer<typeof insertBrandHallucinationSchema>;
-export type BrandHallucination = typeof brandHallucinations.$inferSelect;
-export type InsertBrandFactSheet = z.infer<typeof insertBrandFactSheetSchema>;
-export type BrandFactSheet = typeof brandFactSheet.$inferSelect;
-export type InsertMetricsHistory = z.infer<typeof insertMetricsHistorySchema>;
-export type MetricsHistory = typeof metricsHistory.$inferSelect;
-export type InsertAlertSettings = z.infer<typeof insertAlertSettingsSchema>;
-export type AlertSettings = typeof alertSettings.$inferSelect;
-export type InsertAlertHistory = z.infer<typeof insertAlertHistorySchema>;
-export type AlertHistory = typeof alertHistory.$inferSelect;
-export type InsertAgentTask = z.infer<typeof insertAgentTaskSchema>;
-export type AgentTask = typeof agentTasks.$inferSelect;
 export type InsertWorkflowRun = z.infer<typeof insertWorkflowRunSchema>;
 export type WorkflowRun = typeof workflowRuns.$inferSelect;
 
@@ -1987,6 +1987,8 @@ export const chatbotThreads = pgTable(
     userUpdatedIdx: index("chatbot_threads_user_updated_idx").on(t.userId, t.updatedAt.desc()),
   }),
 );
+export type ChatbotThread = typeof chatbotThreads.$inferSelect;
+export type InsertChatbotThread = typeof chatbotThreads.$inferInsert;
 
 export const chatbotMessages = pgTable(
   "chatbot_messages",
@@ -2012,6 +2014,9 @@ export const chatbotMessages = pgTable(
   }),
 );
 
+export type ChatbotMessage = typeof chatbotMessages.$inferSelect;
+export type InsertChatbotMessage = typeof chatbotMessages.$inferInsert;
+
 export const chatbotTokenUsage = pgTable(
   "chatbot_token_usage",
   {
@@ -2027,11 +2032,6 @@ export const chatbotTokenUsage = pgTable(
     pk: primaryKey({ columns: [t.userId, t.usageDate] }),
   }),
 );
-
-export type ChatbotMessage = typeof chatbotMessages.$inferSelect;
-export type InsertChatbotMessage = typeof chatbotMessages.$inferInsert;
-export type ChatbotThread = typeof chatbotThreads.$inferSelect;
-export type InsertChatbotThread = typeof chatbotThreads.$inferInsert;
 export type ChatbotTokenUsage = typeof chatbotTokenUsage.$inferSelect;
 export type InsertChatbotTokenUsage = typeof chatbotTokenUsage.$inferInsert;
 
@@ -2061,6 +2061,9 @@ export const scanJobs = pgTable("scan_jobs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export type ScanJob = typeof scanJobs.$inferSelect;
+export type InsertScanJob = typeof scanJobs.$inferInsert;
+
 export const sourceHealth = pgTable(
   "source_health",
   {
@@ -2078,6 +2081,8 @@ export const sourceHealth = pgTable(
     pk: primaryKey({ columns: [t.brandId, t.source] }),
   }),
 );
+export type SourceHealth = typeof sourceHealth.$inferSelect;
+export type InsertSourceHealth = typeof sourceHealth.$inferInsert;
 
 export const sentimentCache = pgTable("sentiment_cache", {
   contentHash: text("content_hash").primaryKey(),
@@ -2085,11 +2090,6 @@ export const sentimentCache = pgTable("sentiment_cache", {
   sentimentScore: numeric("sentiment_score", { precision: 3, scale: 2 }).notNull(),
   cachedAt: timestamp("cached_at").notNull().defaultNow(),
 });
-
-export type ScanJob = typeof scanJobs.$inferSelect;
-export type InsertScanJob = typeof scanJobs.$inferInsert;
-export type SourceHealth = typeof sourceHealth.$inferSelect;
-export type InsertSourceHealth = typeof sourceHealth.$inferInsert;
 export type SentimentCache = typeof sentimentCache.$inferSelect;
 export type InsertSentimentCache = typeof sentimentCache.$inferInsert;
 
@@ -2204,6 +2204,8 @@ export const systemState = pgTable("system_state", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+export type SystemState = typeof systemState.$inferSelect;
+
 // ── Brand perception scoring (migration 0088) ──────────────────────────
 // Mirrors migrations/0088_brand_perception_runs.sql exactly. Every axis
 // column is nullable - a judge that can't assess an axis from the
@@ -2289,6 +2291,8 @@ export const brandPerceptionProbeRuns = pgTable(
   ],
 );
 
+export type BrandPerceptionProbeRun = typeof brandPerceptionProbeRuns.$inferSelect;
+
 export const brandPerceptionProbes = pgTable(
   "brand_perception_probes",
   {
@@ -2327,11 +2331,7 @@ export const brandPerceptionProbes = pgTable(
     unique("brand_perception_probes_unique_cell").on(table.runId, table.platform, table.axis),
   ],
 );
-
-export type BrandPerceptionProbeRun = typeof brandPerceptionProbeRuns.$inferSelect;
 export type BrandPerceptionProbe = typeof brandPerceptionProbes.$inferSelect;
-
-export type SystemState = typeof systemState.$inferSelect;
 
 // ── Site health scan history (migration 0094) ──────────────────────────
 // Mirrors migrations/0094_site_health_scan_history.sql exactly. One row per

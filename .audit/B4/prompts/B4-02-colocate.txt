@@ -1,0 +1,70 @@
+Reorganise `shared/schema.ts` so every table's companions sit beside it.
+
+This is preparation, not a split. No new files. No module boundaries. Nothing
+leaves this file.
+
+## Why
+
+The file grew by appending. 93 of its 131 `export type` declarations sit in one
+block after line 1600, interleaved across every domain: `Citation`, `Analytics`,
+`Article`, `Brand`, `Competitor` and the rest, in no order. Some zod builders sit
+next to their table, others do not: `insertBrandSchema` is at line 1000 while
+`brands` is at line 54.
+
+The next six commits split this file into domain modules. Doing that against the
+current layout means six passes hunting through a tail block that gets more
+mangled each time, and that is where a dropped export comes from.
+
+## What to do
+
+For every table in the file, gather its companions directly beneath it:
+
+- its `createInsertSchema` builder, if it has one
+- its `$inferSelect` and `$inferInsert` type aliases
+- its `z.infer` type aliases
+- any constant, enum or helper that exists only to serve that table
+
+Order tables so a table appears after anything it references. `users` has no
+references and comes first. `brands` references `users`. Everything else follows.
+That ordering is what makes the later split produce modules with no import
+cycles.
+
+Leave shared helpers that serve many tables where they are, near the top, and say
+in your report which ones you treated as shared and why.
+
+## What must not change
+
+- No column, type, name or default changes. Nothing is added or removed.
+- No consumer edits. Not one.
+- The set of exported names is identical afterwards.
+
+Comments move with the code they describe. Note that a comment block sitting
+above a table usually belongs to that table, not the one before it.
+
+## Acceptance, in this order
+
+1. `npm run schema:surface:check` prints "Export surface unchanged. 260 exports."
+2. Generated SQL is unchanged. Prove it:
+   - `git show HEAD:shared/schema.ts > shared/__head.ts`
+   - generate from each into separate directories with
+     `DATABASE_URL="postgresql://u:p@127.0.0.1:1/none" npx drizzle-kit generate --out=<dir> --schema=<file> --dialect=postgresql`
+   - split both outputs on `--> statement-breakpoint`, normalise whitespace, sort,
+     and diff. They must be identical. Both should hold 271 statements.
+   - delete `shared/__head.ts`
+3. `npm run check`
+4. `npm run lint` and `npm run format:check`
+5. `npm test -- --maxWorkers=1`
+
+Show the output of each. If the SQL differs, you changed the schema. Find what
+and fix it; do not explain it away.
+
+## Report
+
+Write `.audit/B4/B4-02-colocate-report.md`: the ordering rule you applied, which
+helpers you judged shared and why, the five gate outputs, `git diff --stat`, and
+a plain statement of whether any consumer file changed.
+
+## This run is non-interactive
+
+Nobody can answer you. Decide, implement, verify, report. Do not end your turn
+with a question.
