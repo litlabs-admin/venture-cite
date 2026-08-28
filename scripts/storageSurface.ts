@@ -42,6 +42,21 @@ function parse(file: string): ts.SourceFile {
   return ts.createSourceFile(file, fs.readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
 }
 
+function objectLiteralInitializer(
+  initializer: ts.Expression,
+): ts.ObjectLiteralExpression | undefined {
+  let expression = initializer;
+  while (
+    ts.isAsExpression(expression) ||
+    ts.isParenthesizedExpression(expression) ||
+    ts.isSatisfiesExpression(expression) ||
+    ts.isTypeAssertionExpression(expression)
+  ) {
+    expression = expression.expression;
+  }
+  return ts.isObjectLiteralExpression(expression) ? expression : undefined;
+}
+
 /** Collapses whitespace so formatting churn does not read as a behaviour change. */
 function normalise(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -110,8 +125,10 @@ function implementations(): {
       // export const fooStorage = { async bar() { ... } }
       if (ts.isVariableStatement(node)) {
         for (const decl of node.declarationList.declarations) {
-          if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue;
-          for (const prop of decl.initializer.properties) {
+          if (!decl.initializer) continue;
+          const initializer = objectLiteralInitializer(decl.initializer);
+          if (!initializer) continue;
+          for (const prop of initializer.properties) {
             if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
               record(prop.name.text, prop.body ? prop.body.getText(source) : "");
             }

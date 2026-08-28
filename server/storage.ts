@@ -1019,4 +1019,20 @@ export interface IStorage {
 }
 
 import { DatabaseStorage } from "./databaseStorage";
-export const storage: IStorage = new DatabaseStorage();
+import { chatbotStorage } from "./storage/chatbotStorage";
+
+function databaseStorageObject(): Omit<IStorage, keyof typeof chatbotStorage> {
+  const databaseStorage = new DatabaseStorage();
+  const prototype = Object.getPrototypeOf(databaseStorage);
+
+  for (const name of Object.getOwnPropertyNames(prototype)) {
+    if (name === "constructor") continue;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, name);
+    if (!descriptor) continue;
+    Object.defineProperty(databaseStorage, name, { ...descriptor, enumerable: true });
+  }
+
+  return databaseStorage;
+}
+
+export const storage: IStorage = { ...databaseStorageObject(), ...chatbotStorage };
