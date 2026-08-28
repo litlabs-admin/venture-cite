@@ -1,0 +1,49 @@
+Replace two tests that prove nothing.
+
+## The defect
+
+An audit found two test files that would pass unchanged if the feature they
+claim to cover were deleted.
+
+1. `tests/component/PreviewParam.test.tsx:7`
+   It defines its own local copy of `isAdmin()` and asserts against that copy.
+   It imports nothing from the application. The real admin gate lives in
+   TourOrchestrator. Deleting the real gate does not fail this test.
+
+2. `tests/unit/dashboardPreDataState.test.ts:4`
+   Same class of defect. Read it and determine exactly what it claims to test
+   and what it actually exercises.
+
+## What to do
+
+For each file, find the real implementation it was meant to cover, then write a
+test that exercises that implementation through its public interface. Import the
+real thing. Do not redefine logic in the test.
+
+If the real behaviour cannot be reached from a unit test, say so and write the
+test at the level where it can be reached, or state plainly that the test should
+be deleted rather than rewritten. Deleting a test that proves nothing is a valid
+outcome. A test suite that reports green while proving nothing is worse than no
+suite, because it buys false confidence.
+
+## Method
+
+1. Read the test. State what it claims to cover.
+2. Find the real implementation. Quote the lines.
+3. Prove the current test is worthless: comment out or break the real
+   implementation and show the test still passes. Restore it afterwards.
+4. Write the replacement. Show it failing against the broken implementation and
+   passing against the correct one.
+
+## Acceptance
+
+Both replacement tests pass, and each fails when its real implementation is
+broken. Show all four runs.
+
+Then `npm run check`, `npm run lint`, and `npm run format:check` all pass.
+
+## Record
+
+Append one row per decision to `.audit/B2B3/ledger.tsv` with columns:
+timestamp, task, decision, why, evidence, result. Use a fixed timestamp string;
+do not call a clock.

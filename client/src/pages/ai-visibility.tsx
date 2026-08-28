@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactElement } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { VISIBILITY_ENGINE_STORAGE_KEY } from "@/lib/clientStorageKeys";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -818,7 +819,7 @@ export default function AIVisibility() {
   const { toast } = useToast();
   const { selectedBrandId, brands, isLoading: brandsLoading } = useBrandSelection();
   const [selectedEngineId, setSelectedEngineId] = usePersistedState<string>(
-    "vc_visibility_engine",
+    VISIBILITY_ENGINE_STORAGE_KEY,
     aiEngines[0].id,
   );
   const [completedSteps, setCompletedSteps] = useState<Record<string, string[]>>({});

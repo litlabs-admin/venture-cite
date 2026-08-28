@@ -3,8 +3,8 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { usePersistedState } from "./use-persisted-state";
 import type { Brand } from "@shared/schema";
+import { SELECTED_BRAND_STORAGE_KEY } from "@/lib/clientStorageKeys";
 
-const PERSIST_KEY = "vc_selected_brand_id";
 const QUERY_PARAM = "brandId";
 
 /**
@@ -27,7 +27,7 @@ const QUERY_PARAM = "brandId";
 export function useBrandSelection() {
   const navigate = useNavigate();
   const search = useSearch({ strict: false });
-  const [persistedId, setPersistedId] = usePersistedState<string>(PERSIST_KEY, "");
+  const [persistedId, setPersistedId] = usePersistedState<string>(SELECTED_BRAND_STORAGE_KEY, "");
 
   const { data: brandsResponse, isLoading } = useQuery<{ success: boolean; data: Brand[] }>({
     queryKey: ["/api/brands"],

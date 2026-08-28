@@ -36,8 +36,10 @@
 export type Theme = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
-/** localStorage key. Versioned so we can migrate the storage shape later
- *  (e.g. add per-user themes) without colliding with the v1 string value. */
+/**
+ * Device preference, not user data. Keep it across logout so this browser
+ * keeps its selected appearance for the next account.
+ */
 export const THEME_STORAGE_KEY = "vc-theme-v1";
 
 /** When no signal is available anywhere, we land here. Hand-tuned to match

@@ -1,4 +1,5 @@
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { KEYWORDS_FILTER_STORAGE_KEY } from "@/lib/clientStorageKeys";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,7 +59,10 @@ export default function KeywordResearchPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { selectedBrandId, selectedBrand } = useBrandSelection();
-  const [statusFilter, setStatusFilter] = usePersistedState<string>("vc_keywords_filter", "all");
+  const [statusFilter, setStatusFilter] = usePersistedState<string>(
+    KEYWORDS_FILTER_STORAGE_KEY,
+    "all",
+  );
 
   const {
     data: keywordsData,

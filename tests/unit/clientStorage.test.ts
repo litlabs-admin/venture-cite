@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { clearAllVentureCiteStorage } from "../../client/src/lib/clientStorage";
+import { USER_SCOPED_STORAGE_KEYS } from "../../client/src/lib/clientStorageKeys";
+import { THEME_STORAGE_KEY } from "../../client/src/lib/theme";
 
 // Minimal in-memory localStorage shim for the Node test environment.
 function makeLocalStorage(): Storage {
@@ -29,6 +31,29 @@ function makeLocalStorage(): Storage {
 describe("clearAllVentureCiteStorage", () => {
   beforeEach(() => {
     vi.stubGlobal("localStorage", makeLocalStorage());
+    vi.stubGlobal("sessionStorage", makeLocalStorage());
+  });
+
+  it("removes every user-scoped key from localStorage and sessionStorage", () => {
+    for (const key of USER_SCOPED_STORAGE_KEYS) {
+      localStorage.setItem(key, "user-a");
+      sessionStorage.setItem(key, "user-a");
+    }
+
+    clearAllVentureCiteStorage();
+
+    for (const key of USER_SCOPED_STORAGE_KEYS) {
+      expect(localStorage.getItem(key)).toBeNull();
+      expect(sessionStorage.getItem(key)).toBeNull();
+    }
+  });
+
+  it("keeps the device theme preference across logout", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dark");
+
+    clearAllVentureCiteStorage();
+
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
   });
 
   it("removes all venturecite-* prefixed keys", () => {

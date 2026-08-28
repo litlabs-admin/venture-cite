@@ -1,0 +1,53 @@
+Fix the persisted storage keys that survive logout.
+
+## The defect
+
+`client/src/lib/clientStorage.ts:15` defines `VENTURECITE_PREFIX = "venturecite-"`
+and `clearAllVentureCiteStorage()` removes only keys with that prefix. It is
+called from the logout path in `client/src/hooks/use-auth.ts`.
+
+Seven keys do not match that prefix and therefore survive logout. An audit
+verified each one:
+
+- `vc_selected_brand_id`         client/src/hooks/use-brand-selection.ts:7
+- `vc_visibility_engine`         client/src/pages/ai-visibility.tsx:820
+- `vc_citations_tab`             client/src/pages/citations.tsx:356
+- `vc_keywords_filter`           client/src/pages/keyword-research.tsx:61
+- `venturecite:pending-verify-email`  client/src/pages/register.tsx:17 and
+                                       client/src/pages/verify-email.tsx:21
+                                       (colon, not hyphen; holds an email address)
+- `vc-theme-v1`                  client/src/lib/theme.ts:41
+- `internal-page-view`           client/src/pages/internal/... :248
+
+Two people share a browser. User A logs out. User B logs in and inherits A's
+selected brand, and in one case A's email address.
+
+## Judgement you must make
+
+Not every key is user data. A theme is a device preference and there is a
+reasonable argument for keeping it across logout. Decide per key, and write the
+decision down. If you keep a key, say why in a comment at its definition, and
+make the clearing rule prove it is deliberate rather than forgotten.
+
+## Method
+
+1. Write a failing test first. It must assert that after
+   `clearAllVentureCiteStorage()` no user-scoped key remains. Drive it from the
+   real key definitions rather than a hardcoded copy, so a new key added later
+   fails the test instead of slipping through.
+2. Then fix the clearing rule. Prefer one mechanism that cannot be forgotten
+   over renaming seven call sites, unless renaming is genuinely simpler.
+3. Run the test and show it passing.
+
+## Acceptance
+
+`npx vitest run tests/unit/clientStorage.test.ts` passes, and the test fails if
+you revert the fix. Show both runs.
+
+Then `npm run check`, `npm run lint`, and `npm run format:check` all pass.
+
+## Record
+
+Append one row per decision to `.audit/B2B3/ledger.tsv` with columns:
+timestamp, task, decision, why, evidence, result. Create the file with that
+header if it does not exist. Use a fixed timestamp string; do not call a clock.

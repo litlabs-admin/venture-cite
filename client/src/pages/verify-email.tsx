@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CheckCircle, Loader2, Mail } from "lucide-react";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
+import { PENDING_VERIFY_EMAIL_STORAGE_KEY } from "@/lib/clientStorageKeys";
 
 // Post-register "check your email" screen. Register.tsx drops the
 // pending email in sessionStorage and routes here; the resend button
@@ -18,7 +19,6 @@ import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel"
 // (user closed the tab, navigated here directly), we fall back to a
 // manual email input so the user can still resend.
 
-const PENDING_VERIFY_EMAIL_KEY = "venturecite:pending-verify-email";
 const RESEND_COOLDOWN_SECONDS = 60;
 const EMAIL_RE = /\S+@\S+\.\S+/;
 
@@ -30,7 +30,7 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     try {
-      const stored = sessionStorage.getItem(PENDING_VERIFY_EMAIL_KEY);
+      const stored = sessionStorage.getItem(PENDING_VERIFY_EMAIL_STORAGE_KEY);
       if (stored) setStoredEmail(stored);
     } catch {
       // sessionStorage unavailable (Safari private mode); fall through to manual input

@@ -10,12 +10,11 @@ import { setSession } from "@/lib/authStore";
 import { PASSWORD_RULES } from "@shared/passwordPolicy";
 import { BrandLogo } from "@/components/BrandLogo";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
+import { PENDING_VERIFY_EMAIL_STORAGE_KEY } from "@/lib/clientStorageKeys";
 
 // Sessionstorage key that hands the verify-email page the address the
 // user just registered with - avoids a query-string param that could
 // leak into logs/referrers.
-const PENDING_VERIFY_EMAIL_KEY = "venturecite:pending-verify-email";
-
 export default function Register() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -62,7 +61,7 @@ export default function Register() {
       // /verify-email screen until they click the link Supabase sent.
       if (data?.requiresVerification) {
         try {
-          sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, data.email ?? email);
+          sessionStorage.setItem(PENDING_VERIFY_EMAIL_STORAGE_KEY, data.email ?? email);
         } catch {
           // sessionStorage may be unavailable (Safari private mode); the
           // verify-email page falls back to a generic message in that

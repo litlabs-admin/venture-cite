@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearch, useNavigate, useRouterState } from "@tanstack/react-router";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { CITATIONS_TAB_STORAGE_KEY } from "@/lib/clientStorageKeys";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -353,7 +354,10 @@ export default function Citations() {
   const navigate = useNavigate();
   const location = useRouterState({ select: (s) => s.location.pathname });
   const search = useSearch({ strict: false });
-  const [lastUsedTab, setLastUsedTab] = usePersistedState<string>("vc_citations_tab", "prompts");
+  const [lastUsedTab, setLastUsedTab] = usePersistedState<string>(
+    CITATIONS_TAB_STORAGE_KEY,
+    "prompts",
+  );
   const ptabFromUrl = typeof search.ptab === "string" ? search.ptab : undefined;
   // Falls back to "prompts" for any tab id this page no longer renders. Both
   // sources are untyped strings that outlive a deploy: `?ptab=` can be a stale

@@ -1,0 +1,51 @@
+Stop writing unredacted AI payloads to stdout.
+
+## The defect
+
+`server/lib/aiLogger.ts:29` and `:41` print AI request and response bodies with
+`console.log`. `attachAiLogger` is wired into 13 or more files, including
+citation checking, the hallucination detector, the fact agent and the LLM job
+outbox.
+
+Those payloads contain brand data, user prompts and model output. The Pino
+logger in `server/lib/logger.ts` redacts sensitive keys through `SENSITIVE_KEYS`
+and its `redact.paths` configuration. This path bypasses all of it.
+
+`AGENTS.md` states the rule: use `logger` for server logs, do not use
+`console.log`.
+
+## What to do
+
+Route AI logging through the Pino logger so it inherits redaction. Keep the
+debugging value: someone added this deliberately and relies on it. Losing the
+ability to see what a model was asked is a real cost, so preserve it in a form
+that does not print secrets.
+
+Decide and justify: what should be redacted, what should be truncated, what can
+be logged in full, and whether this should be off by default behind an
+environment flag.
+
+## Method
+
+1. Read `server/lib/aiLogger.ts` in full, and `server/lib/logger.ts` to learn
+   what redaction already exists.
+2. Find every `attachAiLogger` call site. The change must not break them.
+3. Write a failing test first: assert that a payload containing a secret-shaped
+   value does not appear in the logged output.
+4. Make the change.
+5. Update the allow-list entry in `scripts/hooks/checkServerLogging.mjs`. That
+   hook currently exempts `server/lib/aiLogger.ts`; once the console calls are
+   gone, remove the exemption so a future regression is caught.
+
+## Acceptance
+
+The new test passes and fails when the redaction is removed. Show both runs.
+`rg -n 'console\.(log|debug|info)' server/lib/aiLogger.ts` returns nothing.
+
+Then `npm run check`, `npm run lint`, and `npm run format:check` all pass.
+
+## Record
+
+Append one row per decision to `.audit/B2B3/ledger.tsv` with columns:
+timestamp, task, decision, why, evidence, result. Use a fixed timestamp string;
+do not call a clock.

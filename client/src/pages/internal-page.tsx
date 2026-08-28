@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { INTERNAL_PAGE_VIEW_STORAGE_KEY } from "@/lib/clientStorageKeys";
 import { FileText, LayoutDashboard, Megaphone, Search, SquareCode, UserRound } from "lucide-react";
 import { Board } from "./internal/Board";
 import { Dashboard } from "./internal/Dashboard";
@@ -245,19 +246,17 @@ const SEEDS: Record<BoardId, Ticket[]> = {
   ben: SEED_BEN,
 };
 
-const VIEW_KEY = "internal-page-view";
-
 export default function InternalPage() {
   // Remembering the tab means a refresh does not throw you back to Dashboard
   // mid-edit. Guarded because a stored value can outlive a renamed tab.
   const [view, setView] = useState<ViewId>(() => {
     if (typeof window === "undefined") return "dashboard";
-    const saved = window.localStorage.getItem(VIEW_KEY);
+    const saved = window.localStorage.getItem(INTERNAL_PAGE_VIEW_STORAGE_KEY);
     return NAV.some((n) => n.id === saved) ? (saved as ViewId) : "dashboard";
   });
 
   useEffect(() => {
-    window.localStorage.setItem(VIEW_KEY, view);
+    window.localStorage.setItem(INTERNAL_PAGE_VIEW_STORAGE_KEY, view);
   }, [view]);
 
   const active = useMemo(() => NAV.find((n) => n.id === view) ?? NAV[0], [view]);

@@ -38,3 +38,4 @@ src/routeTree.gen.ts
 # B1p audit output. These are evidence written by audit agents, not authored
 # source. Reformatting them edits the record.
 .audit/B1p/
+.audit/B2B3/
