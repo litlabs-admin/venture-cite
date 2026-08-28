@@ -1,21 +1,22 @@
-Extract the competitors storage domain into .
+Extract the competitors storage domain into `server/storage/competitorsStorage.ts`.
 
-Module 3 of 11. Read  first; it records the design and
-why it is shaped this way.
+Module 3 of 11. Read `.audit/B5/PARTITION.md` first. It records the
+design and why it is shaped this way.
 
 ## The pattern
 
- already uses the target shape. Follow it:
+`server/storage/workflowStorage.ts` already uses the target shape. Follow it:
 
     export const competitorsStorage = {
       async someMethod(...) { ... },
     } satisfies Partial<IStorage> & ThisType<IStorage>;
 
- is stateless, so its methods move verbatim into a plain object.
+`DatabaseStorage` is stateless with no instance fields, so its methods move
+verbatim into a plain object.
 
 ## What moves
 
-These 16 methods, from  unless noted:
+These 16 methods, from `server/databaseStorage.ts`:
 
   addCompetitorNameVariation
   createCompetitor
@@ -35,56 +36,64 @@ These 16 methods, from  unless noted:
   updateCompetitor
 
 Move each body VERBATIM. Do not reformat, rename, simplify, or fix anything you
-notice on the way. A gate compares every method body before and after with
-whitespace collapsed, and it will fail on any edit. If you find a real defect,
+notice along the way. A gate compares every method body before and after with
+whitespace collapsed, and it fails on any edit. If you find a real defect,
 write it in your report and leave the code alone.
 
-## Cross-domain calls stay as 
-Some methods call others that live in different domains. Do NOT import the other
-domain module to resolve that. Object spread preserves  binding to the
-composed  object, so  resolves at runtime without
-an import, and  gives TypeScript the same view. Importing
-across domains would build a dependency tangle the composition exists to avoid.
+## Cross-domain calls stay as `this.`
 
-Where a method used  inside the class, it keeps using . You
-may need  as a first parameter for TypeScript to accept it.
+Some methods call others that live in a different domain. Do NOT import the
+other domain module to resolve that. Object spread preserves `this` binding to
+the composed `storage` object, so `this.getBrandById()` resolves at runtime
+without an import, and `ThisType<IStorage>` gives TypeScript the same view.
+Importing across domains builds the dependency tangle this composition exists
+to avoid.
+
+Where a method used `this.x()` inside the class, it keeps using `this.x()`. You
+may need `this: IStorage` as a first parameter for TypeScript to accept it.
 
 ## Wiring
 
- composes the result:
+`server/storage.ts` composes the result. While `DatabaseStorage` still holds the
+remaining methods, spread the class instance as well so the composition stays
+complete:
 
-    export const storage: IStorage = { ...competitorsStorage, ...(whatever else exists) };
+    export const storage: IStorage = { ...new DatabaseStorage(), ...competitorsStorage };
 
-While  still holds the remaining methods, spread the class
-instance too, so the composition stays complete. TypeScript enforces this: an
-incomplete spread produces TS2741 naming the missing method.
+Order matters: the extracted module must win, so it comes last. TypeScript
+enforces completeness. An incomplete spread produces TS2741 naming the missing
+method.
 
 ## What must not change
 
- keeps all 307 declarations. No consumer file changes; 60 files import
+`IStorage` keeps all 307 declarations. No consumer file changes; 60 files import
 this layer. No method body changes. No method is implemented twice.
+
+Delete the moved methods from `DatabaseStorage`. Leaving them in place makes the
+method implemented twice, which the gate rejects.
 
 ## Acceptance
 
     npx tsx scripts/storageSurface.ts --check .audit/B5/storage-surface-before.json
     npm run check
-    npm run lint && npm run format:check
+    npm run lint
+    npm run format:check
     npm test -- --maxWorkers=1
 
-The first must report the surface intact with no duplicates and no body changed.
-If it reports a changed body, you edited something during a move. Restore it.
+The first must report the surface intact, with no duplicates and no body
+changed. If it reports a changed body, you edited something during a move.
+Restore it.
 
 ## Clean up after yourself, but only after yourself
 
 Delete temporary files you create. Do not delete anything you did not create.
-Files under  are inputs.
+Files under `.audit/B5/prompts/` are inputs, not temporary work.
 
 ## Report
 
-Write : how many methods moved, any that used
- across a domain and how you handled them, the gate output, and whether
-any consumer file changed. Note any defect you spotted and deliberately left
-alone.
+Write `.audit/B5/B5-03-competitors-report.md`: how many methods moved, any that call across
+a domain via `this.` and how you handled them, the gate output, and whether any
+consumer file changed. Note any defect you spotted and deliberately left alone.
 
 ## This run is non-interactive
 
