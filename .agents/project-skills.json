@@ -1,0 +1,46 @@
+{
+  "$comment": [
+    "Curated project skill set. `scripts/setupProjectSkills.mjs` reads this file and",
+    "generates `.claude/skills/`, which git ignores because this machine runs with",
+    "core.symlinks=false.",
+    "",
+    "Skills the superpowers plugin already provides are deliberately absent. The plugin",
+    "exposes them under a `superpowers:` prefix, so listing them here only creates a",
+    "duplicate entry and blunts skill selection.",
+    "",
+    "Run `npm run skills:setup` after cloning. Run `npm run skills:check` in CI."
+  ],
+  "source": ".agents/skills",
+  "target": ".claude/skills",
+  "skills": {
+    "verification": [
+      "principle-prove-it-works",
+      "create-verification-skill",
+      "maintain-verification-skill",
+      "blast-radius"
+    ],
+    "writing": ["unslop", "technical-writing"],
+    "planning": ["wayfinder", "show-me-your-work", "principle-guard-the-context-window"],
+    "design": [
+      "architect",
+      "codebase-design",
+      "how",
+      "improve-codebase-architecture",
+      "principle-minimize-reader-load"
+    ],
+    "migration": [
+      "principle-sequence-verifiable-units",
+      "principle-outcome-oriented-execution",
+      "principle-make-operations-idempotent",
+      "principle-separate-before-serializing-shared-state"
+    ],
+    "simplification": [
+      "principle-subtract-before-you-add",
+      "principle-laziness-protocol",
+      "principle-encode-lessons-in-structure"
+    ],
+    "types": ["principle-type-system-discipline", "typescript-best-practices"],
+    "debugging": ["diagnosing-bugs", "principle-fix-root-causes"],
+    "domain": ["supabase", "supabase-postgres-best-practices"]
+  }
+}

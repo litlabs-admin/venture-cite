@@ -1,0 +1,30 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 5000,
+      "autoPort": true
+    },
+    {
+      "name": "dev-readonly",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "cross-env",
+        "ALLOW_REMOTE_DEVELOPMENT_SERVICES=true",
+        "DISABLE_STRIPE_SETUP=true",
+        "DISABLE_STARTUP_AUTOPILOT=true",
+        "NODE_ENV=development",
+        "tsx",
+        "server/index.ts"
+      ],
+      "port": 5000,
+      "autoPort": true
+    }
+  ]
+}
