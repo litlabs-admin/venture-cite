@@ -1,0 +1,56 @@
+Extract the chatbot domain into `shared/schema/chatbot.ts`.
+
+Six modules already exist: identity, brands, content, prompts, competitors,
+perception. Follow their pattern exactly. Move tables with the zod builders and
+type aliases beneath them, re-export from the barrel with `export *`, keep
+imports one directional.
+
+## What moves
+
+The `chatbotThreads`, `chatbotMessages` and `chatbotTokenUsage` tables, wherever they now sit in `shared/schema.ts`. Locate them; line numbers have shifted as earlier modules were extracted.
+
+Confirm the boundary yourself. A comment block above a table belongs to that
+table, not the one before it.
+
+Tables: `chatbotThreads`, `chatbotMessages`, `chatbotTokenUsage`
+
+## References
+
+`chatbotThreads` references `brands` and `users`. `chatbotMessages` references `brands`, `users` and `chatbotThreads`. `chatbotTokenUsage` references `users`. So the module imports `brands` from `./brands` and `users` from `./identity`.
+
+## Membership completeness
+
+The identity extraction left `insertUserSchema` behind and every gate still
+passed, because a declaration in the wrong file exports, compiles and
+type-checks. After moving, search `shared/schema.ts` for each table name and
+confirm the only remaining references are foreign keys from other tables.
+
+## Clean up after yourself, but only after yourself
+
+Delete every temporary file and directory you create. Do not delete anything you
+did not create. Files under `.audit/B4/prompts/` are inputs, not temporary work.
+
+## What must not change
+
+No column, type, name or default changes. No new migration. No consumer edits.
+
+## Acceptance
+
+Run `node scripts/verifySchemaSplit.mjs`. All six gates must pass. It checks the
+export surface against the pre-split baseline, compares generated SQL from HEAD
+against the working tree by sorted statement set, then runs typecheck, lint,
+format and the test suite.
+
+If the SQL gate fails you changed the schema. Find what and fix it. Do not
+explain it away.
+
+## Report
+
+Write `.audit/B4/B4-09-chatbot-report.md`: the boundary you confirmed, the membership check
+result, the import direction, the gate output, and whether any consumer file
+changed.
+
+## This run is non-interactive
+
+Nobody can answer you. Decide, implement, verify, report. Do not end your turn
+with a question.
