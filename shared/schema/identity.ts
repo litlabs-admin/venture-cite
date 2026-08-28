@@ -66,6 +66,46 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+
+export const betaInviteCodes = pgTable("beta_invite_codes", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  maxUses: integer("max_uses").default(1).notNull(),
+  usedCount: integer("used_count").default(0).notNull(),
+  accessTier: text("access_tier").default("beta").notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type BetaInviteCode = typeof betaInviteCodes.$inferSelect;
+export type InsertBetaInviteCode = typeof betaInviteCodes.$inferInsert;
+
+export const waitlist = pgTable("waitlist", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  source: text("source").default("landing"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertWaitlistSchema = createInsertSchema(waitlist).omit({
+  id: true,
+  createdAt: true,
+});
+export type Waitlist = typeof waitlist.$inferSelect;
+export type InsertWaitlist = z.infer<typeof insertWaitlistSchema>;
+
 /**
  * Per-tier caps. `-1` means unlimited; `0` means the feature is not part of
  * that plan at all (a hard no, not an exhausted allowance).
@@ -185,39 +225,3 @@ export function resolveTier(user: { accessTier?: string | null }): keyof typeof 
 
 /** Length of the free trial granted at signup. */
 export const TRIAL_DAYS = 14;
-
-export type UpsertUser = typeof users.$inferInsert;
-
-export const betaInviteCodes = pgTable("beta_invite_codes", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  code: text("code").notNull().unique(),
-  maxUses: integer("max_uses").default(1).notNull(),
-  usedCount: integer("used_count").default(0).notNull(),
-  accessTier: text("access_tier").default("beta").notNull(),
-  expiresAt: timestamp("expires_at"),
-  createdBy: text("created_by"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export type User = typeof users.$inferSelect;
-export type InsertUser = typeof users.$inferInsert;
-export type BetaInviteCode = typeof betaInviteCodes.$inferSelect;
-export type InsertBetaInviteCode = typeof betaInviteCodes.$inferInsert;
-
-export const waitlist = pgTable("waitlist", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  email: text("email").notNull().unique(),
-  source: text("source").default("landing"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const insertWaitlistSchema = createInsertSchema(waitlist).omit({
-  id: true,
-  createdAt: true,
-});
-export type Waitlist = typeof waitlist.$inferSelect;
-export type InsertWaitlist = z.infer<typeof insertWaitlistSchema>;

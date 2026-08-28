@@ -1,0 +1,65 @@
+Extract the brands domain, and finish the identity module that preceded it.
+
+## Part 1: finish identity
+
+The previous commit moved `users`, `betaInviteCodes` and `waitlist` into
+`shared/schema/identity.ts` but left `insertUserSchema` behind in
+`shared/schema.ts` at line 26, where it imports `users` back from the module it
+should live in. Move it into `identity.ts`, beside `users`.
+
+`identity.ts` is also not internally ordered: `betaInviteCodes` sits between
+`UpsertUser` and `User`. Apply the same rule used on `schema.ts` in the previous
+commit. Every table carries its zod builder and its type aliases directly
+beneath it, and a table follows anything it references.
+
+Check for any other companion left behind. `users`, `betaInviteCodes` and
+`waitlist` should have nothing of theirs remaining in `shared/schema.ts`.
+
+## Part 2: extract brands
+
+Lines 32 to 102 of `shared/schema.ts` are a contiguous block: the `brands`
+table, `insertBrandSchema`, `InsertBrand`, `Brand`. Confirm the boundary
+yourself before cutting. Move them to `shared/schema/brands.ts`.
+
+`brands` references `users`, so `brands.ts` imports from `identity.ts`. That is
+the first cross-module reference in this split and it must stay one directional:
+`identity` knows nothing about `brands`.
+
+44 of the 81 foreign keys in this schema point at `brands`, and those tables are
+still in `shared/schema.ts`. The barrel therefore needs `brands` available as a
+value to them, the same way it currently imports `users` from `identity`.
+
+Follow the barrel pattern already in `shared/schema.ts`: `export *`, not a named
+re-export. 25 files use `import * as schema`.
+
+## What must not change
+
+No column, type, name or default changes. No new migration. No consumer edits.
+147 files import this schema and none of them may need touching.
+
+## Acceptance, in this order
+
+1. `npm run schema:surface:check` prints "Export surface unchanged. 260 exports."
+2. Generated SQL unchanged. Generate from `git show HEAD:shared/schema.ts` and
+   from the working tree into separate directories with
+   `DATABASE_URL="postgresql://u:p@127.0.0.1:1/none" npx drizzle-kit generate --out=<dir> --schema=<file> --dialect=postgresql`,
+   split both on `--> statement-breakpoint`, normalise whitespace, sort, diff.
+   Identical, 271 statements each. Delete any temporary file you created.
+3. `npm run check`
+4. `npm run lint` and `npm run format:check`
+5. `npm test -- --maxWorkers=1`
+
+If the SQL differs you changed the schema. Find what and fix it. Do not explain
+it away.
+
+## Report
+
+Write `.audit/B4/B4-03-brands-report.md`: what you found left behind from
+identity, the boundary you confirmed for brands, the import direction between
+the two modules, the five gate outputs, `git diff --stat`, and a plain statement
+of whether any consumer file changed.
+
+## This run is non-interactive
+
+Nobody can answer you. Decide, implement, verify, report. Do not end your turn
+with a question.
