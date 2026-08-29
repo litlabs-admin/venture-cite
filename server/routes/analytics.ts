@@ -805,10 +805,14 @@ Consider:
           ? await storage.getGeoRankingsByBrandPromptIds(brandPrompts.map((p) => p.id))
           : [];
         const articles = (await storage.getArticles()).filter((a) => a.brandId === brand.id);
-        const articleRankings = articles.length
-          ? (await storage.getGeoRankings()).filter(
-              (r) => r.articleId && articles.some((a) => a.id === r.articleId),
-            )
+        // Use the indexed (articleId) read instead of scanning every
+        // geo_ranking row in the table and post-filtering in memory - see
+        // the equivalent fix on /api/geo-analytics/:brandId above. No
+        // `since` bound is applied here (unlike that route): this endpoint
+        // reports against the brand's entire history, not a run window.
+        const articleIds = articles.map((a) => a.id);
+        const articleRankings = articleIds.length
+          ? await storage.getGeoRankingsByArticleIds(articleIds)
           : [];
         const cited = [...rankings, ...articleRankings].filter((r) => r.isCited === 1);
         const totalCited = cited.length;
