@@ -9,6 +9,12 @@
             "command": "node scripts/hooks/guardGitWrite.mjs",
             "timeout": 10,
             "statusMessage": "Checking git write guard"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/hooks/guardRipgrepReplace.mjs",
+            "timeout": 10,
+            "statusMessage": "Checking ripgrep --replace guard"
           }
         ]
       }

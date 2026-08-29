@@ -33,6 +33,29 @@ const MAX_BRANDS_PER_TICK = 3;
 // ~7s so the cron step doesn't overrun the function timeout.
 const DEFAULT_REFRESH_BUDGET_MS = cronStepBudget(0.8);
 
+// A brand whose site is permanently unreachable never produces a 'completed'
+// run - every attempt terminates 'failed' - so the staleness query below
+// ("no completed run, or the last one is stale") stayed true for it forever.
+// Nothing counted attempts, so it was re-selected and given a full six-source
+// re-scrape on every single tick, without end. Mirrors the shape of
+// AUTOPILOT_MAX_ATTEMPTS / AUTOPILOT_RETRY_BACKOFF_MINUTES in
+// onboardingAutopilot.ts: a small cap on consecutive terminal failures, plus a
+// backoff between attempts below that cap. See .audit/B6/B6a-07 for the trace.
+//
+// Deliberately small - same reasoning as the autopilot cap: this exists to
+// survive a transient failure (a 5xx, a flaky DNS lookup), not to grind on a
+// brand that is durably broken (dead domain, robots blocking everything).
+export const FACT_SCRAPE_MAX_CONSECUTIVE_FAILURES = 3;
+// Wait between retries of a brand below the cap. Long enough that a
+// transient outage has a real chance to clear before another full six-source
+// scrape is spent checking again.
+export const FACT_SCRAPE_RETRY_BACKOFF_HOURS = 24;
+// Headroom for the retry gate below to filter candidates out and still leave
+// enough real candidates to fill MAX_BRANDS_PER_TICK. The brand table this
+// query runs against is small (tens of rows), so this is effectively "fetch
+// everything currently stale," not a meaningful production tuning knob.
+const MAX_CANDIDATE_ROWS = 200;
+
 interface StaleBrand {
   id: string;
   name: string;
@@ -47,14 +70,78 @@ interface StaleBrand {
   tone: string | null;
 }
 
-async function findStaleBrands(limit: number): Promise<StaleBrand[]> {
+interface RecentRunRow {
+  status: string;
+  hours_since_started: number | string;
+}
+
+interface StaleBrandRow extends StaleBrand {
+  recent_runs: RecentRunRow[] | null;
+}
+
+export interface RecentRunSummary {
+  status: string;
+  hoursSinceStarted: number;
+}
+
+/**
+ * Decides whether a brand may be given another scrape attempt this tick.
+ *
+ * `recentRuns` must be ordered most-recent-first and hold at most
+ * FACT_SCRAPE_MAX_CONSECUTIVE_FAILURES entries (the query below enforces
+ * this). A single non-'failed' run - most commonly 'completed' - anywhere at
+ * the front of the list breaks the streak, so a brand that succeeds resets
+ * to fully eligible: one bad week does not permanently disable it.
+ */
+export function isRetryEligible(recentRuns: RecentRunSummary[]): {
+  eligible: boolean;
+  reason?: "cap" | "backoff";
+} {
+  let consecutiveFailures = 0;
+  for (const run of recentRuns) {
+    if (run.status !== "failed") break;
+    consecutiveFailures += 1;
+  }
+  if (consecutiveFailures >= FACT_SCRAPE_MAX_CONSECUTIVE_FAILURES) {
+    return { eligible: false, reason: "cap" };
+  }
+  if (
+    consecutiveFailures > 0 &&
+    recentRuns[0].hoursSinceStarted < FACT_SCRAPE_RETRY_BACKOFF_HOURS
+  ) {
+    return { eligible: false, reason: "backoff" };
+  }
+  return { eligible: true };
+}
+
+export async function findStaleBrands(limit: number): Promise<StaleBrand[]> {
   const result = await db.execute(sql`
     SELECT b.id, b.name, b.website, b.industry, b.description,
            b.products AS products_raw,
            b.target_audience,
            b.unique_selling_points AS unique_selling_points_raw,
            b.key_values AS key_values_raw,
-           b.brand_voice, b.tone
+           b.brand_voice, b.tone,
+           COALESCE(
+             (
+               SELECT json_agg(
+                        json_build_object(
+                          'status', t.status,
+                          'hours_since_started', t.hours_since_started
+                        )
+                        ORDER BY t.started_at DESC
+                      )
+               FROM (
+                 SELECT r4.status, r4.started_at,
+                        EXTRACT(EPOCH FROM (now() - r4.started_at)) / 3600.0 AS hours_since_started
+                 FROM brand_fact_scrape_runs r4
+                 WHERE r4.brand_id = b.id
+                 ORDER BY r4.started_at DESC
+                 LIMIT ${FACT_SCRAPE_MAX_CONSECUTIVE_FAILURES}
+               ) t
+             ),
+             '[]'::json
+           ) AS recent_runs
     FROM brands b
     WHERE b.deleted_at IS NULL
       AND b.fact_scrape_enabled = true
@@ -76,9 +163,35 @@ async function findStaleBrands(limit: number): Promise<StaleBrand[]> {
         ) < now() - (${REFRESH_INTERVAL_DAYS} || ' days')::interval
       )
     ORDER BY b.created_at ASC
-    LIMIT ${limit}
+    LIMIT ${MAX_CANDIDATE_ROWS}
   `);
-  return (result as unknown as { rows: StaleBrand[] }).rows;
+  const rows = (result as unknown as { rows: StaleBrandRow[] }).rows;
+
+  const excludedByCap: string[] = [];
+  const eligible: StaleBrand[] = [];
+  for (const row of rows) {
+    const recentRuns: RecentRunSummary[] = (row.recent_runs ?? []).map((r) => ({
+      status: r.status,
+      hoursSinceStarted: Number(r.hours_since_started),
+    }));
+    const gate = isRetryEligible(recentRuns);
+    if (!gate.eligible) {
+      if (gate.reason === "cap") excludedByCap.push(row.id);
+      continue;
+    }
+    const { recent_runs: _recentRuns, ...brand } = row;
+    eligible.push(brand);
+    if (eligible.length >= limit) break;
+  }
+
+  if (excludedByCap.length > 0) {
+    logger.warn(
+      { brandIds: excludedByCap, maxConsecutiveFailures: FACT_SCRAPE_MAX_CONSECUTIVE_FAILURES },
+      "fact-sheet-refresh: brand excluded from cron refresh - too many consecutive scrape failures",
+    );
+  }
+
+  return eligible;
 }
 
 function coerceArray(v: unknown): string[] {

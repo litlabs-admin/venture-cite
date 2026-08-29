@@ -29,6 +29,22 @@ export const AUTOPILOT_MAX_ATTEMPTS = 5;
  *  the retry budget against the same wall. */
 export const AUTOPILOT_RETRY_BACKOFF_MINUTES = 60;
 
+/** How long a brand may sit in an in-flight state before the resume sweep
+ *  treats it as stalled rather than progressing.
+ *
+ *  In-flight states used to resume UNCONDITIONALLY, on the reasoning that they
+ *  are mid-pipeline and the work need not be repeated. That premise is false:
+ *  every resume of 'running_citations' re-runs a full citation sweep, six
+ *  engines per prompt. A brand that never leaves the state therefore repeats
+ *  that work without end. One did - 114 runs in 34 hours - with
+ *  autopilot_attempts still reading 0 because the attempt cap only ever applied
+ *  to 'idle' and 'failed'.
+ *
+ *  A real activation finishes in minutes, so six hours means stuck, not slow.
+ *  Past it the brand is demoted to 'failed', which is both visible and subject
+ *  to the bounded retry path below, instead of being retried without limit. */
+export const AUTOPILOT_STALL_HOURS = 6;
+
 async function setAutopilot(brandId: string, patch: Partial<Brand>): Promise<void> {
   try {
     await storage.updateBrand(brandId, patch as any);
@@ -286,6 +302,17 @@ async function runOnboardingAutopilotUnlocked(
     // 'running', and an insert error as the autopilot_error. The bug was
     // invisible while nothing resumed frequently; making activation actually
     // run in the background is what surfaced it.
+    // Finishing the in-flight run must NOT fall through to runBrandPrompts.
+    //
+    // It used to: `if (!slice?.done) return` returned only on an UNFINISHED
+    // slice, so a run that completed dropped straight into runBrandPrompts,
+    // which always inserts a new run. That new run rarely fit the remaining
+    // deadline, so `done` came back false, the brand stayed in
+    // 'running_citations', and the next tick did it all again. One brand
+    // logged 114 full 60-check runs in 34 hours - roughly one every 18
+    // minutes - before anyone noticed, because every individual run looked
+    // healthy and 'succeeded'. Completing the citation work has to advance
+    // to step 3, not restart step 2.
     const activeRuns = await storage.getActiveCitationRuns(brandId);
     if (activeRuns.length > 0) {
       const { advanceCitationRun } = await import("../citationChecker");
@@ -298,36 +325,39 @@ async function runOnboardingAutopilotUnlocked(
       // Not finished within this slice - stay in 'running_citations' and let
       // the next tick continue. Nothing to fail here.
       if (!slice?.done) return;
-    }
+      // Finished: fall past step 2 entirely, do NOT start another run.
+    } else {
+      const citationResult = await runBrandPrompts(brandId, undefined, {
+        triggeredBy: "auto_onboarding",
+        deadlineMs: options.deadlineMs,
+        // Resume mode is safe to set unconditionally - for a fresh
+        // citation run there are no existing rankings to skip.
+        resume: true,
+        onProgress: async (checked, total) => {
+          try {
+            await db.execute(sql`
+              UPDATE brands
+              SET autopilot_progress = COALESCE(autopilot_progress, '{}'::jsonb) || ${JSON.stringify(
+                {
+                  citationsRun: checked,
+                  citationsTotal: total,
+                },
+              )}::jsonb
+              WHERE id = ${brandId}
+            `);
+          } catch (err) {
+            logger.warn({ err, brandId }, "onboardingAutopilot: progress write failed");
+          }
+        },
+      });
 
-    const citationResult = await runBrandPrompts(brandId, undefined, {
-      triggeredBy: "auto_onboarding",
-      deadlineMs: options.deadlineMs,
-      // Resume mode is safe to set unconditionally - for a fresh
-      // citation run there are no existing rankings to skip.
-      resume: true,
-      onProgress: async (checked, total) => {
-        try {
-          await db.execute(sql`
-            UPDATE brands
-            SET autopilot_progress = COALESCE(autopilot_progress, '{}'::jsonb) || ${JSON.stringify({
-              citationsRun: checked,
-              citationsTotal: total,
-            })}::jsonb
-            WHERE id = ${brandId}
-          `);
-        } catch (err) {
-          logger.warn({ err, brandId }, "onboardingAutopilot: progress write failed");
-        }
-      },
-    });
-
-    if (!citationResult.done) {
-      logger.info(
-        { brandId, userId },
-        "onboardingAutopilot: citation slice incomplete - will resume next cron tick",
-      );
-      return;
+      if (!citationResult.done) {
+        logger.info(
+          { brandId, userId },
+          "onboardingAutopilot: citation slice incomplete - will resume next cron tick",
+        );
+        return;
+      }
     }
 
     // Step 3: everything the citation run does not populate - site health,
@@ -387,8 +417,32 @@ async function runOnboardingAutopilotUnlocked(
 // next cron tick picks up whichever autopilots didn't finish today.
 export async function resumeInFlightAutopilots(deadlineMs?: number): Promise<void> {
   try {
-    // In-flight states resume unconditionally: they are mid-pipeline and the
-    // work is already paid for.
+    // Demote stalled in-flight brands BEFORE the scan, so a brand that cannot
+    // finish stops being retried without limit and becomes visible instead.
+    // The scan below then picks it up on the bounded 'failed' path, with the
+    // attempt cap and the backoff, rather than the unbounded in-flight path.
+    const stalled = await db.execute<{ id: string }>(sql`
+      UPDATE brands
+      SET autopilot_status = 'failed',
+          autopilot_error = ${`Autopilot stalled in-flight for over ${AUTOPILOT_STALL_HOURS}h; demoted by the resume sweep so it stops repeating completed work.`}
+      WHERE deleted_at IS NULL
+        AND autopilot_status IN ('pending', 'scraping_facts', 'generating_prompts', 'running_citations')
+        AND autopilot_started_at IS NOT NULL
+        AND autopilot_started_at < now() - ${sql.raw(`interval '${AUTOPILOT_STALL_HOURS} hours'`)}
+      RETURNING id
+    `);
+    const stalledRows = (stalled as { rows?: Array<{ id: string }> }).rows ?? [];
+    if (stalledRows.length > 0) {
+      logger.warn(
+        { count: stalledRows.length, brandIds: stalledRows.map((r) => r.id) },
+        "onboardingAutopilot: demoted stalled in-flight brands - each resume re-runs a full citation sweep",
+      );
+    }
+
+    // In-flight states resume without an attempt cap: they are mid-pipeline,
+    // and counting slices as retries would exhaust the budget of a brand that
+    // is progressing normally (see markAutopilotAttempt). The stall demotion
+    // above is what bounds them instead.
     //
     // 'idle' and 'failed' are ALSO swept now, but bounded. They were excluded
     // before, which is why a brand whose kickoff never landed, or which hit a
