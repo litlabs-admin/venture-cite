@@ -1029,6 +1029,7 @@ import { jobsStorage } from "./storage/jobsStorage";
 import { platformStorage } from "./storage/platformStorage";
 import { promptsStorage } from "./storage/promptsStorage";
 import { signalsStorage } from "./storage/signalsStorage";
+import { contentStorage } from "./storage/contentStorage";
 
 function databaseStorageObject(): Omit<
   IStorage,
@@ -1042,6 +1043,7 @@ function databaseStorageObject(): Omit<
   | keyof typeof platformStorage
   | keyof typeof promptsStorage
   | keyof typeof signalsStorage
+  | keyof typeof contentStorage
 > {
   const databaseStorage = new DatabaseStorage();
   const prototype = Object.getPrototypeOf(databaseStorage);
@@ -1068,4 +1070,5 @@ export const storage: IStorage = {
   ...citationsStorage,
   ...promptsStorage,
   ...signalsStorage,
+  ...contentStorage,
 };
