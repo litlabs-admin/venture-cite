@@ -182,6 +182,13 @@ export type InsertEmailFailure = typeof emailFailures.$inferInsert;
 // API cost tracking
 // Records every outbound LLM call so we can enforce per-user, per-tier
 // daily/monthly token budgets. Migration in 0019_api_costs.sql.
+//
+// est_cost_cents is numeric, not integer (0122_api_costs_cost_precision.sql).
+// A single call can cost a fraction of a cent; rounding that to the nearest
+// whole cent before storage made every cheap, high-frequency call record
+// exactly 0. The unit is still cents - a numeric row of 0.45 means
+// 0.45 cents, not 0.45 dollars. Existing integer rows are unchanged in
+// meaning (5 reads back as 5).
 export const apiCosts = pgTable(
   "api_costs",
   {
@@ -193,7 +200,9 @@ export const apiCosts = pgTable(
     model: text("model"),
     tokensIn: integer("tokens_in").default(0).notNull(),
     tokensOut: integer("tokens_out").default(0).notNull(),
-    estCostCents: integer("est_cost_cents").default(0).notNull(),
+    estCostCents: numeric("est_cost_cents", { precision: 12, scale: 6, mode: "number" })
+      .default(0)
+      .notNull(),
     idempotencyKey: text("idempotency_key"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },

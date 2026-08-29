@@ -105,8 +105,23 @@ export function isBudgetExceededError(err: unknown): err is BudgetExceededError 
   return err instanceof BudgetExceededError;
 }
 
+// Precision kept in the returned value. Matches the `numeric(12,6)`
+// column est_cost_cents is stored in - rounding here to more places than
+// the column keeps would just let Postgres re-round on insert.
+const CENTS_PRECISION = 6;
+const CENTS_PRECISION_FACTOR = 10 ** CENTS_PRECISION;
+
 // Estimate cents for a given token count + model. Falls back to a
 // generic price when the model isn't in the table.
+//
+// Returns a fractional number of cents rather than rounding to a whole
+// cent. A single call routinely costs less than one cent - one Gemini
+// Flash-Lite call at ~28 input / 935 output tokens prices to roughly
+// 0.14 cents - and rounding that to the nearest integer before storage
+// made every such call record as exactly 0. `api_costs.est_cost_cents`
+// is a `numeric` column (0122_api_costs_cost_precision.sql) so the
+// fraction survives into storage; callers that need a display value can
+// round at render time, not here.
 export function estimateCostCents(
   model: string | undefined | null,
   tokensIn: number,
@@ -118,5 +133,6 @@ export function estimateCostCents(
     Object.entries(PRICING_PER_1K_TOKENS_CENTS).find(([k]) => key.startsWith(k))?.[1] ??
     FALLBACK_PRICING;
   const cents = (tokensIn / 1000) * price.in + (tokensOut / 1000) * price.out;
-  return Math.max(0, Math.round(cents));
+  const rounded = Math.round(cents * CENTS_PRECISION_FACTOR) / CENTS_PRECISION_FACTOR;
+  return Math.max(0, rounded);
 }
