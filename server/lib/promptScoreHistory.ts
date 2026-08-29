@@ -8,6 +8,8 @@
 //
 // Kept out of the route so it can be tested without a database.
 
+import { citationRatePct } from "@shared/visibilityMetrics";
+
 export type ScoreRankingRow = {
   brandPromptId: string | null;
   runId: string | null;
@@ -120,7 +122,7 @@ export function buildPromptScoreHistory(
     const kept = buckets.slice(-maxPoints);
     const series = kept.map((b) => ({
       at: new Date(b.at).toISOString(),
-      score: b.checks > 0 ? Math.round((b.cited / b.checks) * 100) : 0,
+      score: citationRatePct(b.cited, b.checks),
       cited: b.cited,
       checks: b.checks,
       rank: meanRank(b),

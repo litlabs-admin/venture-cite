@@ -16,6 +16,7 @@ import {
   type InsertCitationRun,
 } from "@shared/schema";
 import type { IStorage } from "../storage";
+import { citationRatePct } from "@shared/visibilityMetrics";
 
 export const citationsStorage = {
   async getCitations(opts?: { limit?: number; offset?: number }): Promise<Citation[]> {
@@ -321,7 +322,7 @@ export const citationsStorage = {
 
     const totalChecks = runRows.length;
     const totalCited = runRows.filter((x) => x.isCited === 1).length;
-    const citationRate = totalChecks > 0 ? Math.round((totalCited / totalChecks) * 100) : 0;
+    const citationRate = citationRatePct(totalCited, totalChecks);
 
     const platformMap = new Map<string, { cited: number; checks: number }>();
     for (const x of runRows) {
@@ -333,7 +334,7 @@ export const citationsStorage = {
     const platformBreakdown = Object.fromEntries(
       Array.from(platformMap.entries()).map(([p, s]) => [
         p,
-        { ...s, rate: s.checks > 0 ? Math.round((s.cited / s.checks) * 100) : 0 },
+        { ...s, rate: citationRatePct(s.cited, s.checks) },
       ]),
     );
 

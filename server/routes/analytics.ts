@@ -15,7 +15,7 @@
 import type { Express } from "express";
 import { storage } from "../storage";
 import { AI_PLATFORMS as SHARED_AI_PLATFORMS } from "@shared/constants";
-import { computeVisibilityScore } from "../lib/visibilityMetrics";
+import { computeVisibilityScore } from "@shared/visibilityMetrics";
 import { MODELS } from "../lib/modelConfig";
 import { requireUser } from "../lib/ownership";
 import {
@@ -805,6 +805,13 @@ Consider:
           ? await storage.getGeoRankingsByBrandPromptIds(brandPrompts.map((p) => p.id))
           : [];
         const articles = (await storage.getArticles()).filter((a) => a.brandId === brand.id);
+        // No `since` bound here, deliberately, and confirmed as a product
+        // decision on 2026-08-29: Opportunities reports against the brand's
+        // entire history while /api/geo-analytics scopes to a run window.
+        // Adding a window would make the two pages agree but would drop older
+        // cited rows from the key stats and per-platform shares, leaving this
+        // page sparse for any brand without a recent run. Do not "fix" the
+        // inconsistency by adding one; it is intended.
         // Use the indexed (articleId) read instead of scanning every
         // geo_ranking row in the table and post-filtering in memory - see
         // the equivalent fix on /api/geo-analytics/:brandId above. No

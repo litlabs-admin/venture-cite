@@ -6,6 +6,7 @@ import { attachAiLogger } from "../aiLogger";
 import { MODELS } from "../modelConfig";
 import { logger } from "../logger";
 import { LLM_CALL_TIMEOUT_MS } from "../factAgent/v2/vercelBudget";
+import { citationRatePct } from "@shared/visibilityMetrics";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -73,7 +74,7 @@ export const weeklyCatchupWorkflow: WorkflowDefinition = {
         const totalChecks =
           Number.isFinite(rawTotalChecks) && rawTotalChecks > 0 ? rawTotalChecks : 0;
         const totalCited = Number(citation.totalCited ?? 0);
-        const currentScore = totalChecks > 0 ? Math.round((totalCited / totalChecks) * 100) : 0;
+        const currentScore = citationRatePct(totalCited, totalChecks);
 
         const history = await storage.getMetricsHistory(ctx.run.brandId, "visibility_score", 14);
 

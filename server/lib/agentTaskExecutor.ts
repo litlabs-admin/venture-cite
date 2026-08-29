@@ -4,6 +4,7 @@ import { isKnownAgentTaskType, parseAgentTaskInput, type AgentTaskType } from ".
 import { assertTransition, InvalidStateTransitionError } from "./statusTransitions";
 import { logger } from "./logger";
 import type { AgentTask } from "@shared/schema";
+import { citationRatePct } from "@shared/visibilityMetrics";
 
 export class AgentTaskExecutionError extends Error {
   constructor(
@@ -127,10 +128,7 @@ export async function executeAgentTask(taskId: string, userId: string): Promise<
         runId: runResult.runId,
         totalChecks: runResult.totalChecks,
         totalCited: runResult.totalCited,
-        citationRate:
-          runResult.totalChecks > 0
-            ? Math.round((runResult.totalCited / runResult.totalChecks) * 100)
-            : 0,
+        citationRate: citationRatePct(runResult.totalCited, runResult.totalChecks),
         byPrompt,
         output: `Citation run ${runResult.runId}: ${runResult.totalCited}/${runResult.totalChecks} cited.`,
       };

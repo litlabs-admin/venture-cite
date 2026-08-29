@@ -4,7 +4,7 @@ import type { GeoRanking, Brand, InsertCompetitorGeoRanking } from "@shared/sche
 import { resolveTier } from "@shared/schema";
 import { attachAiLogger } from "./lib/aiLogger";
 import { CITATION_MODELS, OPENROUTER_BASE_URL } from "./lib/modelConfig";
-import { citationRatePct } from "./lib/visibilityMetrics";
+import { citationRatePct } from "@shared/visibilityMetrics";
 import { judgeCitation, type JudgeBrand } from "./citationJudge";
 import { assertWithinBudget, recordSpend, type Tier } from "./lib/llmBudget";
 import { logger } from "./lib/logger";

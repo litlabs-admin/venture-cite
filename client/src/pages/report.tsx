@@ -9,6 +9,7 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
 import CitedUrlsCard from "@/components/dashboard/CitedUrlsCard";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
+import { citationRatePct } from "@shared/visibilityMetrics";
 
 // ─── Report ──────────────────────────────────────────────────────────────────
 // The "prove the impact" surface. Opens with one plain-language conclusion
@@ -277,7 +278,7 @@ export default function Report() {
                 <span className="text-right">Score</span>
               </div>
               {engines.map(([name, p]) => {
-                const rate = p.mentions > 0 ? Math.round((p.citations / p.mentions) * 100) : 0;
+                const rate = citationRatePct(p.citations, p.mentions);
                 return (
                   <div
                     key={name}

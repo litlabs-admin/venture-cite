@@ -4,7 +4,7 @@ import {
   citationRateFraction,
   citationRatePct,
   computeVisibilityScore,
-} from "../../server/lib/visibilityMetrics";
+} from "../../shared/visibilityMetrics";
 
 describe("visibilityMetrics - canonical citation rate", () => {
   describe("citationRateFraction", () => {
@@ -30,6 +30,7 @@ describe("visibilityMetrics - canonical citation rate", () => {
     it("returns an integer 0..100 with half-up rounding", () => {
       expect(citationRatePct(0, 10)).toBe(0);
       expect(citationRatePct(10, 10)).toBe(100);
+      expect(citationRatePct(5, 10)).toBe(50); // exact half
       expect(citationRatePct(1, 3)).toBe(33);
       expect(citationRatePct(2, 3)).toBe(67);
       expect(citationRatePct(1, 8)).toBe(13); // 12.5 → 13 (Math.round)

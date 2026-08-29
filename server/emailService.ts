@@ -4,6 +4,7 @@ import { signUnsubscribeToken } from "./lib/unsubscribeToken";
 import { withEmailRetry } from "./lib/emailRetry";
 import { db } from "./db";
 import { users, emailFailures } from "@shared/schema";
+import { citationRatePct } from "@shared/visibilityMetrics";
 import { isEmailDeliveryEnabled } from "./lib/environmentSafety";
 import { logger } from "./lib/logger";
 
@@ -148,7 +149,7 @@ export async function sendWeeklyVisibilityReport(data: WeeklyReportData): Promis
                 `<tr>
                 <td style="padding:8px;border-bottom:1px solid #eee">${escapeHtml(p.platform)}</td>
                 <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${p.cited} / ${p.checks}</td>
-                <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${p.checks > 0 ? Math.round((p.cited / p.checks) * 100) : 0}%</td>
+                <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${citationRatePct(p.cited, p.checks)}%</td>
               </tr>`,
             )
             .join("")

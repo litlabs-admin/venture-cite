@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { PLAN_PRICE_CENTS } from "@shared/schema";
+import { citationRateFraction } from "@shared/visibilityMetrics";
 
 // ─── Internal dashboard ──────────────────────────────────────────────────────
 // Reads /api/internal/kpis, which returns aggregate counts only - no emails,
@@ -63,9 +64,13 @@ export function Dashboard() {
       return sum + (price ? price * count : 0);
     }, 0);
 
+  // One decimal rather than the whole-number citationRatePct used on customer
+  // screens: this is an ops view where a 0.4 point move between refreshes is
+  // the signal. The definition still comes from the canonical fraction, so the
+  // extra precision is a presentation choice here and not a second formula.
   const citedRate =
     kpis && kpis.totalCitationChecks > 0
-      ? Math.round((kpis.citedChecks / kpis.totalCitationChecks) * 1000) / 10
+      ? Math.round(citationRateFraction(kpis.citedChecks, kpis.totalCitationChecks) * 1000) / 10
       : null;
 
   return (

@@ -15,7 +15,7 @@ import { sendError, asyncHandler } from "../lib/routesShared";
 import { AI_PLATFORMS_CORE, VISIBILITY_CHECKLIST_TOTAL } from "@shared/constants";
 import type { BrandPrompt, GeoRanking, Competitor } from "@shared/schema";
 import { getRecommendations, type RecommendationState } from "../lib/recommendationsEngine";
-import { citationRatePct, computeVisibilityScore } from "../lib/visibilityMetrics";
+import { citationRatePct, computeVisibilityScore } from "@shared/visibilityMetrics";
 import {
   parseRobotsTxt,
   evaluateCrawlers,
@@ -1048,7 +1048,7 @@ export function setupDashboardRoutes(app: Express): void {
           weekStart,
           cited: b.cited,
           total: b.total,
-          citationRate: b.total > 0 ? Math.round((b.cited / b.total) * 100) : 0,
+          citationRate: citationRatePct(b.cited, b.total),
         }));
 
         res.json({ success: true, data: { weeks: series } });

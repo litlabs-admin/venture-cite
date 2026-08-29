@@ -25,6 +25,7 @@ import { db } from "../db";
 import { assertChatbotBudget, recordChatbotUsage } from "../lib/chatbotBudget";
 import { BudgetExceededError, estimateCostCents, type Tier } from "../lib/llmPricing";
 import { getOpenRouterClient, CHATBOT_MODEL } from "../lib/openrouterClient";
+import { citationRatePct } from "@shared/visibilityMetrics";
 import { SYSTEM_PROMPT } from "../lib/chatbotKnowledge";
 import { resolveTier } from "@shared/schema";
 
@@ -258,9 +259,15 @@ export function setupAssistantRoutes(app: Express): void {
             const latest = citationRuns.find(
               (r) => r.status === "completed" || r.status === "succeeded",
             );
+            // `null`, not 0, when no run has completed: it selects the "no
+            // completed runs yet" wording below. Telling the assistant a brand
+            // sits at 0% when it has simply never been measured would have it
+            // advise on a decline that never happened. The guard already proves
+            // totalChecks > 0, so the helper's zero branch is unreachable here
+            // and this reads exactly as it did before.
             const rate =
               latest && (latest.totalChecks ?? 0) > 0
-                ? Math.round(((latest.totalCited ?? 0) / latest.totalChecks!) * 100)
+                ? citationRatePct(latest.totalCited ?? 0, latest.totalChecks!)
                 : null;
             brandContextBlock = `[Current user's brand]
 Name: ${brand.name}

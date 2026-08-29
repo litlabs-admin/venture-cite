@@ -29,6 +29,7 @@ import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared"
 import { detectBrandAndCompetitors, matchEntity, extractDomain } from "../lib/brandMatcher";
 import { logger } from "../lib/logger";
 import { buildPromptScoreHistory, resolvePoints } from "../lib/promptScoreHistory";
+import { citationRatePct } from "@shared/visibilityMetrics";
 import { waitUntil } from "@vercel/functions";
 import {
   TRACKED_PROMPTS_CAP,
@@ -1817,11 +1818,11 @@ export function setupPromptsRoutes(app: Express): void {
 
         const byPlatform = Array.from(platformMap.values()).map((p) => ({
           ...p,
-          citationRate: p.checks > 0 ? Math.round((p.cited / p.checks) * 100) : 0,
+          citationRate: citationRatePct(p.cited, p.checks),
         }));
         const byPrompt = Array.from(promptMap.values());
         const totalChecks = latest.length;
-        const citationRate = totalChecks > 0 ? Math.round((totalCited / totalChecks) * 100) : 0;
+        const citationRate = citationRatePct(totalCited, totalChecks);
 
         res.json({
           success: true,

@@ -13,6 +13,7 @@ import { runMentionScan } from "./lib/runMentionScan";
 import { scanBrandListicles } from "./lib/listicleScanner";
 import { logger } from "./lib/logger";
 import { PAYING_TIERS } from "@shared/schema";
+import { citationRatePct } from "@shared/visibilityMetrics";
 import { logSystemAudit } from "./lib/audit";
 import { supabaseAdmin } from "./supabase";
 import { startRun } from "./lib/workflowEngine";
@@ -146,7 +147,7 @@ async function runWeeklyReportJobImpl(): Promise<{ sent: number; skipped: number
           name: brand.name,
           totalChecks,
           totalCited,
-          citationRate: totalChecks > 0 ? Math.round((totalCited / totalChecks) * 100) : 0,
+          citationRate: citationRatePct(totalCited, totalChecks),
           platformStats,
           topPrompts,
           needsSetup: false,

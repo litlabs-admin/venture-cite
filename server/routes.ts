@@ -9,6 +9,7 @@ import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { usageLimits, resolveTier } from "@shared/schema";
+import { citationRatePct } from "@shared/visibilityMetrics";
 import {
   setupAuth,
   attachUserIfPresent,
@@ -395,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (r.isCited === 1) totalCitations += 1;
           }
         }
-        const citationRate = totalChecks > 0 ? Math.round((totalCitations / totalChecks) * 100) : 0;
+        const citationRate = citationRatePct(totalCitations, totalChecks);
 
         res.json({
           success: true,
