@@ -243,13 +243,6 @@ export function setupContentRoutes(app: Express): void {
         if (!article) {
           return res.status(404).json({ success: false, error: "Article not found" });
         }
-        if (article.status !== "draft" && article.status !== "failed") {
-          return res.status(409).json({
-            success: false,
-            error: `Cannot generate - article is in status '${article.status}'.`,
-            code: "invalid_status",
-          });
-        }
         const parsed = contentGenerationRequestSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
           const firstIssue = parsed.error.issues[0];

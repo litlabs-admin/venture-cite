@@ -280,6 +280,36 @@ export const promptsStorage = {
       .limit(1);
     return row?.createdAt ?? null;
   },
+  // Re-detect-all has no dedicated result table to read a "last run" time
+  // from (unlike set-health / AI audiences) - re-detect deliberately writes
+  // no citation_runs row (see server/routes/prompts.ts). system_state is the
+  // existing generic key/value store used for exactly this shape of durable
+  // per-brand ledger elsewhere (see server/lib/jobDebounce.ts,
+  // server/lib/siteHealthHistory.ts), so it's used here rather than an
+  // in-memory Map, which resets on redeploy and doesn't coordinate across
+  // instances.
+  async getReDetectAllLastRunAt(brandId: string): Promise<Date | null> {
+    const [row] = await db
+      .select({ valueJson: schema.systemState.valueJson })
+      .from(schema.systemState)
+      .where(eq(schema.systemState.key, `re-detect-all:${brandId}`))
+      .limit(1);
+    const iso = (row?.valueJson as { lastRanAt?: string } | undefined)?.lastRanAt;
+    if (!iso) return null;
+    const at = new Date(iso);
+    return Number.isNaN(at.getTime()) ? null : at;
+  },
+  async setReDetectAllLastRunAt(brandId: string, at: Date): Promise<void> {
+    const key = `re-detect-all:${brandId}`;
+    const valueJson = { lastRanAt: at.toISOString() };
+    await db
+      .insert(schema.systemState)
+      .values({ key, valueJson, updatedAt: at })
+      .onConflictDoUpdate({
+        target: schema.systemState.key,
+        set: { valueJson, updatedAt: at },
+      });
+  },
   async getLatestSetHealthRun(brandId: string): Promise<PromptSetHealthRun | undefined> {
     const [row] = await db
       .select()

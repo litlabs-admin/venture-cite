@@ -269,6 +269,12 @@ export interface IStorage {
   /** createdAt of the most recent AI-generated audience batch for this
    *  brand, or null if none exists yet - backs the generation cooldown. */
   getLatestAiAudienceCreatedAt(brandId: string): Promise<Date | null>;
+  // Re-detect-all cooldown. Backed by system_state (no dedicated table -
+  // re-detect deliberately writes no citation_runs row) so the cooldown
+  // survives a redeploy and is shared across instances, unlike a per-process
+  // in-memory map.
+  getReDetectAllLastRunAt(brandId: string): Promise<Date | null>;
+  setReDetectAllLastRunAt(brandId: string, at: Date): Promise<void>;
   // Prompt set health
   getLatestSetHealthRun(brandId: string): Promise<PromptSetHealthRun | undefined>;
   createSetHealthRun(run: {

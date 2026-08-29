@@ -1417,10 +1417,12 @@ export function setupPromptsRoutes(app: Express): void {
     }),
   );
 
-  // Per-brand in-memory rate limit. Matcher-only re-checks are cheap but
-  // iterating thousands of stored rows still burns DB bandwidth; 60s keeps
-  // repeated button clicks from stampeding.
-  const reDetectLastRunAt = new Map<string, number>();
+  // Per-brand rate limit. Matcher-only re-checks are cheap but iterating
+  // thousands of stored rows still burns DB bandwidth; 60s keeps repeated
+  // button clicks from stampeding. Enforced from system_state
+  // (storage.getReDetectAllLastRunAt/setReDetectAllLastRunAt) rather than an
+  // in-memory Map: a Map resets on every redeploy and does not coordinate
+  // between instances, so either would let the cooldown be bypassed outright.
   const RE_DETECT_COOLDOWN_MS = 60_000;
 
   // Re-run detection across every stored surface (geo_rankings, listicles,
@@ -1435,17 +1437,20 @@ export function setupPromptsRoutes(app: Express): void {
         const user = requireUser(req);
         const brand = await requireBrand(req.params.brandId, user.id);
 
-        const last = reDetectLastRunAt.get(brand.id) ?? 0;
-        const since = Date.now() - last;
-        if (since < RE_DETECT_COOLDOWN_MS) {
-          return res.status(429).json({
-            success: false,
-            error: `Re-check rate-limited. Try again in ${Math.ceil(
-              (RE_DETECT_COOLDOWN_MS - since) / 1000,
-            )}s.`,
-          });
+        const last = await storage.getReDetectAllLastRunAt(brand.id);
+        if (last) {
+          const since = Date.now() - last.getTime();
+          if (since < RE_DETECT_COOLDOWN_MS) {
+            const retryAfterSec = Math.ceil((RE_DETECT_COOLDOWN_MS - since) / 1000);
+            res.setHeader("Retry-After", String(retryAfterSec));
+            return res.status(429).json({
+              success: false,
+              error: `Re-check rate-limited. Try again in ${retryAfterSec}s.`,
+              retryAfterSeconds: retryAfterSec,
+            });
+          }
         }
-        reDetectLastRunAt.set(brand.id, Date.now());
+        await storage.setReDetectAllLastRunAt(brand.id, new Date());
 
         // Re-detect does not write a citation_runs
         // row. An earlier pass added one to fire the live banner, but
