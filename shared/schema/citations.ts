@@ -124,6 +124,17 @@ export const citationRuns = pgTable(
     triggeredBy: text("triggered_by").notNull().default("manual"), // manual | cron
     startedAt: timestamp("started_at").defaultNow().notNull(),
     completedAt: timestamp("completed_at"),
+    // Stamped at row creation and again every time a slice actually
+    // advances the run (server/storage/citationsStorage.ts,
+    // bumpCitationRunProgress) - not only at slice start/end. Staleness
+    // reaping (server/lib/citationReconciliation.ts,
+    // server/citationChecker.ts) compares against this, not startedAt:
+    // startedAt measures total run age, and a slice-based run legitimately
+    // stays 'running' far longer than any reasonable "definitely dead"
+    // window. NULL on a row created before migration 0123 - both reap
+    // sites fall back to startedAt in that case. See
+    // .audit/B6/B6a-12-citation-run-staleness.md.
+    lastAdvanceStartedAt: timestamp("last_advance_started_at"),
     // Per-platform breakdown snapshot so the history endpoint doesn't
     // need to re-join geo_rankings for every run.
     platformBreakdown: jsonb("platform_breakdown"),

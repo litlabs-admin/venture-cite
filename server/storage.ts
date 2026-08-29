@@ -336,9 +336,19 @@ export interface IStorage {
     citationRate: number;
   }>;
   // Live-update lifecycle.
-  getActiveCitationRuns(
-    brandId: string,
-  ): Promise<Array<{ id: string; startedAt: Date; progressPct: number; status: string }>>;
+  getActiveCitationRuns(brandId: string): Promise<
+    Array<{
+      id: string;
+      startedAt: Date;
+      lastAdvanceStartedAt: Date | null;
+      progressPct: number;
+      status: string;
+    }>
+  >;
+  // How many automatic (cron / auto_onboarding) citation runs this brand has
+  // STARTED since `since`. Used to bound automatic run creation per brand
+  // per rolling window - manual runs never call this, by design.
+  countAutomaticCitationRunsSince(brandId: string, since: Date): Promise<number>;
   bumpCitationRunProgress(
     runId: string,
     progressPct: number,

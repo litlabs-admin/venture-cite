@@ -16,6 +16,31 @@ import { dynamicLockNamespaces, withDynamicAdvisoryLock } from "./lib/advisoryLo
 import { extractCitedUrls } from "./lib/urlExtractor";
 import type { TrackedContentUrl } from "@shared/schema";
 import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
+import { isRunStaleSinceLastProgress } from "./lib/citationReconciliation";
+
+// Bound on automatic (cron / auto_onboarding) citation run CREATION, per
+// brand, per rolling window. Deliberately enforced here - where the row is
+// created - not in the scheduler that happens to be calling today, so a
+// future caller (a third trigger source) inherits the bound automatically
+// instead of needing its own copy of it.
+//
+// Chosen from what the product actually does, not a round number:
+//   - The auto-citation cron fires hourly (AUTO_CITATION_CRON, default
+//     "0 * * * *"), but isBrandDueForCitation only lets a brand through
+//     once every ~6 days, so cron alone never produces more than one
+//     automatic run per brand in any given hour.
+//   - Onboarding autopilot retries a stranded brand at most
+//     AUTOPILOT_MAX_ATTEMPTS (5) times, backed off
+//     AUTOPILOT_RETRY_BACKOFF_MINUTES (60) apart - so under normal
+//     operation it also produces at most one new automatic run per brand
+//     per rolling hour.
+// A brand legitimately needs at most ~2 automatic run creations in any
+// given hour (cron and an onboarding retry landing in the same window).
+// The incident this guards against produced one run roughly every 18
+// minutes - over 3 per hour - so a cap of 3 refuses it on the very next
+// attempt after the window fills, instead of after 114 runs.
+const AUTOMATIC_RUN_WINDOW_MS = 60 * 60_000;
+const AUTOMATIC_RUN_MAX_PER_WINDOW = 3;
 
 // ChatGPT citation checks go through the direct OpenAI client.
 // Citation runs execute in slices via /advance polling on Vercel -
@@ -480,6 +505,94 @@ export async function runBrandPrompts(
     if (!existing) throw new Error(`citation_runs row ${options.runId} not found`);
     citationRun = existing;
   } else {
+    // A human clicking "run citation check" always goes through
+    // kickoffBrandPromptsRun, which creates its own row and calls back in
+    // here with options.runId already set - so triggeredBy === "manual"
+    // never reaches this branch in practice. The check is still explicit
+    // (rather than assumed) so a future manual call site that skips the
+    // kickoff path is never silently rate-limited or blocked by a stale
+    // row it didn't create.
+    const isAutomatic = triggeredBy === "cron" || triggeredBy === "auto_onboarding";
+
+    if (isAutomatic) {
+      // Defect: run creation happens BEFORE any provider call, so a run
+      // abandoned mid-flight (crash, killed process, a stuck slice) leaves
+      // citation_runs pinned at 'running' forever. Every later automatic
+      // attempt for this brand has no runId to reuse, so it always tries
+      // to INSERT a fresh row, which always collides with the partial
+      // unique index (migration 0035) and throws 23505 - caught by the
+      // caller, logged, and repeated on an identical footing next tick.
+      // The brand never completes another automatic run, silently.
+      //
+      // Reap it here, at creation time, rather than depending on the
+      // boot-time / once-daily orphan sweep
+      // (server/lib/citationReconciliation.ts) to happen to have run
+      // since. Calls that sweep's own isRunStaleSinceLastProgress - NOT an
+      // independent age comparison - so the two reap sites can never drift
+      // apart on which timestamp they read or how they fall back when it's
+      // NULL. citation_runs is slice-based: a genuinely live run keeps
+      // stamping lastAdvanceStartedAt as it advances
+      // (bumpCitationRunProgress) and can legitimately stay 'running', with
+      // startedAt hours old, across many ticks. Judging staleness by
+      // startedAt instead was the exact defect this reap was found to
+      // reintroduce - see .audit/B6/B6a-12-citation-run-staleness.md.
+      const activeRuns = await storage.getActiveCitationRuns(brandId);
+      let blockedByLiveRun = false;
+      for (const run of activeRuns) {
+        if (!isRunStaleSinceLastProgress(run)) {
+          // Genuinely still advancing (or not yet old enough to judge, for
+          // a NULL lastAdvanceStartedAt falling back to startedAt). Do not
+          // touch it, and do not start a second one alongside it.
+          blockedByLiveRun = true;
+          continue;
+        }
+        const lastProgressAt = run.lastAdvanceStartedAt ?? run.startedAt;
+        const ageMs = Date.now() - new Date(lastProgressAt).getTime();
+        await storage.updateCitationRun(run.id, {
+          status: "failed",
+          errorMessage: "orphaned - reaped before automatic retry",
+          completedAt: new Date(),
+          progressPct: 100,
+        } as never);
+        logger.warn(
+          { brandId, triggeredBy, reapedRunId: run.id, ageMs },
+          "citation.run.stale_active_reaped",
+        );
+      }
+      if (blockedByLiveRun) {
+        logger.warn(
+          { brandId, triggeredBy, reason: "active_run_in_progress" },
+          "citation.run.automatic_refused",
+        );
+        return { totalChecks: 0, totalCited: 0, rankings: [], runId: null, done: false };
+      }
+
+      // Bound how many automatic runs this brand may START within a
+      // rolling window, independent of which caller is asking. See the
+      // AUTOMATIC_RUN_WINDOW_MS / AUTOMATIC_RUN_MAX_PER_WINDOW comment
+      // above for the reasoning. Counted from citation_runs itself so the
+      // bound holds even across a process restart or a second caller.
+      const windowStart = new Date(Date.now() - AUTOMATIC_RUN_WINDOW_MS);
+      const recentAutomaticCount = await storage.countAutomaticCitationRunsSince(
+        brandId,
+        windowStart,
+      );
+      if (recentAutomaticCount >= AUTOMATIC_RUN_MAX_PER_WINDOW) {
+        logger.warn(
+          {
+            brandId,
+            triggeredBy,
+            reason: "automatic_rate_bound",
+            recentAutomaticCount,
+            windowMs: AUTOMATIC_RUN_WINDOW_MS,
+            maxPerWindow: AUTOMATIC_RUN_MAX_PER_WINDOW,
+          },
+          "citation.run.automatic_refused",
+        );
+        return { totalChecks: 0, totalCited: 0, rankings: [], runId: null, done: false };
+      }
+    }
+
     citationRun = await storage.createCitationRun({
       brandId,
       triggeredBy,

@@ -1,0 +1,41 @@
+-- Source: migrations/0123_citation_run_last_advance.sql
+-- SHA256: 44659f4c6c8ecedafe42f8f6cd7c6a6ba2696e75daa3e133e9245649342e9845
+
+-- Track last-progress time on citation_runs, so staleness reaping can stop
+-- misjudging a healthy slice-based run as dead.
+--
+-- Both reap sites (server/lib/citationReconciliation.ts's
+-- reconcileOrphanCitationRuns and the inline reap in runBrandPrompts,
+-- server/citationChecker.ts) compared a "definitely dead" threshold against
+-- started_at. started_at measures total run age, not staleness - it is set
+-- once, at creation, and never moves. citation_runs is deliberately
+-- slice-based (server/citationChecker.ts's worker loop, resumed via
+-- advanceCitationRun): a healthy run legitimately stays 'running' across
+-- many ticks. Measured against 449 production runs that completed
+-- successfully: 38.5% took longer than the old 5-minute threshold. See
+-- .audit/B6/B6a-12-citation-run-staleness.md for the full measurement and
+-- the derivation of the new threshold.
+--
+-- last_advance_started_at follows the naming and shape of the existing
+-- precedent for exactly this problem in this schema -
+-- content_generation_jobs.last_advance_started_at (migration 0044). It is
+-- stamped at row creation (createCitationRun) and again every time a slice
+-- actually persists progress (bumpCitationRunProgress) - so, unlike the
+-- content-jobs column, it refreshes repeatedly DURING a live slice, not
+-- only at slice start. Both reap sites now compare against this column
+-- instead of started_at.
+--
+-- Existing rows get NULL - no backfill. This costs nothing: the reap
+-- queries only ever look at status IN ('pending', 'running'), and every
+-- completed row (the overwhelming majority of history) is excluded from
+-- that filter regardless of what this column holds. The only rows that
+-- could read NULL here are ones that were still pending/running at the
+-- moment this migration ran; both reap sites COALESCE this column to
+-- started_at, so a NULL row is judged exactly the way every row was judged
+-- before this migration, until its next progress bump (or reap) gives it a
+-- real value.
+--
+-- ADD COLUMN IF NOT EXISTS is already idempotent on replay - no separate
+-- guard needed, same shape as migrations/0044_content_job_advance.sql.
+ALTER TABLE citation_runs
+  ADD COLUMN IF NOT EXISTS last_advance_started_at TIMESTAMPTZ;

@@ -273,7 +273,13 @@ export const citationsStorage = {
   },
 
   async createCitationRun(run: InsertCitationRun): Promise<CitationRun> {
-    const [row] = await db.insert(schema.citationRuns).values(run).returning();
+    // Stamp last_advance_started_at at creation, same moment status is set
+    // to 'running' - so a freshly created row is never mistaken for one
+    // that has gone stale with no recorded progress. See migration 0123.
+    const [row] = await db
+      .insert(schema.citationRuns)
+      .values({ ...run, lastAdvanceStartedAt: new Date() })
+      .returning();
     return row;
   },
 
@@ -346,13 +352,20 @@ export const citationsStorage = {
     return { totalChecks, totalCited, citationRate };
   },
 
-  async getActiveCitationRuns(
-    brandId: string,
-  ): Promise<Array<{ id: string; startedAt: Date; progressPct: number; status: string }>> {
+  async getActiveCitationRuns(brandId: string): Promise<
+    Array<{
+      id: string;
+      startedAt: Date;
+      lastAdvanceStartedAt: Date | null;
+      progressPct: number;
+      status: string;
+    }>
+  > {
     const rows = await db
       .select({
         id: schema.citationRuns.id,
         startedAt: schema.citationRuns.startedAt,
+        lastAdvanceStartedAt: schema.citationRuns.lastAdvanceStartedAt,
         progressPct: schema.citationRuns.progressPct,
         status: schema.citationRuns.status,
       })
@@ -367,12 +380,30 @@ export const citationsStorage = {
     return rows;
   },
 
+  async countAutomaticCitationRunsSince(brandId: string, since: Date): Promise<number> {
+    const [row] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(schema.citationRuns)
+      .where(
+        and(
+          eq(schema.citationRuns.brandId, brandId),
+          inArray(schema.citationRuns.triggeredBy, ["cron", "auto_onboarding"]),
+          gte(schema.citationRuns.startedAt, since),
+        ),
+      );
+    return row?.n ?? 0;
+  },
+
   async bumpCitationRunProgress(
     runId: string,
     progressPct: number,
     totalChecks: number,
     totalCited: number,
   ): Promise<void> {
+    // This fires repeatedly during a single slice (every PROGRESS_BUMP_EVERY
+    // tasks or PROGRESS_BUMP_INTERVAL_MS, see server/citationChecker.ts) -
+    // it is the mid-slice signal that staleness reaping keys off of. See
+    // migration 0123.
     await db
       .update(schema.citationRuns)
       .set({
@@ -380,6 +411,7 @@ export const citationsStorage = {
         totalChecks,
         totalCited,
         status: "running",
+        lastAdvanceStartedAt: new Date(),
       })
       .where(eq(schema.citationRuns.id, runId));
   },

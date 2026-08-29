@@ -34,16 +34,19 @@ beforeEach(() => {
 });
 
 describe("reconcileOrphanCitationRuns", () => {
-  it("issues an UPDATE that filters by status + 5-minute age threshold", async () => {
+  it("issues an UPDATE that filters by status + last-progress age threshold", async () => {
     queryMock.mockResolvedValueOnce({ rowCount: 0, rows: [] });
     await reconcileOrphanCitationRuns();
     expect(queryMock).toHaveBeenCalledTimes(1);
     const sql = queryMock.mock.calls[0][0] as string;
     expect(sql).toMatch(/UPDATE citation_runs/i);
     expect(sql).toMatch(/status\s+IN\s+\('pending',\s*'running'\)/i);
-    // The limit is five minutes so lambda-stopped
-    // runs are picked up faster (see citationReconciliation.ts).
-    expect(sql).toMatch(/INTERVAL\s+'5 minutes'/i);
+    // Staleness is judged by last_advance_started_at (falling back to
+    // started_at when NULL), not started_at alone - see
+    // tests/unit/citationRunStaleness.test.ts and
+    // .audit/B6/B6a-12-citation-run-staleness.md for why.
+    expect(sql).toMatch(/COALESCE\(\s*last_advance_started_at\s*,\s*started_at\s*\)/i);
+    expect(sql).toMatch(/INTERVAL\s+'240 minutes'/i);
     expect(sql).toMatch(/error_message\s*=\s*'orphaned by restart'/i);
   });
 
