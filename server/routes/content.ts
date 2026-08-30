@@ -27,33 +27,48 @@
 //   GET  /api/keyword-research/:brandId/opportunities
 //   PATCH /api/keyword-research/:id          - update row
 //   DELETE /api/keyword-research/:id         - delete row
+//
+// Business logic (job driving, auto-improve, keyword suggestions/discovery,
+// popular topics) lives in server/services/contentGeneration.ts and
+// server/services/keywordResearch.ts (phase B7-13). Handlers here only
+// parse/validate input, enforce ownership, call one service function, and
+// shape the response.
 
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
-import { storage } from "../storage";
-import { MODELS } from "../lib/modelConfig";
 import { type GenerationPayload } from "../contentGenerationWorker";
 import { requireUser, requireBrand } from "../lib/ownership";
 import {
-  openai,
   aiLimitMiddleware,
   sendError,
-  safeParseJson,
   MAX_CONTENT_LENGTH,
   asyncHandler,
 } from "../lib/routesShared";
-import { runArticleSlice } from "../contentGenerationWorker";
-import { waitUntil } from "@vercel/functions";
 import { enforceFeatureCooldownOr429 } from "../lib/rateLimitBuckets";
 import { hasEnoughBrandProfile } from "../lib/brandProfileCompleteness";
 
 import { logger } from "../lib/logger";
-import { captureAndFlush } from "../lib/sentryReport";
-import { enqueueLlmJob, registerLlmJobHandler, classifyAiEnqueueError } from "../lib/llmJobs";
+import { registerLlmJobHandler } from "../lib/llmJobs";
 import { createRequestActor } from "../lib/requestActor";
 import { liveOpenAIEnabled } from "../lib/localFlowSafety";
 import { contentRequestData } from "../data/contentRequestData";
 import { usesFakeContentGenerationProvider } from "../lib/contentGenerationProvider";
+import {
+  computeJobStatePayload,
+  contentLengthForResponse,
+  driveArticleGenerationInBackground,
+  advanceContentJobSlice,
+  autoImproveArticle,
+} from "../services/contentGeneration";
+import {
+  keywordDiscoveryFinalize,
+  suggestKeywords,
+  getPopularTopics,
+  discoverBrandKeywords,
+  type KeywordDiscoveryPayload,
+} from "../services/keywordResearch";
+
+export { computeJobStatePayload, contentLengthForResponse };
 
 const keywordUpdateSchema = z
   .object({
@@ -96,136 +111,13 @@ const articleImproveRequestSchema = z
   })
   .strict();
 
-// ─────────────────────────────────────────────────────────────────────────
-// Keyword discovery handler - registered at module-load. The poll endpoint
-// in routes/llmJobs.ts dispatches to this handler when the OpenAI Responses
-// background run completes. The handler is responsible for:
-//   - validating the structured output
-//   - deduping against existing rows
-//   - persisting brand-keyword rows
-//   - returning the lean result the client renders
-// ─────────────────────────────────────────────────────────────────────────
-interface KeywordDiscoveryPayload {
-  brandId: string;
-}
-
-interface DiscoveredKeyword {
-  keyword: string;
-  searchVolume?: number;
-  difficulty?: number;
-  opportunityScore?: number;
-  aiCitationPotential?: number;
-  intent?: string;
-  category?: string | null;
-  competitorGap?: number;
-  suggestedContentType?: string;
-  relatedKeywords?: string[];
-}
-
 registerLlmJobHandler<
   KeywordDiscoveryPayload,
   { data: unknown[]; count: number; message?: string }
 >({
   kind: "keyword_discovery",
-  finalize: async ({ payload, structuredOutput, outputText }) => {
-    // Tolerate both shapes the model historically returned:
-    // either { keywords: [...] } or a bare [...] array.
-    const parsed = structuredOutput as
-      { keywords?: DiscoveredKeyword[] } | DiscoveredKeyword[] | null;
-    const keywords: DiscoveredKeyword[] = Array.isArray(parsed)
-      ? parsed
-      : Array.isArray(parsed?.keywords)
-        ? parsed.keywords
-        : [];
-
-    if (keywords.length === 0) {
-      throw new Error(
-        outputText && outputText.length > 0
-          ? "AI returned an unexpected response shape (no keywords[])."
-          : "AI returned an empty response.",
-      );
-    }
-
-    // Dedup against existing keyword_research rows.
-    const existingKeywords = await storage.getKeywordResearch(payload.brandId, {});
-    const existingSet = new Set(existingKeywords.map((k) => k.keyword.trim().toLowerCase()));
-
-    const savedKeywords: unknown[] = [];
-    for (const kw of keywords) {
-      if (!kw || typeof kw.keyword !== "string" || !kw.keyword.trim()) continue;
-      const normalized = kw.keyword.trim().toLowerCase();
-      if (existingSet.has(normalized)) continue;
-      existingSet.add(normalized);
-      const saved = await storage.createKeywordResearch({
-        brandId: payload.brandId,
-        keyword: kw.keyword.trim(),
-        searchVolume: typeof kw.searchVolume === "number" ? kw.searchVolume : null,
-        difficulty: typeof kw.difficulty === "number" ? kw.difficulty : null,
-        opportunityScore: typeof kw.opportunityScore === "number" ? kw.opportunityScore : 50,
-        aiCitationPotential:
-          typeof kw.aiCitationPotential === "number" ? kw.aiCitationPotential : 50,
-        intent: kw.intent || "informational",
-        category: kw.category || null,
-        competitorGap: typeof kw.competitorGap === "number" ? kw.competitorGap : 0,
-        suggestedContentType: kw.suggestedContentType || "article",
-        relatedKeywords: Array.isArray(kw.relatedKeywords) ? kw.relatedKeywords : null,
-        status: "discovered",
-        provenance: "ai-estimate",
-        contentGenerated: 0,
-        articleId: null,
-      });
-      savedKeywords.push(saved);
-    }
-
-    if (savedKeywords.length === 0) {
-      // Soft case: all returned keywords matched existing rows.
-      return {
-        data: [],
-        count: 0,
-        message:
-          "No new keywords found - try completing your brand profile (description, products, target audience) for better results.",
-      };
-    }
-
-    return { data: savedKeywords, count: savedKeywords.length };
-  },
+  finalize: keywordDiscoveryFinalize,
 });
-// The previous time-driven "phase label"
-// (Brainstorming → Drafting → Writing → Polishing) was theatre - the
-// Responses API background mode doesn't expose intra-run progress, so
-// those labels were uncorrelated with what the model was actually doing.
-// We now show honest elapsed seconds only, plus a Cancel button.
-export function computeJobStatePayload(job: {
-  status: string;
-  errorMessage: string | null;
-  startedAt: Date | null;
-}): {
-  status: string;
-  done: boolean;
-  errorMessage: string | null;
-  elapsedSeconds?: number;
-} {
-  const done = job.status !== "pending" && job.status !== "running";
-  if (done) {
-    return {
-      status: job.status,
-      done: true,
-      errorMessage: job.errorMessage ?? null,
-    };
-  }
-  const startMs = job.startedAt ? new Date(job.startedAt).getTime() : Date.now();
-  const elapsedMs = Math.max(0, Date.now() - startMs);
-  return {
-    status: job.status,
-    done: false,
-    errorMessage: job.errorMessage ?? null,
-    elapsedSeconds: Math.round(elapsedMs / 1000),
-  };
-}
-
-export function contentLengthForResponse(article: { content: string | null } | undefined): number {
-  return article?.content?.length ?? 0;
-}
 
 export function setupContentRoutes(app: Express): void {
   // ── Generate content for an existing draft article ─────────────────────────
@@ -312,37 +204,8 @@ export function setupContentRoutes(app: Express): void {
         const jobId = result.jobId;
 
         // Server-side drive: progress the job without requiring an open
-        // browser tab. Additive - the client /advance loop still runs as
-        // the fast path when a tab is open (Vercel Hobby has no frequent
-        // cron); the per-job slice lock (claimContentJobForSlice) makes
-        // client + server coexist (only one slice at a time). Whatever
-        // doesn't finish in this function's window is resumed by the
-        // daily cron's drainPendingContentJobs - same backstop as today,
-        // but a tab is no longer REQUIRED for progress.
-        const driveDeadlineMs = Date.now() + 50_000;
-        waitUntil(
-          (async () => {
-            try {
-              while (Date.now() < driveDeadlineMs) {
-                const claimed = await storage.claimContentJobForSlice(jobId, 12);
-                if (claimed) {
-                  const sliceDeadlineMs = Math.min(driveDeadlineMs, Date.now() + 10_000);
-                  const outcome = await runArticleSlice(
-                    jobId,
-                    sliceDeadlineMs,
-                    claimed.advanceToken,
-                  );
-                  if (outcome.done) break;
-                }
-                // The OpenAI Responses run is background:true - it needs
-                // wall-clock time on OpenAI's side; don't hot-poll.
-                await new Promise((r) => setTimeout(r, 4_000));
-              }
-            } catch (err) {
-              captureAndFlush(err, { tags: { source: "content.generate.serverDrive" } });
-            }
-          })(),
-        );
+        // browser tab in the loop; see contentGeneration.ts for details.
+        driveArticleGenerationInBackground(jobId);
 
         return res.json({ success: true, data: { jobId, status: "pending" } });
       } catch (error) {
@@ -432,9 +295,10 @@ export function setupContentRoutes(app: Express): void {
   // /state returns `done: true`. The first call kicks off an OpenAI
   // Responses run (background mode) and stores the response_id; later
   // calls poll openai.responses.retrieve until the run completes,
-  // failed, or was cancelled. The runArticleSlice helper handles all
-  // success / failure / refund bookkeeping; the route just enforces
-  // ownership and the per-call lock (last_advance_started_at).
+  // failed, or was cancelled. advanceContentJobSlice handles the
+  // per-call slice lock and delegates the run itself to runArticleSlice
+  // (all success / failure / refund bookkeeping); the route just
+  // enforces ownership and shapes the response.
   app.post(
     "/api/content-jobs/:jobId/advance",
     asyncHandler(async (req, res) => {
@@ -450,23 +314,16 @@ export function setupContentRoutes(app: Express): void {
           });
         }
 
-        // Per-job slice lock: prevents two browser tabs from concurrently
-        // streaming into the same buffer. Slice budget = 9s (deadline 8s +
-        // 1s safety so the lock window outlasts the slice itself).
-        const claimed = await storage.claimContentJobForSlice(job.id, 9);
-        if (!claimed) {
+        const result = await advanceContentJobSlice(job, content.articles);
+        if (result.kind === "busy") {
           // Another caller is mid-slice; tell client to keep polling /state.
           return res.json({
             success: true,
-            data: { status: job.status, done: false, busy: true },
+            data: { status: result.status, done: false, busy: true },
           });
         }
 
-        const deadlineMs = Date.now() + 8000;
-        const outcome = await runArticleSlice(job.id, deadlineMs, claimed.advanceToken);
-        const updatedArticle = job.articleId
-          ? await content.articles.get(job.articleId)
-          : undefined;
+        const { outcome, updatedArticle } = result;
         res.json({
           success: outcome.status !== "failed",
           data: {
@@ -549,10 +406,8 @@ export function setupContentRoutes(app: Express): void {
 
   // ── Auto-Improve ────────────────────────────────────────────────────────────
   //
-  // One rewrite pass. Creates an immutable revision row from the current
-  // content (so it's preserved for diff/restore), then writes the rewritten
-  // content back to the article and bumps version. The legacy 3-pass loop +
-  // human-score gating is gone.
+  // One rewrite pass. See autoImproveArticle() for the actual work: snapshot,
+  // rewrite, optimistic-lock write, and the two revision rows.
   app.post(
     "/api/articles/:id/improve",
     aiLimitMiddleware,
@@ -569,95 +424,54 @@ export function setupContentRoutes(app: Express): void {
         if (!article) {
           return res.status(404).json({ success: false, error: "Article not found" });
         }
-        if (!article.content) {
+
+        const result = await autoImproveArticle({
+          article,
+          instructions: parsed.data.instructions ?? null,
+          expectedVersion: parsed.data.expectedVersion,
+          articles: content.articles,
+          revisions: content.revisions,
+        });
+
+        if (result.kind === "no_content") {
           return res
             .status(400)
             .json({ success: false, error: "Cannot improve an article with no content yet." });
         }
-        if ((article.content || "").length > MAX_CONTENT_LENGTH) {
+        if (result.kind === "too_long") {
           return res.status(413).json({
             success: false,
             error: `Article exceeds ${MAX_CONTENT_LENGTH} characters.`,
           });
         }
-        if (!liveOpenAIEnabled(process.env)) {
+        if (result.kind === "unavailable") {
           return res.status(503).json({
             success: false,
             error: "Auto-Improve is not available. OpenAI API key is not configured.",
           });
         }
-
-        const instructions = parsed.data.instructions ?? null;
-        const expectedVersion = parsed.data.expectedVersion;
-
-        // Snapshot the current content as a revision before we overwrite it.
-        // The new content will get its own revision after the rewrite succeeds.
-        // Doing it in this order means even if the LLM call fails, the revision
-        // history is untouched (no orphan "rewrite I'm about to do" rows).
-        const beforeContent = article.content;
-
-        const systemPrompt = `You are an expert editor. Rewrite the user's article to be clearer, more authoritative, and more readable while preserving all factual content, structure, and markdown formatting. Return ONLY the rewritten markdown - no preamble, no commentary.${instructions ? `\n\nFollow these specific instructions: ${instructions}` : ""}`;
-
-        const response = await openai.chat.completions.create({
-          model: MODELS.contentHumanize,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: beforeContent },
-          ],
-          max_tokens: 4500,
-          temperature: 0.7,
-        });
-        const improved = response.choices[0].message.content?.trim();
-        if (!improved) {
+        if (result.kind === "empty_response") {
           return res
             .status(502)
             .json({ success: false, error: "AI returned an empty response. Please try again." });
         }
-
-        // Optimistic-lock: if the caller passed expectedVersion, only write
-        // when the row hasn't moved. Returns 409 otherwise.
-        let updated;
-        if (expectedVersion !== undefined) {
-          updated = await content.articles.updateIfVersion(article.id, expectedVersion, {
-            content: improved,
-          });
-          if (!updated) {
-            const current = await content.articles.get(article.id);
-            if (!current) {
-              return res.status(404).json({ success: false, error: "Article not found" });
-            }
-            return res.status(409).json({
-              success: false,
-              error:
-                "Article changed since you started editing. Refresh to see the latest content, then re-apply your changes.",
-              code: "version_conflict",
-              current,
-            });
-          }
-        } else {
-          updated = await content.articles.update(article.id, { content: improved });
-          if (!updated) {
-            return res.status(404).json({ success: false, error: "Article not found" });
-          }
+        if (result.kind === "not_found") {
+          return res.status(404).json({ success: false, error: "Article not found" });
         }
-
-        // Persist both the before-snapshot (so users can revert) and the new
-        // revision (so the diff viewer has both sides indexed).
-        await content.revisions.create({
-          articleId: article.id,
-          content: beforeContent,
-          source: "manual_edit",
-        });
-        await content.revisions.create({
-          articleId: article.id,
-          content: improved,
-          source: "auto_improve",
-        });
+        if (result.kind === "version_conflict") {
+          return res.status(409).json({
+            success: false,
+            error:
+              "Article changed since you started editing. Refresh to see the latest content, then re-apply your changes.",
+            code: "version_conflict",
+            current: result.current,
+          });
+        }
 
         res.json({
           success: true,
-          article: updated,
-          improvedContent: improved,
+          article: result.article,
+          improvedContent: result.improvedContent,
         });
       } catch (error) {
         sendError(res, error, "Failed to auto-improve article");
@@ -687,48 +501,19 @@ export function setupContentRoutes(app: Express): void {
         });
       }
 
-      try {
-        const response = await openai.chat.completions.create({
-          model: MODELS.keywordSuggestions,
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: `You are a keyword research expert. Return a JSON object of the shape {"suggestions": ["keyword 1", "keyword 2", ...]} with 6-8 short keyword phrases relevant to the user's input and industry. Only output valid JSON, nothing else.`,
-            },
-            {
-              role: "user",
-              content: `Input: "${input}"\nIndustry: ${industry}\n\nReturn {"suggestions": [6-8 short keyword phrases]}`,
-            },
-          ],
-          max_tokens: 300,
-        });
-
-        const rawContent = response.choices[0].message.content;
-        const parsed = safeParseJson<{ suggestions?: unknown } | string[]>(rawContent);
-        let suggestions: string[] = [];
-        if (Array.isArray(parsed)) {
-          suggestions = parsed.filter((s): s is string => typeof s === "string");
-        } else if (parsed && Array.isArray((parsed as any).suggestions)) {
-          suggestions = ((parsed as any).suggestions as unknown[]).filter(
-            (s): s is string => typeof s === "string",
-          );
-        }
-
-        res.json({
-          success: true,
-          suggestions: suggestions.slice(0, 8),
-        });
-      } catch (error) {
-        logger.error({ err: error }, "Keyword suggestion error");
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        captureAndFlush(error, { tags: { source: "content.ts:541" } });
-        res.status(500).json({
+      const result = await suggestKeywords(input, industry);
+      if (result.kind === "error") {
+        return res.status(500).json({
           success: false,
-          error: errorMessage,
+          error: result.message,
           message: "Failed to generate keyword suggestions. Please try again.",
         });
       }
+
+      res.json({
+        success: true,
+        suggestions: result.suggestions,
+      });
     }),
   );
 
@@ -764,56 +549,19 @@ export function setupContentRoutes(app: Express): void {
         });
       }
 
-      try {
-        const response = await openai.chat.completions.create({
-          model: MODELS.popularTopics,
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: `You are a trend analyst expert. Return a JSON object of the shape {"topics": [{"topic": "...", "description": "...", "category": "..."}, ...]} with 6-8 trending topics. Only output valid JSON, nothing else.`,
-            },
-            {
-              role: "user",
-              content: `Industry: ${industry}\n\nReturn {"topics": [6-8 current trending topics valuable for content creators in 2026]}.`,
-            },
-          ],
-          max_tokens: 600,
-        });
-
-        const rawContent = response.choices[0].message.content;
-        const parsed = safeParseJson<{ topics?: unknown } | unknown[]>(rawContent);
-        let topics: any[] = [];
-        if (Array.isArray(parsed)) {
-          topics = parsed;
-        } else if (parsed && Array.isArray((parsed as any).topics)) {
-          topics = (parsed as any).topics;
-        }
-
-        if (topics.length === 0) {
-          topics = [
-            {
-              topic: "Industry Innovation",
-              description: "Latest trends and developments",
-              category: "General",
-            },
-          ];
-        }
-
-        res.json({
+      const result = await getPopularTopics(industry);
+      if (result.kind === "error") {
+        return res.json({
           success: true,
-          topics: topics.slice(0, 8),
-        });
-      } catch (error) {
-        logger.error({ err: error }, "Popular topics error");
-        res.json({
-          success: true,
-          topics: [
-            { topic: "Industry Innovation", description: "Latest trends", category: "General" },
-          ],
+          topics: result.topics,
           fallback: true,
         });
       }
+
+      res.json({
+        success: true,
+        topics: result.topics,
+      });
     }),
   );
 
@@ -872,91 +620,32 @@ export function setupContentRoutes(app: Express): void {
           return;
         }
 
-        const competitors = await storage.getCompetitors(brandId);
-        const competitorContext =
-          competitors.length > 0
-            ? `Competitors: ${competitors.map((c) => c.name).join(", ")}.`
-            : "";
-
-        // Vercel-Hobby-safe: enqueue a background LLM job instead of
-        // waiting inline. The OpenAI Responses run executes on OpenAI's
-        // infrastructure (background:true, store:true) and the client
-        // polls /api/llm-jobs/:id. Both the kickoff and each poll fit
-        // in <1s of function time, so even with a 6s budget the user
-        // gets through 10–20s of effective LLM work.
-        const instructions = `You are an expert keyword researcher specializing in AI search optimization (GEO - Generative Engine Optimization). Your goal is to find keywords that will help brands get cited by AI search engines like ChatGPT, Claude, Perplexity, and Google AI.
-
-Return a JSON object of the shape:
-{
-  "keywords": [
-    {
-      "keyword": "primary keyword phrase",
-      "searchVolume": 1000-50000,
-      "difficulty": 1-100,
-      "opportunityScore": 1-100,
-      "aiCitationPotential": 1-100,
-      "intent": "informational" | "commercial" | "transactional" | "navigational",
-      "category": "topic category",
-      "competitorGap": 0-100,
-      "suggestedContentType": "article" | "guide" | "comparison" | "how-to" | "listicle",
-      "relatedKeywords": ["related term 1", "related term 2"]
-    }
-  ]
-}
-
-Focus on:
-1. Questions AI assistants commonly answer
-2. Comparison queries ("X vs Y")
-3. "Best of" and recommendation queries
-4. How-to and educational content
-5. Industry-specific expertise queries`;
-
-        const userPrompt = `Discover 12-15 high-opportunity keywords for this brand:
-
-Brand: ${brand.name}
-Company: ${brand.companyName}
-Industry: ${brand.industry}
-Description: ${brand.description || "Not specified"}
-Products/Services: ${brand.products?.join(", ") || "Not specified"}
-Target Audience: ${brand.targetAudience || "Not specified"}
-${competitorContext}
-
-Find keywords that would help this brand get cited by AI search engines. Prioritize queries where creating authoritative content could establish the brand as a trusted source.`;
-
-        try {
-          const job = await enqueueLlmJob<KeywordDiscoveryPayload>({
-            kind: "keyword_discovery",
-            payload: { brandId },
-            brandId,
-            userId: user.id,
-            model: MODELS.keywordResearch,
-            instructions,
-            input: userPrompt,
-            responseFormat: { type: "json_object" },
-          });
-          // 202 Accepted - the work is running on OpenAI's infra. The
-          // client polls /api/llm-jobs/:jobId and renders the result
-          // when status='succeeded'.
-          return res.status(202).json({
-            success: true,
-            jobId: job.jobId,
-            status: job.status,
-            pollUrl: `/api/llm-jobs/${job.jobId}`,
-            message: "Discovering keywords - this usually takes 10-20s.",
-          });
-        } catch (aiErr: unknown) {
-          const e = aiErr as { status?: number; name?: string };
-          const mapped = classifyAiEnqueueError(e);
-          if (mapped) return res.status(mapped.status).json(mapped.body);
-          if (e?.name === "AbortError" || e?.name === "TimeoutError") {
-            return res
-              .status(504)
-              .json({ success: false, error: "Keyword discovery timed out. Please try again." });
-          }
+        const result = await discoverBrandKeywords(brand, user.id);
+        if (result.kind === "ai_error") {
+          return res.status(result.status).json(result.body);
+        }
+        if (result.kind === "timeout") {
+          return res
+            .status(504)
+            .json({ success: false, error: "Keyword discovery timed out. Please try again." });
+        }
+        if (result.kind === "service_error") {
           return res
             .status(502)
             .json({ success: false, error: "AI service error. Please try again shortly." });
         }
+
+        // Vercel-Hobby-safe: enqueue a background LLM job instead of
+        // waiting inline. 202 Accepted - the work is running on OpenAI's
+        // infra. The client polls /api/llm-jobs/:jobId and renders the
+        // result when status='succeeded'.
+        return res.status(202).json({
+          success: true,
+          jobId: result.jobId,
+          status: result.status,
+          pollUrl: `/api/llm-jobs/${result.jobId}`,
+          message: "Discovering keywords - this usually takes 10-20s.",
+        });
       } catch (error) {
         sendError(res, error, "Failed to discover keywords");
       }
