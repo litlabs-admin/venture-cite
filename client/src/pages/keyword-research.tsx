@@ -280,7 +280,7 @@ export default function KeywordResearchPage() {
                 </div>
               ))}
             </div>
-          ) : filteredKeywords.length === 0 ? (
+          ) : keywords.length === 0 ? (
             <EmptyState
               icon={Sparkles}
               title="No Keywords Found"
@@ -293,6 +293,21 @@ export default function KeywordResearchPage() {
               action={{
                 label: "Discover Keywords",
                 onClick: () => discoverMutation.mutate(),
+              }}
+            />
+          ) : filteredKeywords.length === 0 ? (
+            // `keywords.length === 0` used to be the same branch as this one
+            // (`filteredKeywords.length === 0`), so a brand that already HAS
+            // keywords - just none matching the current status filter - got
+            // offered "Discover Keywords with AI" (another paid LLM job)
+            // instead of the actual fix, which is to clear the filter.
+            <EmptyState
+              icon={Filter}
+              title="No keywords match this filter"
+              description="Try a different status filter, or clear it to see every keyword."
+              action={{
+                label: "Clear filter",
+                onClick: () => setStatusFilter("all"),
               }}
             />
           ) : (
@@ -410,7 +425,12 @@ export default function KeywordResearchPage() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span className="text-ui font-semibold text-foreground inline-flex items-center gap-1">
-                                  {keyword.searchVolume
+                                  {/* `? … : "-"` treated a genuinely
+                                      estimated 0 the same as "no estimate at
+                                      all" - the server sends `null` for the
+                                      latter (server/services/keywordResearch.ts)
+                                      specifically so the two stay distinct. */}
+                                  {keyword.searchVolume != null
                                     ? keyword.searchVolume.toLocaleString()
                                     : "-"}
                                   <Sparkles className="h-3 w-3 text-muted-foreground" />

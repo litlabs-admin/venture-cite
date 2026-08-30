@@ -37,7 +37,12 @@ const TERMS = [
     relatedPages: [
       { label: "Community outreach", href: "/community" },
       { label: "FAQ Manager", href: "/faq-manager" },
-      { label: "GEO Opportunities", href: "/geo-opportunities" },
+      // `/geo-opportunities` was never a real route (verified against
+      // src/routes/**) - the closest real destination is the existing
+      // `/opportunities` legacy alias (src/routes/_app/opportunities.tsx),
+      // which redirects to /diagnose?tab=hallucinations. Pointing here
+      // instead of inventing a new page for this link.
+      { label: "GEO Opportunities", href: "/opportunities" },
     ],
   },
   {

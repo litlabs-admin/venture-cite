@@ -381,8 +381,14 @@ export default function FaqManager() {
                   </p>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-caption font-medium mb-1 block">Question</label>
+                      <label
+                        htmlFor="faq-new-question"
+                        className="text-caption font-medium mb-1 block"
+                      >
+                        Question
+                      </label>
                       <Textarea
+                        id="faq-new-question"
                         placeholder="What is your product/service?"
                         value={newQuestion}
                         onChange={(e) => setNewQuestion(e.target.value)}
@@ -391,8 +397,14 @@ export default function FaqManager() {
                       />
                     </div>
                     <div>
-                      <label className="text-caption font-medium mb-1 block">Answer</label>
+                      <label
+                        htmlFor="faq-new-answer"
+                        className="text-caption font-medium mb-1 block"
+                      >
+                        Answer
+                      </label>
                       <Textarea
+                        id="faq-new-answer"
                         placeholder="Provide a comprehensive answer..."
                         value={newAnswer}
                         onChange={(e) => setNewAnswer(e.target.value)}
@@ -401,9 +413,14 @@ export default function FaqManager() {
                       />
                     </div>
                     <div>
-                      <label className="text-caption font-medium mb-1 block">Category</label>
+                      <label
+                        htmlFor="faq-new-category"
+                        className="text-caption font-medium mb-1 block"
+                      >
+                        Category
+                      </label>
                       <Select value={newCategory} onValueChange={setNewCategory}>
-                        <SelectTrigger data-testid="select-new-category">
+                        <SelectTrigger id="faq-new-category" data-testid="select-new-category">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -667,10 +684,14 @@ export default function FaqManager() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div>
-                        <label className="text-caption font-medium mb-2 block">
+                        <label
+                          htmlFor="faq-generate-topic"
+                          className="text-caption font-medium mb-2 block"
+                        >
                           Topic Focus (Optional)
                         </label>
                         <Input
+                          id="faq-generate-topic"
                           placeholder="e.g., pricing, features, getting started, comparisons"
                           value={generateTopic}
                           onChange={(e) => setGenerateTopic(e.target.value)}
@@ -681,11 +702,17 @@ export default function FaqManager() {
                         </p>
                       </div>
                       <div>
-                        <label className="text-caption font-medium mb-2 block">
+                        <label
+                          htmlFor="faq-generate-count"
+                          className="text-caption font-medium mb-2 block"
+                        >
                           Number of FAQs to generate
                         </label>
                         <Select value={generateCount} onValueChange={setGenerateCount}>
-                          <SelectTrigger data-testid="select-generate-count">
+                          <SelectTrigger
+                            id="faq-generate-count"
+                            data-testid="select-generate-count"
+                          >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>

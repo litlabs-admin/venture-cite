@@ -133,7 +133,12 @@ export default function PromptDiagnosePage() {
                 label="Models citing"
                 value={`${data.standing.modelsCited}/${data.standing.modelsChecked || data.standing.modelsTotal}`}
               />
-              <Stat label="Rivals named" value={data.rivals.length || null} />
+              {/* `|| null` turned a real, measured 0 into NoValue's "not
+                  measured" dash - contradicting the "Who wins this question
+                  instead (0)" heading a few lines below, which shows the
+                  same number correctly. `??` only substitutes on
+                  null/undefined, so a genuine zero stays a zero. */}
+              <Stat label="Rivals named" value={data.rivals.length ?? null} />
             </div>
           </div>
 

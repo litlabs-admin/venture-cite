@@ -264,50 +264,61 @@ export function useDashboardData(brandId: string) {
   const hero = useQuery<Envelope<HeroData>>({
     queryKey: [`/api/dashboard/hero/${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   const trend = useQuery<Envelope<{ weeks: TrendWeek[] }>>({
     queryKey: [`/api/dashboard/citation-trend/${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   // 30 days is the widest range the chart's toggle offers; 7D/14D slice this
   // same series client-side rather than refetching per range.
   const history = useQuery<Envelope<MetricRow[]>>({
     queryKey: [`/api/metrics-history/${brandId}?metricType=visibility_score&days=30`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   const leaderboard = useQuery<Envelope<LeaderRow[]>>({
     queryKey: [`/api/competitors/leaderboard?brandId=${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   const recommendations = useQuery<Envelope<Recommendation[]>>({
     queryKey: [`/api/brands/${brandId}/recommendations`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   const platforms = useQuery<Envelope<{ platforms: PlatformRank[] }>>({
     queryKey: [`/api/dashboard/rankings/${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   const gapMatrix = useQuery<Envelope<{ categories: string[]; rows: GapMatrixRow[] }>>({
     queryKey: [`/api/dashboard/gap-matrix/${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   const hallucinations = useQuery<Envelope<HallucinationStats>>({
     queryKey: [`/api/hallucinations/stats/${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   const listicles = useQuery<Envelope<Listicle[]>>({
     queryKey: [`/api/listicles?brandId=${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   const prompts = useQuery<
     Envelope<{ byPrompt: PromptRow[]; totalChecks: number; totalCited: number }>
   >({
     queryKey: [`/api/brand-prompts/${brandId}/results`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   const citedUrls = useQuery<Envelope<{ items: CitedUrl[]; total: number; truncated: boolean }>>({
     queryKey: [`/api/dashboard/cited-urls/${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   // `stats.total` on this endpoint is all-time, so the 7-day figure comes from
   // counting the windowed rows. `truncated` is surfaced rather than hidden -
@@ -329,6 +340,7 @@ export function useDashboardData(brandId: string) {
   }>({
     queryKey: [`/api/brand-mentions/${brandId}?from=${mentionsFrom}&limit=200`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
   // Has a mention scan EVER completed for this brand?
   //
@@ -344,6 +356,7 @@ export function useDashboardData(brandId: string) {
   const lastMentionScan = useQuery<{ data: { completedAt?: string } | null }>({
     queryKey: [`/api/brand-mentions/scans/last/${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
 
   // Site health = AI-crawler access, read from robots.txt. Server-side cached
@@ -353,6 +366,7 @@ export function useDashboardData(brandId: string) {
   const siteHealth = useQuery<{ success: boolean; data: SiteHealth }>({
     queryKey: [`/api/dashboard/site-health/${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
 
   // Newest persisted perception run. Read-only and LLM-free - scoring happens
@@ -361,6 +375,7 @@ export function useDashboardData(brandId: string) {
   const perception = useQuery<{ success: boolean; data: Perception | null }>({
     queryKey: [`/api/dashboard/perception/${brandId}`],
     enabled,
+    meta: { suppressErrorToast: true },
   });
 
   // Tone from the mention stats already on the wire.
@@ -368,6 +383,39 @@ export function useDashboardData(brandId: string) {
     () => buildTone(mentions.data?.stats?.bySentiment),
     [mentions.data],
   );
+
+  // ─── Error visibility ──────────────────────────────────────────────────
+  // Every fallback above (`?? []`, `?? null`) makes a failed fetch look
+  // exactly like "nothing to show yet" to the panels, which is the honesty
+  // rule this file's header comment exists to prevent - it only covered
+  // "unmeasured" vs "measured zero", not "failed to load" vs either. A 500
+  // from e.g. the gap-matrix endpoint must not read as "no content gaps".
+  // `queriesToWatch` deliberately excludes nothing: any of these failing
+  // means SOME section of the dashboard is showing stale/empty data instead
+  // of what the brand actually has.
+  const queriesToWatch = [
+    hero,
+    trend,
+    history,
+    leaderboard,
+    recommendations,
+    platforms,
+    gapMatrix,
+    hallucinations,
+    listicles,
+    prompts,
+    citedUrls,
+    mentions,
+    lastMentionScan,
+    siteHealth,
+    perception,
+  ];
+  const hasError = queriesToWatch.some((q) => q.isError);
+  const retryFailed = () => {
+    for (const q of queriesToWatch) {
+      if (q.isError) void q.refetch();
+    }
+  };
 
   const h = hero.data?.data;
 
@@ -476,5 +524,10 @@ export function useDashboardData(brandId: string) {
 
     tone,
     toneLoading: mentions.isLoading,
+
+    // True when any of the underlying requests failed (as opposed to being
+    // loading or genuinely empty). See the comment above `queriesToWatch`.
+    hasError,
+    retryFailed,
   };
 }

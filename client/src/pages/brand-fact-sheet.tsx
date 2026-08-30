@@ -118,7 +118,7 @@ function groupByDomain(facts: ResolvedFact[]): Record<Domain, ResolvedFact[]> {
 export default function BrandFactSheet() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { selectedBrandId, selectedBrand } = useBrandSelection();
+  const { selectedBrandId, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
   const [editingFact, setEditingFact] = useState<ResolvedFact | null>(null);
 
   /* ---------- manual "Add fact" ---------- */
@@ -540,6 +540,26 @@ export default function BrandFactSheet() {
     // task's blanket "metadata belongs to the route" rule; /setup falls
     // back to the root's site-wide defaults.
     <PanelPage>
+      {/* `selectedBrand` is falsy during the brands query's initial load, when
+          the account has no brands yet, AND when /api/brands failed - the old
+          `{selectedBrand && (...)}` gate below treated all three identically
+          by rendering nothing at all, which reads as a blank, broken page
+          rather than any of those three real states. The branches below give
+          each one a distinct render instead of silently disappearing. */}
+      {brandsLoading && (
+        <div className="space-y-3 p-8">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      )}
+      {!brandsLoading && !selectedBrand && (
+        <div className="p-12">
+          <EmptyState
+            title="Select a brand to get started"
+            body="Choose a brand from the selector above to view its fact sheet."
+          />
+        </div>
+      )}
       {selectedBrand && (
         <>
           {/* HEADER SECTION - Task 8 */}
@@ -633,10 +653,14 @@ export default function BrandFactSheet() {
                       // unchanged "0 facts" state; user can retry.
                     }
                   }}
-                  onManualFill={() => {
-                    // For MVP, just close/dismiss - the existing FactRow edit button
-                    // and EditFactDialog are already on the page.
-                  }}
+                  // "Or fill fields manually" used to be a no-op: an enabled
+                  // button a user could click that visibly did nothing. It
+                  // now opens the same "Add fact" dialog the Resolved Facts
+                  // panel's own button opens (`setNewFact(emptyDraft)`),
+                  // which is the "FactRow edit button and EditFactDialog...
+                  // already on the page" the old comment pointed at without
+                  // actually wiring up.
+                  onManualFill={() => setNewFact(emptyDraft)}
                 />
               </Panel>
             </PanelRow>
@@ -868,12 +892,12 @@ export default function BrandFactSheet() {
           {newFact && (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label htmlFor="new-fact-domain">Category</Label>
                 <Select
                   value={newFact.domain}
                   onValueChange={(v) => setNewFact({ ...newFact, domain: v as Domain })}
                 >
-                  <SelectTrigger data-testid="select-fact-domain">
+                  <SelectTrigger id="new-fact-domain" data-testid="select-fact-domain">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -886,8 +910,9 @@ export default function BrandFactSheet() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Field name</Label>
+                <Label htmlFor="new-fact-key">Field name</Label>
                 <Input
+                  id="new-fact-key"
                   value={newFact.factKey}
                   placeholder="e.g. CEO, Headquarters, Founded"
                   onChange={(e) => setNewFact({ ...newFact, factKey: e.target.value })}
@@ -895,8 +920,9 @@ export default function BrandFactSheet() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Value</Label>
+                <Label htmlFor="new-fact-value">Value</Label>
                 <Input
+                  id="new-fact-value"
                   value={newFact.factValue}
                   placeholder="e.g. Jane Doe"
                   onChange={(e) => setNewFact({ ...newFact, factValue: e.target.value })}
@@ -904,8 +930,9 @@ export default function BrandFactSheet() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Source URL (optional)</Label>
+                <Label htmlFor="new-fact-source">Source URL (optional)</Label>
                 <Input
+                  id="new-fact-source"
                   value={newFact.sourceUrl}
                   placeholder="https://…"
                   onChange={(e) => setNewFact({ ...newFact, sourceUrl: e.target.value })}
@@ -939,29 +966,33 @@ export default function BrandFactSheet() {
           {editingFact && (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Subcategory</Label>
+                <Label htmlFor="edit-fact-subcategory">Subcategory</Label>
                 <Input
+                  id="edit-fact-subcategory"
                   value={editingFact.subcategory}
                   onChange={(e) => setEditingFact({ ...editingFact, subcategory: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Fact Key</Label>
+                <Label htmlFor="edit-fact-key">Fact Key</Label>
                 <Input
+                  id="edit-fact-key"
                   value={editingFact.factKey}
                   onChange={(e) => setEditingFact({ ...editingFact, factKey: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Value</Label>
+                <Label htmlFor="edit-fact-value">Value</Label>
                 <Input
+                  id="edit-fact-value"
                   value={editingFact.factValue}
                   onChange={(e) => setEditingFact({ ...editingFact, factValue: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Source URL</Label>
+                <Label htmlFor="edit-fact-source">Source URL</Label>
                 <Input
+                  id="edit-fact-source"
                   value={editingFact.sourceUrl || ""}
                   onChange={(e) => setEditingFact({ ...editingFact, sourceUrl: e.target.value })}
                 />

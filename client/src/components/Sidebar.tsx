@@ -65,16 +65,24 @@ function NavItem({
   // 16px icon, accent-subtle fill + accent text when active. No pill, no
   // heavy weight - the active state is a tint, not a slab.
   return (
-    <Link to={href} onClick={onNavigate}>
+    // `Link` renders a real `<a>`, already focusable and Enter-activatable.
+    // The inner `<div tabIndex={0}>` used to duplicate that as a SECOND tab
+    // stop with no onClick/onKeyDown of its own - every nav item cost a
+    // keyboard user two Tab presses instead of one, the second landing on a
+    // dead stop. The focus ring now lives on the `<a>`, which is the
+    // element that actually receives focus.
+    <Link
+      to={href}
+      onClick={onNavigate}
+      className="block rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-vc-accent/40"
+    >
       <div
         className={[
-          "group flex w-full cursor-pointer items-center gap-2.5 rounded-sm px-2 py-2 text-caption transition-colors duration-150",
-          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-vc-accent/40",
+          "group flex w-full items-center gap-2.5 rounded-sm px-2 py-2 text-caption transition-colors duration-150",
           active
             ? "bg-vc-accent-subtle font-medium text-vc-accent"
             : "text-vc-secondary hover:bg-vc-muted/50 hover:text-vc-primary",
         ].join(" ")}
-        tabIndex={0}
       >
         <Icon className="h-4 w-4 shrink-0" />
         <span className="truncate">{label}</span>

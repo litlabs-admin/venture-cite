@@ -23,6 +23,17 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { safeExternalHref } from "@/lib/urlSafety";
@@ -259,18 +270,29 @@ export default function CommunityEngagement() {
 
   const handleSaveGenerated = () => {
     if (!generatedContent) return;
-    createPostMutation.mutate({
-      brandId: selectedBrandId || null,
-      platform: generateForm.platform,
-      groupName: generateForm.groupName,
-      title: generatedContent.title,
-      content: generatedContent.content,
-      status: "draft",
-      postType: generateForm.postType,
-      generatedByAi: 1,
-    });
-    setGenerateDialogOpen(false);
-    setGeneratedContent(null);
+    // Close the dialog and clear the draft only once the save has actually
+    // succeeded. This used to run unconditionally right after `.mutate()`,
+    // so a failed save (network blip, 500) discarded the just-generated
+    // content from the dialog's state before the user ever saw the result -
+    // the only copy of it was gone, and regenerating costs another AI call.
+    createPostMutation.mutate(
+      {
+        brandId: selectedBrandId || null,
+        platform: generateForm.platform,
+        groupName: generateForm.groupName,
+        title: generatedContent.title,
+        content: generatedContent.content,
+        status: "draft",
+        postType: generateForm.postType,
+        generatedByAi: 1,
+      },
+      {
+        onSuccess: () => {
+          setGenerateDialogOpen(false);
+          setGeneratedContent(null);
+        },
+      },
+    );
   };
 
   const handleSaveDiscoveredGroup = (group: DiscoveredGroup) => {
@@ -337,12 +359,14 @@ export default function CommunityEngagement() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-caption font-medium">Platform</label>
+                      <label htmlFor="gen-platform" className="text-caption font-medium">
+                        Platform
+                      </label>
                       <Select
                         value={generateForm.platform}
                         onValueChange={(v) => setGenerateForm((f) => ({ ...f, platform: v }))}
                       >
-                        <SelectTrigger data-testid="select-gen-platform">
+                        <SelectTrigger id="gen-platform" data-testid="select-gen-platform">
                           <SelectValue placeholder="Select platform" />
                         </SelectTrigger>
                         <SelectContent>
@@ -352,12 +376,14 @@ export default function CommunityEngagement() {
                       </Select>
                     </div>
                     <div>
-                      <label className="text-caption font-medium">Post Type</label>
+                      <label htmlFor="gen-post-type" className="text-caption font-medium">
+                        Post Type
+                      </label>
                       <Select
                         value={generateForm.postType}
                         onValueChange={(v) => setGenerateForm((f) => ({ ...f, postType: v }))}
                       >
-                        <SelectTrigger data-testid="select-gen-type">
+                        <SelectTrigger id="gen-post-type" data-testid="select-gen-type">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -369,8 +395,11 @@ export default function CommunityEngagement() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-caption font-medium">Community/Group Name</label>
+                    <label htmlFor="gen-group" className="text-caption font-medium">
+                      Community/Group Name
+                    </label>
                     <Input
+                      id="gen-group"
                       placeholder="e.g., r/marketing, Hacker News"
                       value={generateForm.groupName}
                       onChange={(e) =>
@@ -380,8 +409,11 @@ export default function CommunityEngagement() {
                     />
                   </div>
                   <div>
-                    <label className="text-caption font-medium">Topic / Question to Address</label>
+                    <label htmlFor="gen-topic" className="text-caption font-medium">
+                      Topic / Question to Address
+                    </label>
                     <Input
+                      id="gen-topic"
                       placeholder="e.g., Best practices for AI-optimized content"
                       value={generateForm.topic}
                       onChange={(e) => setGenerateForm((f) => ({ ...f, topic: e.target.value }))}
@@ -389,12 +421,14 @@ export default function CommunityEngagement() {
                     />
                   </div>
                   <div>
-                    <label className="text-caption font-medium">Tone</label>
+                    <label htmlFor="gen-tone" className="text-caption font-medium">
+                      Tone
+                    </label>
                     <Select
                       value={generateForm.tone}
                       onValueChange={(v) => setGenerateForm((f) => ({ ...f, tone: v }))}
                     >
-                      <SelectTrigger data-testid="select-gen-tone">
+                      <SelectTrigger id="gen-tone" data-testid="select-gen-tone">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -730,6 +764,7 @@ export default function CommunityEngagement() {
                             });
                           }}
                           title="View / edit draft"
+                          aria-label="View / edit draft"
                           data-testid={`button-edit-draft-${post.id}`}
                         >
                           <Pencil className="w-3 h-3" />
@@ -738,6 +773,8 @@ export default function CommunityEngagement() {
                           size="sm"
                           variant="ghost"
                           onClick={() => copyToClipboard(post.content)}
+                          title="Copy draft text"
+                          aria-label="Copy draft text"
                           data-testid={`button-copy-draft-${post.id}`}
                         >
                           <Copy className="w-3 h-3" />
@@ -747,18 +784,47 @@ export default function CommunityEngagement() {
                           variant="ghost"
                           onClick={() => markPostedMutation.mutate(post.id)}
                           title="Mark as posted"
+                          aria-label="Mark as posted"
                           data-testid={`button-mark-posted-${post.id}`}
                         >
                           <CheckCircle2 className="w-3 h-3" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => deletePostMutation.mutate(post.id)}
-                          data-testid={`button-delete-draft-${post.id}`}
-                        >
-                          <Trash2 className="w-3 h-3 text-destructive" />
-                        </Button>
+                        {/* Deletes a draft with no way to get it back - this board has
+                            no undo/trash, so the mutation itself is instant and
+                            permanent. A confirmation step is the only guard against
+                            a stray click, matching the AlertDialog pattern already
+                            used for destructive deletes in articles.tsx/content.tsx. */}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title="Delete draft"
+                              aria-label="Delete draft"
+                              data-testid={`button-delete-draft-${post.id}`}
+                            >
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                {post.title || "This draft"} will be permanently deleted. This
+                                cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deletePostMutation.mutate(post.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete permanently
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   </div>

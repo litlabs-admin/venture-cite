@@ -88,6 +88,29 @@ export default function Home() {
           (or has failed). Without it, a brand created minutes ago is
           indistinguishable from one that finished and genuinely has no data. */}
       <ActivationBanner brandId={selectedBrandId} />
+      {/* useDashboardData fans out to ~13 endpoints; every one of them falls
+          back to `[]`/`null` on failure so a panel can render "not measured"
+          instead of crashing. That fallback used to make a failed request
+          indistinguishable from a brand that genuinely has no data yet - the
+          exact honesty violation this page's DATA HONESTY contract (above)
+          exists to prevent. This banner is the distinct "couldn't load"
+          signal the reference Dashboard (client/src/pages/internal/Dashboard.tsx)
+          shows for the same failure. */}
+      {d.hasError && (
+        <div
+          className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-warning bg-warning-subtle px-4 py-2 text-caption text-warning"
+          role="alert"
+        >
+          <span>Some dashboard data couldn&apos;t be loaded. Numbers below may be incomplete.</span>
+          <button
+            type="button"
+            onClick={d.retryFailed}
+            className="font-medium underline underline-offset-2 hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       {/* data-tour-id values are literal build-gate targets - scripts/
           verify-tour-targets.ts greps for these exact strings and fails the
           build if a registered tour step has nothing to point at. */}

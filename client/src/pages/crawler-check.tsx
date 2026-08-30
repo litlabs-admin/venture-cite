@@ -499,6 +499,7 @@ export default function CrawlerCheck() {
                     size="sm"
                     className="absolute top-2 right-2"
                     onClick={() => copyToClipboard(checkResult.rawRobotsTxt!)}
+                    aria-label="Copy raw robots.txt"
                   >
                     <Copy className="h-4 w-4" />
                   </Button>

@@ -21,6 +21,7 @@ import {
 } from "@/hooks/usePrompts";
 import { PanelLabel, NoValue, CCLink } from "@/components/dashboard-panels/primitives";
 import { PanelPage } from "@/components/dashboard-panels/Panel";
+import { ErrorState } from "@/components/ui/error-state";
 import { AI_PLATFORMS_ACTIVE } from "@shared/constants";
 import { TagChip } from "@/components/prompts/TagChip";
 import { PromptByModelTable } from "@/components/prompts/PromptByModelTable";
@@ -56,7 +57,13 @@ export default function PromptDetailPage() {
   const [showAllSources, setShowAllSources] = useState(false);
 
   const { data: allData } = useAllPrompts(selectedBrandId);
-  const { data: detailData, isLoading: detailLoading } = usePrompt(selectedBrandId, promptId);
+  const {
+    data: detailData,
+    isLoading: detailLoading,
+    isError: detailIsError,
+    refetch: refetchDetail,
+    isRefetching: detailIsRefetching,
+  } = usePrompt(selectedBrandId, promptId);
   const { data: historyData } = usePromptScoreHistory(selectedBrandId);
   const { data: resultsData } = usePromptResults(selectedBrandId);
   const { data: tagsData } = usePromptTags(selectedBrandId);
@@ -184,7 +191,19 @@ export default function PromptDetailPage() {
         </div>
       </div>
 
-      {detailLoading || !prompt ? (
+      {detailIsError ? (
+        // `detailLoading || !prompt` used to be the only gate here, so a
+        // genuinely failed fetch (404 for a stale/bad promptId, 500,
+        // network error) left `detailLoading` false and `prompt` undefined
+        // forever - the two animated skeleton bars above just kept
+        // shimmering with no way out. This is the distinct "couldn't load"
+        // branch that was missing.
+        <ErrorState
+          title="Couldn't load this prompt"
+          onRetry={() => void refetchDetail()}
+          isRetrying={detailIsRefetching}
+        />
+      ) : detailLoading || !prompt ? (
         <div className="space-y-px">
           <div className="h-24 w-full animate-pulse bg-vc-muted/40" />
           <div className="h-40 w-full animate-pulse bg-vc-muted/40" />

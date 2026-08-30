@@ -274,7 +274,12 @@ function ArticleSelect({
   }
   return (
     <Select value={selectedArticleId} onValueChange={onChange}>
-      <SelectTrigger className="w-[320px]" data-testid="select-article">
+      {/* `w-[320px]` was a hard floor: on a 360-375px phone viewport minus
+          this page's horizontal padding, 320px of available width is
+          already gone before the border/padding, so the control clipped or
+          forced the row to scroll. `w-full max-w-[320px]` keeps the same
+          320px cap on desktop but lets it shrink to fit on narrow screens. */}
+      <SelectTrigger className="w-full max-w-[320px]" data-testid="select-article">
         <SelectValue placeholder="Select article" />
       </SelectTrigger>
       <SelectContent>

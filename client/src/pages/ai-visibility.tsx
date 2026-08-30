@@ -985,9 +985,22 @@ export default function AIVisibility() {
               return (
                 <div
                   key={engine.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedEngineId(engine.id)}
+                  onKeyDown={(e) => {
+                    // This card is the only way to switch which engine's
+                    // checklist shows below - `aria-pressed` already
+                    // claimed toggle-button semantics without a role,
+                    // tabIndex, or key handler to back it up, so keyboard
+                    // users could not reach or activate it at all.
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedEngineId(engine.id);
+                    }
+                  }}
                   aria-pressed={isSelected}
-                  className={`cursor-pointer border p-4 pt-4 transition-colors hover:bg-vc-muted/50 ${isSelected ? "bg-vc-muted border-vc-primary/40" : `border-vc-default ${progress.percentage === 100 ? "border-vc-primary" : ""}`}`}
+                  className={`cursor-pointer border p-4 pt-4 transition-colors hover:bg-vc-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isSelected ? "bg-vc-muted border-vc-primary/40" : `border-vc-default ${progress.percentage === 100 ? "border-vc-primary" : ""}`}`}
                   data-testid={`engine-card-${engine.id}`}
                 >
                   <div className="flex items-center gap-2 mb-2">

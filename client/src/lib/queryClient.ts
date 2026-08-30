@@ -1,4 +1,4 @@
-import { QueryClient, QueryFunction, MutationCache } from "@tanstack/react-query";
+import { QueryClient, QueryFunction, MutationCache, QueryCache } from "@tanstack/react-query";
 import { getAccessToken } from "./authStore";
 import { toast } from "@/hooks/use-toast";
 
@@ -115,6 +115,12 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
     return await res.json();
   };
 
+function errorStatus(error: unknown): number | undefined {
+  return error && typeof error === "object" && "status" in error
+    ? Number((error as { status?: number }).status)
+    : undefined;
+}
+
 // A failed mutation used to be COMPLETELY silent: no global handler here, and
 // most hooks wire only `onSuccess`. So a 502 from the server looked exactly
 // like a button that does nothing - the spinner stopped and no message
@@ -128,13 +134,9 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
 const mutationCache = new MutationCache({
   onError: (error, _vars, _ctx, mutation) => {
     if (mutation.options.onError) return;
-    const status =
-      error && typeof error === "object" && "status" in error
-        ? Number((error as { status?: number }).status)
-        : undefined;
     // 401 is session loss, handled by the auth layer redirecting to /login.
     // A toast here would just add noise on top of a navigation.
-    if (status === 401) return;
+    if (errorStatus(error) === 401) return;
     toast({
       variant: "destructive",
       title: "Something went wrong",
@@ -143,8 +145,31 @@ const mutationCache = new MutationCache({
   },
 });
 
+// QUERIES had no equivalent of the mutation floor above until this was
+// added: `getQueryFn`/`apiRequest` throw on every non-2xx response, but
+// nothing ever surfaced that throw. A query's `isError` just sat there
+// unread at ~35 call sites (see .audit/B7/B9-11-ui-ux.md), because failing
+// silently by default meant nobody found out a page needed to read it.
+//
+// Mirrors mutationCache's shape: fires unless the query opts out via
+// `meta.suppressErrorToast`, which a page sets once it renders its own
+// inline error state (an `ErrorState` component, a distinct empty-vs-failed
+// branch) so the user is not told about the same failure twice.
+const queryCache = new QueryCache({
+  onError: (error, query) => {
+    if (query.meta?.suppressErrorToast) return;
+    if (errorStatus(error) === 401) return;
+    toast({
+      variant: "destructive",
+      title: "Couldn't load the latest data",
+      description: error instanceof Error ? error.message : "Please try again.",
+    });
+  },
+});
+
 export const queryClient = new QueryClient({
   mutationCache,
+  queryCache,
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
@@ -159,10 +184,7 @@ export const queryClient = new QueryClient({
       // Only retry on network errors and 5xx.
       retry: (failureCount, error: unknown) => {
         if (failureCount >= 2) return false;
-        const status =
-          error && typeof error === "object" && "status" in error
-            ? Number((error as { status?: number }).status)
-            : undefined;
+        const status = errorStatus(error);
         if (status !== undefined && status >= 400 && status < 500) return false;
         return true;
       },
