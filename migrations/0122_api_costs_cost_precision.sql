@@ -31,9 +31,39 @@ BEGIN
       AND table_name = 'api_costs'
       AND column_name = 'est_cost_cents'
   ) = 'integer' THEN
+    -- The insert policy's WITH CHECK references est_cost_cents, and Postgres
+    -- refuses ALTER COLUMN ... TYPE while any policy depends on the column
+    -- ("cannot alter type of a column used in a policy definition"). Drop it,
+    -- retype, and recreate it.
+    --
+    -- The recreated policy is the CURRENT shape from
+    -- 0113_rls_current_setting_initplan.sql - the `(select current_setting(...))`
+    -- wrapper, not 0099's bare call - because 0113 runs before this migration
+    -- and its wrapper is what makes the check an InitPlan rather than a
+    -- per-row evaluation. Recreating 0099's older shape here would silently
+    -- undo that optimisation.
+    --
+    -- Column-level GRANTs on est_cost_cents are NOT re-issued: privileges
+    -- attach to the column identity, which ALTER TYPE preserves. Only the
+    -- policy dependency blocks the retype.
+    DROP POLICY IF EXISTS api_costs_outbox_worker_insert ON public.api_costs;
+
     ALTER TABLE public.api_costs
       ALTER COLUMN est_cost_cents TYPE numeric(12, 6) USING est_cost_cents::numeric(12, 6),
       ALTER COLUMN est_cost_cents SET DEFAULT 0;
+
+    CREATE POLICY api_costs_outbox_worker_insert
+      ON public.api_costs
+      FOR INSERT
+      TO venturecite_outbox_worker
+      WITH CHECK (
+        user_id = nullif((select current_setting('venturecite.outbox_user_id', true)), '')
+        AND service <> ''
+        AND tokens_in >= 0
+        AND tokens_out >= 0
+        AND est_cost_cents >= 0
+        AND idempotency_key IS NOT NULL
+      );
   END IF;
 END
 $$;
