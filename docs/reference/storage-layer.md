@@ -1,10 +1,15 @@
 # Storage layer
 
-`server/storage.ts` declares the `IStorage` interface (310 methods on
-2026-08-30; `npx tsx scripts/storageSurface.ts` prints the current count) and
-exports a single object, `storage`, that implements it. Every part of the
-server that reads or writes application data does so through this object;
-60 files import it.
+`server/storage.ts` declares the `IStorage` interface and exports a single
+object, `storage`, that implements it. Every part of the server that reads or
+writes application data does so through this object.
+
+No method or file count is stated here on purpose. `npm run storage:surface`
+prints the current interface and implementation counts, and
+`npm run storage:surface:check` fails CI when they change without the
+baseline being updated deliberately. An earlier revision of this page pinned
+the number and was wrong twice in one day, because the count moved underneath
+it both times.
 
 ## Composition
 
