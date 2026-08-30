@@ -22,6 +22,23 @@ const BLOCKED = [
   /\bgit\s+reset\s+--hard\b/,
   /\bgit\s+branch\s+-[dD]\b/,
   /\bgit\s+checkout\s+--\s/,
+
+  // Tree-wide reverts. Added 2026-08-30 after a subagent ran `git stash`
+  // while four others were working in the same worktree: it swept up 33
+  // files, including a production migration fix and completed, verified work
+  // from three separate agents, and left the tree looking merely "clean".
+  // Nothing failed and nothing warned - the loss was only noticed because a
+  // file that had been edited minutes earlier was silently back to its
+  // committed state.
+  //
+  // `git stash list` and `git stash show` are read-only and stay allowed.
+  /\bgit\s+stash\b(?!\s+(list|show)\b)/,
+  /\bgit\s+restore\b/,
+  /\bgit\s+clean\b/,
+  // `git checkout <ref> -- <path>` overwrites working-tree files from another
+  // commit. Recovering from the incident above needed exactly this, which is
+  // why it is blocked rather than forbidden: use the opt-in, deliberately.
+  /\bgit\s+checkout\s+\S+\s+--\s/,
 ];
 
 let raw = "";
