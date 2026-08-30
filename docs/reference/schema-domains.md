@@ -93,3 +93,35 @@ because it happened once, in the identity extraction.
 
 See [Verifying these documents](./verifying-these-docs.md) for the commands
 that run these checks today.
+
+## Foreign keys: the schema declares them, the database names them
+
+`migrations/*.sql` is the source of truth for what the database contains.
+The Drizzle definitions in `shared/schema/*.ts` describe the same tables so
+the query layer is typed and relationships are visible to a reader.
+
+Those two agree on structure and disagree on one detail: constraint names.
+Production carries both conventions, because both tools created constraints
+over time.
+
+| Created by                      | Name shape                           | Example                         |
+| ------------------------------- | ------------------------------------ | ------------------------------- |
+| Hand-written SQL in a migration | `<table>_<column>_fkey`              | `metrics_history_brand_id_fkey` |
+| Drizzle                         | `<table>_<column>_<ref>_<refcol>_fk` | `brands_user_id_users_id_fk`    |
+
+So a `.references()` call in the schema file does NOT necessarily name the
+constraint that exists in the database. It names the relationship correctly -
+target table, column and `onDelete` action all match - but if Drizzle were
+asked to create it, it would pick a different name.
+
+This matters for exactly one command: `npm run db:push`, which applies the
+Drizzle schema directly rather than running the migrations. Against a database
+that already has these constraints under their `_fkey` names, push would add a
+SECOND constraint for the same relationship under its own name. Nothing in CI,
+the deploy path or any script runs `db:push`; migrations are applied by
+`npm run db:migrate`, which reads `migrations/*.sql` through
+`server/lib/migrationRunner.ts` and never consults the Drizzle schema.
+
+Treat `db:push` as unsafe against any database that has had migrations
+applied to it. Add foreign keys by writing a migration, then declare the same
+relationship in the Drizzle file so the schema stays honest about it.

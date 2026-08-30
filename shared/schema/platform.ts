@@ -165,7 +165,10 @@ export const emailFailures = pgTable(
     id: varchar("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    userId: varchar("user_id"),
+    // FK declared to match the database. migrations/0020 created it as
+    // `on delete set null`; verified against production, constraint
+    // email_failures_user_id_fkey.
+    userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
     template: text("template").notNull(),
     toAddress: text("to_address").notNull(),
     payloadJsonb: jsonb("payload_jsonb"),
@@ -195,7 +198,12 @@ export const apiCosts = pgTable(
     id: varchar("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    userId: varchar("user_id").notNull(),
+    // FK declared to match the database. migrations/0019 created it as
+    // `on delete cascade`; verified against production, constraint
+    // api_costs_user_id_fkey.
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     service: text("service").notNull(),
     model: text("model"),
     tokensIn: integer("tokens_in").default(0).notNull(),
@@ -225,7 +233,11 @@ export const auditLogs = pgTable(
     id: varchar("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    userId: varchar("user_id"),
+    // FK declared to match the database. migrations/0017 created it as
+    // `on delete set null` so audit rows survive account deletion, which the
+    // comment above already states; verified against production, constraint
+    // audit_logs_user_id_fkey.
+    userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
     action: text("action").notNull(),
     entityType: text("entity_type").notNull(),
     entityId: text("entity_id"),
@@ -252,7 +264,12 @@ export type InsertAuditLog = typeof auditLogs.$inferInsert;
 export const notificationPreferences = pgTable(
   "notification_preferences",
   {
-    userId: varchar("user_id").notNull(),
+    // FK declared to match the database. migrations/0025 created it as
+    // `on delete cascade`; verified against production, constraint
+    // notification_preferences_user_id_fkey.
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     type: text("type").notNull(),
     emailEnabled: boolean("email_enabled").default(true).notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
