@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import { PLAN_PRICE_CENTS } from "@shared/schema";
 
@@ -261,6 +261,81 @@ describe("POST /api/stripe/checkout safety", () => {
     expect(stubs.checkoutCreate).not.toHaveBeenCalled();
   });
 
+  // Regression: the guard used to list only status:"active", so every
+  // TRIALING customer who upgraded fell through to Checkout and ended up
+  // with a second live subscription - and since most upgrades happen during
+  // the trial, that was the common case, not the edge case.
+  it("updates a trialing subscription instead of creating a second one", async () => {
+    stubs.subscriptionsList.mockResolvedValue({
+      data: [
+        {
+          id: "sub_trial",
+          status: "trialing",
+          items: { data: [{ id: "si_trial", price: { id: "price_agency" } }] },
+        },
+      ],
+    });
+
+    const response = await fetchCheckout({ priceId: "price_pro" });
+
+    expect(response.status).toBe(200);
+    expect(stubs.subscriptionsUpdate).toHaveBeenCalledWith(
+      "sub_trial",
+      expect.objectContaining({ items: [{ id: "si_trial", price: "price_pro" }] }),
+    );
+    expect(stubs.checkoutCreate).not.toHaveBeenCalled();
+  });
+
+  // The proration must bill immediately (not park on the next invoice) so an
+  // upgrade takes effect and is paid for in the same moment the customer
+  // asked for it, and the subscription's metadata.userId must survive the
+  // swap - it is what customer.subscription.updated reads to re-grant the
+  // tier.
+  it("bills the plan swap immediately and carries the userId through to the webhook", async () => {
+    stubs.subscriptionsList.mockResolvedValue({
+      data: [
+        {
+          id: "sub_current",
+          status: "active",
+          items: { data: [{ id: "si_current", price: { id: "price_agency" } }] },
+        },
+      ],
+    });
+
+    const response = await fetchCheckout({ priceId: "price_pro" });
+
+    expect(response.status).toBe(200);
+    expect(stubs.subscriptionsUpdate).toHaveBeenCalledWith(
+      "sub_current",
+      expect.objectContaining({
+        proration_behavior: "always_invoice",
+        metadata: { userId: USER_ID },
+      }),
+    );
+  });
+
+  it("refuses to sell a second copy of the plan already active", async () => {
+    stubs.subscriptionsList.mockResolvedValue({
+      data: [
+        {
+          id: "sub_current",
+          status: "active",
+          items: { data: [{ id: "si_current", price: { id: "price_pro" } }] },
+        },
+      ],
+    });
+
+    const response = await fetchCheckout({ priceId: "price_pro" });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: "You're already on this plan.",
+    });
+    expect(stubs.subscriptionsUpdate).not.toHaveBeenCalled();
+    expect(stubs.checkoutCreate).not.toHaveBeenCalled();
+  });
+
   it("does not grant a second trial when the user row records prior subscription history", async () => {
     stubs.getUser.mockResolvedValue({
       id: USER_ID,
@@ -349,6 +424,56 @@ describe("POST /api/stripe/checkout safety", () => {
     expect(stubs.customerCreate).toHaveBeenCalledTimes(1);
     expect(stubs.updateUserStripeInfo).toHaveBeenLastCalledWith(USER_ID, {
       stripeCustomerId: "cus_new",
+    });
+  });
+
+  // Stripe caches an idempotent response for 24 HOURS, and a Checkout
+  // session also lives 24 hours. A key with no time component would replay
+  // the SAME session right up to the moment it expires and then keep
+  // replaying the corpse: anyone who opened checkout without finishing gets
+  // handed that dead session on every later click for the rest of the day.
+  // Only `Date` is faked below - faking timers too would stall the real
+  // HTTP request `fetchCheckout` makes.
+  describe("checkout idempotency window", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("buckets the idempotency key to the minute, not the whole 24-hour cache", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+      await fetchCheckout({ priceId: "price_pro" });
+      const firstKey = (stubs.checkoutCreate.mock.calls[0]?.[1] as { idempotencyKey?: string })
+        ?.idempotencyKey;
+      expect(firstKey).toMatch(new RegExp(`^checkout:${USER_ID}:price_pro:\\d+$`));
+
+      // 65 seconds later crosses a minute boundary.
+      vi.setSystemTime(new Date("2026-01-01T00:01:05.000Z"));
+      stubs.checkoutCreate.mockClear();
+      await fetchCheckout({ priceId: "price_pro" });
+      const secondKey = (stubs.checkoutCreate.mock.calls[0]?.[1] as { idempotencyKey?: string })
+        ?.idempotencyKey;
+
+      expect(secondKey).not.toBe(firstKey);
+    });
+
+    it("still collapses a double-click into one Stripe session", async () => {
+      // Two clicks land in the same minute bucket, which is the whole point
+      // of the key - losing that would open two subscriptions from one
+      // impatient customer.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-01-01T00:00:10.000Z"));
+      await fetchCheckout({ priceId: "price_pro" });
+      const firstKey = (stubs.checkoutCreate.mock.calls[0]?.[1] as { idempotencyKey?: string })
+        ?.idempotencyKey;
+
+      vi.setSystemTime(new Date("2026-01-01T00:00:45.000Z"));
+      stubs.checkoutCreate.mockClear();
+      await fetchCheckout({ priceId: "price_pro" });
+      const secondKey = (stubs.checkoutCreate.mock.calls[0]?.[1] as { idempotencyKey?: string })
+        ?.idempotencyKey;
+
+      expect(secondKey).toBe(firstKey);
     });
   });
 });

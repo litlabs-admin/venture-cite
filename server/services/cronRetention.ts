@@ -1,11 +1,11 @@
 // Cron orchestrator retention/pruning steps, extracted verbatim from
 // server/routes/cron.ts as part of the B7 service-layer split.
 //
-// Each function is one orchestrator step's worker body. The orchestrator
-// itself (Orchestrator class, STEP_CAPS_MS, `orch.run("step-name", ...)`
-// call sites) stays in server/routes/cron.ts -
-// tests/unit/schedulerOrchestratorParity.test.ts reads that file's source
-// text directly and requires those literal call sites to remain there.
+// Each function is one orchestrator step's worker body. The orchestrator's
+// budgeting mechanics (Orchestrator class, STEP_CAPS_MS) live in
+// server/services/cronOrchestrator.ts; the `orch.run("step-name", ...)` call
+// sequence stays in server/routes/cron.ts because which steps run, in what
+// order and under what gate, is that route's own orchestration policy.
 
 import { logger } from "../lib/logger";
 import { storage } from "../storage";

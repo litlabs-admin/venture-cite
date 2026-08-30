@@ -19,6 +19,7 @@ import { supabaseAdmin } from "./supabase";
 import { startRun } from "./lib/workflowEngine";
 import { tryEmitWeeklyDigestForUser } from "./lib/weeklyDigestEmitter";
 import { runTourEventsCleanupJob } from "./lib/tourCleanup";
+import { SCHEDULER_JOB_NAMES } from "./lib/schedulerJobRegistry";
 
 import { captureAndFlush } from "./lib/sentryReport";
 const WEEKLY_CRON = process.env.WEEKLY_REPORT_CRON || "0 8 * * 0";
@@ -793,7 +794,7 @@ export function initScheduler(): void {
   if (cron.validate(AUTOPILOT_RESUME_CRON)) {
     cron.schedule(
       AUTOPILOT_RESUME_CRON,
-      cronCrashGuard("resume-in-flight-autopilots", async () => {
+      cronCrashGuard(SCHEDULER_JOB_NAMES.resumeInFlightAutopilots, async () => {
         const { resumeInFlightAutopilots } = await import("./lib/onboardingAutopilot");
         // Finish inside the minute so ticks cannot pile up on each other.
         await resumeInFlightAutopilots(Date.now() + 45_000);
@@ -806,7 +807,7 @@ export function initScheduler(): void {
   if (cron.validate(CONTENT_COST_OUTBOX_CRON)) {
     cron.schedule(
       CONTENT_COST_OUTBOX_CRON,
-      cronCrashGuard("content-cost-outbox-drain", async () => {
+      cronCrashGuard(SCHEDULER_JOB_NAMES.contentCostOutboxDrain, async () => {
         const { runContentCostOutboxDrain } = await import("./outbox/contentCostOutboxDrain");
         await runContentCostOutboxDrain({
           maxCommands: 25,
@@ -820,13 +821,19 @@ export function initScheduler(): void {
 
   // Daily account purge for users whose 30-day deletion grace has elapsed.
   if (cron.validate(ACCOUNT_PURGE_CRON)) {
-    cron.schedule(ACCOUNT_PURGE_CRON, cronCrashGuard("account-purge", runAccountPurgeJob));
+    cron.schedule(
+      ACCOUNT_PURGE_CRON,
+      cronCrashGuard(SCHEDULER_JOB_NAMES.accountPurge, runAccountPurgeJob),
+    );
     logger.info({ cron: ACCOUNT_PURGE_CRON }, "account purge job scheduled");
   }
 
   // Daily brand purge for brands whose 30-day soft-delete window has elapsed.
   if (cron.validate(BRAND_PURGE_CRON)) {
-    cron.schedule(BRAND_PURGE_CRON, cronCrashGuard("brand-purge", runBrandPurgeJob));
+    cron.schedule(
+      BRAND_PURGE_CRON,
+      cronCrashGuard(SCHEDULER_JOB_NAMES.brandPurge, runBrandPurgeJob),
+    );
     logger.info({ cron: BRAND_PURGE_CRON }, "brand purge job scheduled");
   }
 
@@ -835,14 +842,17 @@ export function initScheduler(): void {
   if (cron.validate(TOUR_EVENTS_CLEANUP_CRON)) {
     cron.schedule(
       TOUR_EVENTS_CLEANUP_CRON,
-      cronCrashGuard("tour-events-cleanup", runTourEventsCleanupJob),
+      cronCrashGuard(SCHEDULER_JOB_NAMES.tourEventsCleanup, runTourEventsCleanupJob),
     );
     logger.info({ cron: TOUR_EVENTS_CLEANUP_CRON }, "tour events cleanup scheduled");
   }
 
   // Auto-citation cron - always active, no RESEND_API_KEY needed.
   if (cron.validate(AUTO_CITATION_CRON)) {
-    cron.schedule(AUTO_CITATION_CRON, cronCrashGuard("auto-citation", runAutoCitationJob));
+    cron.schedule(
+      AUTO_CITATION_CRON,
+      cronCrashGuard(SCHEDULER_JOB_NAMES.autoCitation, runAutoCitationJob),
+    );
     logger.info({ cron: AUTO_CITATION_CRON }, "auto-citation job scheduled");
   }
 
@@ -870,7 +880,7 @@ export function initScheduler(): void {
       // tests/unit/citationCronUnconditional.test.ts past its 20s ceiling
       // under full-suite load, which is that test telling us the graph got too
       // heavy. Resolve it when the tick fires instead.
-      cronCrashGuard("brand-activation", async () => {
+      cronCrashGuard(SCHEDULER_JOB_NAMES.brandActivation, async () => {
         const { runBrandActivationSweep } = await import("./lib/brandActivation");
         await runBrandActivationSweep();
       }),
@@ -883,7 +893,7 @@ export function initScheduler(): void {
   if (cron.validate(DETECT_FACT_SCRAPE_FAILURE_CRON)) {
     cron.schedule(
       DETECT_FACT_SCRAPE_FAILURE_CRON,
-      cronCrashGuard("detect-fact-scrape-failure", detectFactScrapeFailureRate),
+      cronCrashGuard(SCHEDULER_JOB_NAMES.detectFactScrapeFailure, detectFactScrapeFailureRate),
     );
     logger.info(
       { cron: DETECT_FACT_SCRAPE_FAILURE_CRON },
@@ -904,7 +914,7 @@ export function initScheduler(): void {
   if (cron.validate(WEEKLY_CATCHUP_CRON)) {
     cron.schedule(
       WEEKLY_CATCHUP_CRON,
-      cronCrashGuard("weekly-catchup-kickoff", runWeeklyCatchupKickoff),
+      cronCrashGuard(SCHEDULER_JOB_NAMES.weeklyCatchupKickoff, runWeeklyCatchupKickoff),
     );
     logger.info({ cron: WEEKLY_CATCHUP_CRON }, "weekly catchup kickoff scheduled");
   }
@@ -924,6 +934,6 @@ export function initScheduler(): void {
     logger.error({ cron: WEEKLY_CRON }, "invalid cron expression for weekly report");
     return;
   }
-  cron.schedule(WEEKLY_CRON, cronCrashGuard("weekly-report", runWeeklyReportJob));
+  cron.schedule(WEEKLY_CRON, cronCrashGuard(SCHEDULER_JOB_NAMES.weeklyReport, runWeeklyReportJob));
   logger.info({ cron: WEEKLY_CRON }, "weekly report job scheduled");
 }

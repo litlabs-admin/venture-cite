@@ -1,11 +1,10 @@
 // Cron orchestrator fact-reverification step, extracted verbatim from
 // server/routes/cron.ts as part of the B7 service-layer split.
 //
-// The orchestrator itself (Orchestrator class, STEP_CAPS_MS, the
-// `orch.run("fact-reverification-batch", ...)` call site) stays in
-// server/routes/cron.ts - tests/unit/schedulerOrchestratorParity.test.ts
-// reads that file's source text directly and requires the literal call
-// site to remain there.
+// The orchestrator's budgeting mechanics (Orchestrator class, STEP_CAPS_MS)
+// live in server/services/cronOrchestrator.ts; the
+// `orch.run("fact-reverification-batch", ...)` call site stays in
+// server/routes/cron.ts, in sequence with the rest of that route's steps.
 
 import { logger } from "../lib/logger";
 import { LLM_CALL_TIMEOUT_MS } from "../lib/factAgent/v2/vercelBudget";
