@@ -179,7 +179,13 @@ describeIfLocal("request database RLS foundation", () => {
          and policyname like '%_request_%'
        order by policyname`,
     );
+    // brands_entity_request_select (migrations/0124_rls_defence_in_depth.sql)
+    // reads brands from a second, unrelated restricted role
+    // (venturecite_entity_request) that mirrors this one's ownership check
+    // for a different table set. It genuinely matches this query's
+    // "%_request_%" filter and belongs in this exhaustive list.
     expect(policies.rows.map((row) => row.policyname)).toEqual([
+      "brands_entity_request_select",
       "brands_request_insert",
       "brands_request_select",
       "brands_request_update",
