@@ -43,8 +43,8 @@ export const users = pgTable("users", {
   // Soft-delete state. Set when the user requests account deletion.
   // - the row stays for the 30-day grace period so an admin can restore
   // accidental deletions; the daily cron then hard-deletes after grace.
-  deletedAt: timestamp("deleted_at"),
-  deletionScheduledFor: timestamp("deletion_scheduled_for"),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  deletionScheduledFor: timestamp("deletion_scheduled_for", { withTimezone: true }),
   // Email deliverability state. Values: 'active', 'bounced',
   // 'complained', 'unsubscribed'. The email service refuses to send
   // when this isn't 'active' so we don't keep blasting addresses that

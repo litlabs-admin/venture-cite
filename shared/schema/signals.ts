@@ -41,7 +41,7 @@ export const listicles = pgTable(
     outreachNotes: text("outreach_notes"),
     // Refresh on subsequent scans so isIncluded and listPosition can
     // be re-validated rather than frozen at first-discovery time.
-    lastVerifiedAt: timestamp("last_verified_at"),
+    lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
   },
@@ -109,8 +109,8 @@ export const bofuContent = pgTable(
     // where this BOFU piece lives; once set, the citation checker tracks
     // self-citations against it and updates lastCitedAt.
     publishedUrl: text("published_url"),
-    publishedAt: timestamp("published_at"),
-    lastCitedAt: timestamp("last_cited_at"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    lastCitedAt: timestamp("last_cited_at", { withTimezone: true }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
@@ -146,8 +146,8 @@ export const faqItems = pgTable(
     optimizationTips: text("optimization_tips").array(),
     // Lifecycle parallel to bofu_content.
     publishedUrl: text("published_url"),
-    publishedAt: timestamp("published_at"),
-    lastCitedAt: timestamp("last_cited_at"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    lastCitedAt: timestamp("last_cited_at", { withTimezone: true }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
@@ -234,7 +234,7 @@ export const trackedContentUrls = pgTable(
     // stripped. The matcher works against this normalized form so URL
     // variations match consistently.
     normalizedUrl: text("normalized_url").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("tracked_content_urls_brand_id_idx").on(table.brandId),

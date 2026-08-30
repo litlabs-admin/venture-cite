@@ -64,8 +64,8 @@ export const brands = pgTable(
     // Soft-delete window. The DELETE handler sets these. The cron job
     // hard-deletes after deletion_scheduled_for elapses. Filters
     // (`deleted_at IS NULL`) keep deleted brands out of GET responses.
-    deletedAt: timestamp("deleted_at"),
-    deletionScheduledFor: timestamp("deletion_scheduled_for"),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletionScheduledFor: timestamp("deletion_scheduled_for", { withTimezone: true }),
     // Mentions rebuild (0050): per-brand opt-in for daily auto-scan.
     // Default ON: the weekly mention-scan cron reads this flag, and every
     // other dashboard measurement fires on its own schedule. See

@@ -213,7 +213,7 @@ export const contentGenerationJobs = pgTable(
     quotaReservationPeriod: timestamp("quota_reservation_period"),
     // Vercel migration: per-call slice lock. /advance updates this when
     // it claims the job for an 8s slice; concurrent advance calls bail.
-    lastAdvanceStartedAt: timestamp("last_advance_started_at"),
+    lastAdvanceStartedAt: timestamp("last_advance_started_at", { withTimezone: true }),
     advanceToken: text("advance_token"),
     advanceLeaseExpiresAt: timestamp("advance_lease_expires_at", { withTimezone: true }),
     // Vercel migration: ID of the OpenAI Responses run executing this

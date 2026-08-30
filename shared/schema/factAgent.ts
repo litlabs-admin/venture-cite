@@ -207,7 +207,7 @@ export const brandFactSheet = pgTable(
     //     used by the per-fact re-verification cron.
     userOverridden: boolean("user_overridden").notNull().default(false),
     verificationAttempts: integer("verification_attempts").notNull().default(0),
-    lastVerificationAt: timestamp("last_verification_at"),
+    lastVerificationAt: timestamp("last_verification_at", { withTimezone: true }),
     verificationStatus: text("verification_status").notNull().default("never"),
   },
   (table) => [

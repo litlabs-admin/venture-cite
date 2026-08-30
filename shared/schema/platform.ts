@@ -174,7 +174,7 @@ export const emailFailures = pgTable(
     payloadJsonb: jsonb("payload_jsonb"),
     lastError: text("last_error"),
     retryCount: integer("retry_count").default(0).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("email_failures_created_idx").on(table.createdAt)],
 );
@@ -212,7 +212,7 @@ export const apiCosts = pgTable(
       .default(0)
       .notNull(),
     idempotencyKey: text("idempotency_key"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("api_costs_user_created_idx").on(table.userId, table.createdAt),
@@ -245,7 +245,7 @@ export const auditLogs = pgTable(
     afterJsonb: jsonb("after_jsonb"),
     ip: text("ip"),
     userAgent: text("user_agent"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("audit_logs_user_idx").on(table.userId, table.createdAt),
@@ -272,7 +272,7 @@ export const notificationPreferences = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     type: text("type").notNull(),
     emailEnabled: boolean("email_enabled").default(true).notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.userId, table.type] }),

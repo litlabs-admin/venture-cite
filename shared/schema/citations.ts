@@ -134,7 +134,12 @@ export const citationRuns = pgTable(
     // window. NULL on a row created before migration 0123 - both reap
     // sites fall back to startedAt in that case. See
     // .audit/B6/B6a-12-citation-run-staleness.md.
-    lastAdvanceStartedAt: timestamp("last_advance_started_at"),
+    // TIMESTAMPTZ in migration 0123, unlike startedAt/completedAt above,
+    // which predate the convention and are TIMESTAMP WITHOUT TIME ZONE in
+    // production. The declaration has to match the column it maps, or
+    // Drizzle serialises writes without an offset and Postgres reads them
+    // in the session time zone instead of UTC.
+    lastAdvanceStartedAt: timestamp("last_advance_started_at", { withTimezone: true }),
     // Per-platform breakdown snapshot so the history endpoint doesn't
     // need to re-join geo_rankings for every run.
     platformBreakdown: jsonb("platform_breakdown"),
