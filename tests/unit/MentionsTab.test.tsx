@@ -140,19 +140,30 @@ vi.mock("@/components/geo-tools/MentionCard", () => ({
   default: ({
     mention,
     onOpen,
+    onDelete,
   }: {
     mention: { id: string; sourceTitle?: string };
     onOpen: (m: { id: string }) => void;
+    onDelete: (id: string) => void;
   }) =>
+    // Two sibling interactive controls, not nested - axe flags a <button>
+    // nested inside a role="button" container as "nested-interactive".
     React.createElement(
       "div",
-      {
-        "data-testid": `mention-card-${mention.id}`,
-        onClick: () => onOpen(mention),
-        role: "button",
-        tabIndex: 0,
-      },
-      mention.sourceTitle ?? mention.id,
+      { "data-testid": `mention-card-${mention.id}` },
+      React.createElement(
+        "button",
+        { onClick: () => onOpen(mention) },
+        mention.sourceTitle ?? mention.id,
+      ),
+      React.createElement(
+        "button",
+        {
+          "data-testid": `delete-mention-${mention.id}`,
+          onClick: () => onDelete(mention.id),
+        },
+        "Delete",
+      ),
     ),
 }));
 
@@ -397,7 +408,7 @@ describe("MentionsTab", () => {
     const mentions = [makeMention("m1", { sourceTitle: "Hello Reddit" })];
     useMentionsMock.mockReturnValue(makeHookReturn({ mentions }));
     renderTab(BRAND_ID);
-    const card = screen.getByTestId("mention-card-m1");
+    const card = screen.getByText("Hello Reddit");
     await userEvent.click(card);
     // URL should now include mention=m1. navigate() takes `search` as an
     // updater function, so assert on what the updater actually produces -
@@ -424,32 +435,28 @@ describe("MentionsTab", () => {
     expect(setFilterMock).toHaveBeenCalledWith("status", "new");
   });
 
-  // 8. Delete shows undo toast with action prop
-  it("calls deleteMention when the hook fires deleteMention, and toast was called", async () => {
-    // The undo-toast is fired by the hook itself (onSuccess), which we mock.
-    // We verify here that if we trigger delete from the card menu, deleteMention is called.
-    // The toast assertion checks that the hook's toastMock integration works -
-    // we simulate by calling the hook's deleteMention directly on render.
+  // 8. Delete control on the rendered card is wired to the hook's deleteMention.
+  //
+  // The undo toast itself is fired inside useMentions' onSuccess callback and
+  // is covered end-to-end (real hook, real toast call) by
+  // tests/unit/useMentions.test.tsx ("deleteMention removes the row
+  // optimistically and shows an undo toast"). This test's job is the part
+  // that lives in THIS component: that clicking the card's delete control
+  // actually invokes the hook's deleteMention with the clicked mention's id -
+  // i.e. that `onDelete={deleteMention}` is really passed to MentionCard.
+  it("wires the rendered card's delete control to the hook's deleteMention", async () => {
     const deleteMentionMock = vi.fn();
-    const mentions = [makeMention("m1")];
+    const mentions = [makeMention("m1"), makeMention("m2")];
     useMentionsMock.mockReturnValue(makeHookReturn({ mentions, deleteMention: deleteMentionMock }));
     renderTab(BRAND_ID);
-    // The MentionCard mock doesn't expose a delete button - this test verifies
-    // the hook's deleteMention is wired and callable from the tab.
-    // We directly verify the prop is passed by checking deleteMentionMock can be called.
-    deleteMentionMock("m1");
-    expect(deleteMentionMock).toHaveBeenCalledWith("m1");
-    // The real undo toast is fired inside the hook (onSuccess callback).
-    // We verify toast integration by ensuring the toastMock is callable with action prop.
-    toastMock({
-      title: "Mention deleted",
-      description: "Post title m1",
-      action: React.createElement("button", { onClick: () => {} }, "Undo"),
-      duration: 5000,
-    });
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Mention deleted", action: expect.anything() }),
-    );
+
+    const deleteBtn = screen.getByTestId("delete-mention-m1");
+    await userEvent.click(deleteBtn);
+
+    expect(deleteMentionMock).toHaveBeenCalledExactlyOnceWith("m1");
+    // Clicking m1's delete control must not also open the detail sheet or
+    // delete an unrelated mention.
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
   // 9. axe a11y - Task 24: assert no critical/serious violations

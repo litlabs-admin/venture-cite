@@ -148,6 +148,40 @@ describe("outbox worker", () => {
     );
   });
 
+  it("computes an exponential backoff for the reschedule's nextAvailableAt", async () => {
+    // retryAt() is a private function - the only observable trace of its
+    // output is the nextAvailableAt argument passed to outbox.reschedule().
+    // The existing "reschedules a retryable handler failure" test uses
+    // objectContaining and deliberately does not check this field, so a
+    // mutation collapsing the backoff to "always now" produced zero
+    // failures (.audit/B6/B6b-02-mutation-concurrency.md, 3e).
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-20T00:00:00.000Z"));
+      const command = { ...claimed(), attemptCount: 4 };
+      const outbox = repository(command);
+      const handlers: Record<ClaimedOutboxCommand["kind"], OutboxCommandHandler> = {
+        "stripe.create_customer": vi.fn(),
+        "resend.send_email": vi.fn(),
+        "buffer.create_post": vi.fn(),
+        "openai.create_response": vi.fn(),
+        "content_cost.record": vi.fn().mockRejectedValue(new Error("temporary provider failure")),
+      };
+
+      await expect(runOutboxWorkerOnce({ outbox, handlers, leaseSeconds: 120 })).resolves.toEqual({
+        kind: "rescheduled",
+        commandId: command.id,
+      });
+
+      // attemptCount=4 => 2**(4-1) = 8s of backoff, not "now".
+      expect(outbox.reschedule).toHaveBeenCalledWith(
+        expect.objectContaining({ nextAvailableAt: new Date("2026-08-20T00:00:08.000Z") }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("finalizes cancellation before invoking a handler", async () => {
     const command = claimed();
     const outbox = repository(command);

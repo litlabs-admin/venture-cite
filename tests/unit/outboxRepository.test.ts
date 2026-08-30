@@ -33,6 +33,40 @@ describe("outbox repository", () => {
     expect(statement).toContain("kind = any");
   });
 
+  it("excludes a row that has exhausted its retry budget from both claim branches", async () => {
+    // .audit/B6/B6b-02-mutation-concurrency.md (3c): a prior version of this
+    // test checked four substrings across the whole query but never checked
+    // for "attempt_count < max_attempts" anywhere, so deleting that bound
+    // from BOTH the 'pending' and 'processing' arms of the candidate CTE -
+    // the actual cap that stops a poisoned row from retrying forever - left
+    // every test in this file green. Scoped (not whole-query) substring
+    // checks close that hole: each arm is sliced out individually so a
+    // deletion from either one fails here even though the other arm still
+    // contains the phrase.
+    stubs.execute.mockResolvedValue({ rows: [] });
+    const repository = createOutboxRepository(fakeDatabase());
+
+    await repository.claimNext({ leaseSeconds: 120, kinds: ["content_cost.record"] });
+    const statement = executedSql().find((text) => text.includes("for update skip locked")) ?? "";
+
+    // The candidate CTE is the second `status = 'processing'` occurrence -
+    // the first is the unrelated expired_final dead-letter-on-expiry branch.
+    const candidateCteStart = statement.indexOf("candidate as (");
+    expect(candidateCteStart).toBeGreaterThanOrEqual(0);
+    const candidateCte = statement.slice(candidateCteStart);
+    const pendingArmStart = candidateCte.indexOf("status = 'pending'");
+    const processingArmStart = candidateCte.indexOf("status = 'processing'");
+    const armsEnd = candidateCte.indexOf("order by available_at");
+    expect(pendingArmStart).toBeGreaterThanOrEqual(0);
+    expect(processingArmStart).toBeGreaterThan(pendingArmStart);
+    expect(armsEnd).toBeGreaterThan(processingArmStart);
+
+    const pendingArm = candidateCte.slice(pendingArmStart, processingArmStart);
+    const processingArm = candidateCte.slice(processingArmStart, armsEnd);
+    expect(pendingArm).toContain("attempt_count < max_attempts");
+    expect(processingArm).toContain("attempt_count < max_attempts");
+  });
+
   it("rejects a mismatched payload before it reaches the database", async () => {
     const repository = createOutboxRepository(fakeDatabase());
 

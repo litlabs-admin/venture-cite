@@ -806,8 +806,9 @@ Consider:
           : [];
         const articles = (await storage.getArticles()).filter((a) => a.brandId === brand.id);
         // No `since` bound here, deliberately, and confirmed as a product
-        // decision on 2026-08-29: Opportunities reports against the brand's
-        // entire history while /api/geo-analytics scopes to a run window.
+        // decision on 2026-08-29: /api/geo-opportunities/:brandId reports
+        // against the brand's entire history, while
+        // /api/geo-analytics/:brandId scopes to a run window.
         // Adding a window would make the two pages agree but would drop older
         // cited rows from the key stats and per-platform shares, leaving this
         // page sparse for any brand without a recent run. Do not "fix" the

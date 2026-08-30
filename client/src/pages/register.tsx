@@ -227,7 +227,16 @@ export default function Register() {
                 )}
               </Button>
               <p className="text-caption text-vc-tertiary text-center">
-                By signing up, you agree to our Terms of Service and Privacy Policy.
+                By signing up, you agree to our Terms of Service and{" "}
+                {/* /privacy is a real route (client/src/pages/privacy.tsx) that
+                    nothing in the app linked to - see .audit/B7/B7-08-orphaned-pages.md.
+                    Wired here since this disclaimer is the natural place a
+                    visitor looks for it. No Terms of Service page exists yet,
+                    so that phrase stays plain text. */}
+                <a href="/privacy" className="text-vc-accent hover:text-vc-accent/90 underline">
+                  Privacy Policy
+                </a>
+                .
               </p>
             </form>
           </div>

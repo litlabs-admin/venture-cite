@@ -61,11 +61,29 @@ describe("estimateCostCents", () => {
   // some or all of its calls must now record a non-zero value for a
   // representative call shape (50 in / 500 out tokens - a small citation or
   // analysis call, the shape that was most distorted by the old rounding).
+  //
+  // Expected values are derived the same way as the neighboring test above:
+  // cost = (50/1000)*rate.in + (500/1000)*rate.out, against the rates
+  // in PRICING_PER_1K_TOKENS_CENTS (server/lib/llmPricing.ts) at the time
+  // this file was written. These are PINNED, not re-derived from the table
+  // at test time, so a legitimate price update in that table is expected
+  // to require updating the matching row here too - that's a price change,
+  // not a regression. Recompute from the table before "fixing" a failure.
   it.each([
+    // gemini-3.1-flash-lite {in: 0.025, out: 0.15}:
+    //   50/1000*0.025 + 500/1000*0.15 = 0.00125 + 0.075 = 0.07625
     ["google/gemini-3.1-flash-lite", 0.07625],
+    // deepseek-v4-flash {in: 0.014, out: 0.028}:
+    //   50/1000*0.014 + 500/1000*0.028 = 0.0007 + 0.014 = 0.0147
     ["deepseek/deepseek-v4-flash", 0.0147],
+    // perplexity/sonar {in: 0.1, out: 0.1}:
+    //   50/1000*0.1 + 500/1000*0.1 = 0.005 + 0.05 = 0.055
     ["perplexity/sonar", 0.055],
+    // gpt-5.6-luna {in: 0.01, out: 0.06}:
+    //   50/1000*0.01 + 500/1000*0.06 = 0.0005 + 0.03 = 0.0305
     ["openai/gpt-5.6-luna", 0.0305],
+    // claude-haiku-4.5 {in: 0.1, out: 0.5}:
+    //   50/1000*0.1 + 500/1000*0.5 = 0.005 + 0.25 = 0.255
     ["anthropic/claude-haiku-4.5", 0.255],
   ])("produces a non-zero cost for %s at a representative call size", (model, expected) => {
     const cost = estimateCostCents(model, 50, 500);

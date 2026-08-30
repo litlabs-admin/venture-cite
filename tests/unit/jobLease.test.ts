@@ -127,4 +127,50 @@ describe("withJobLease", () => {
     await expect(result).resolves.toBe("completed");
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it("stops renewing and logs when a renewal discovers the lease was lost", async () => {
+    // Simulates another holder taking over an expired lease between our
+    // acquire and our next heartbeat: the renewal UPDATE is scoped to
+    // `lease_key = $1 AND holder_token = $2`, so it matches zero rows once
+    // someone else owns the row. Real code must notice (rowCount !== 1),
+    // stop its own renewal timer, and warn - otherwise it keeps sending
+    // no-op UPDATEs forever and never signals the loss.
+    vi.useFakeTimers();
+    queryMock.mockResolvedValueOnce({ rows: [{ holder_token: "holder" }] }); // acquire
+    queryMock.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // renewal loses the race
+    queryMock.mockResolvedValueOnce({ rows: [] }); // release on the way out
+    let resolveJob: (value: string) => void = () => {
+      throw new Error("Expected the callback to start");
+    };
+    const job = new Promise<string>((resolve) => {
+      resolveJob = resolve;
+    });
+    const fn = vi.fn(() => job);
+
+    const result = withJobLease("daily-report", 9, fn);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fn).toHaveBeenCalledOnce();
+
+    // First renewal tick (~3s in): loses the lease.
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      { leaseKey: "daily-report" },
+      "job-lease: lease lost while renewing",
+    );
+
+    // The renewal timer must actually be cleared - advancing well past
+    // several more intervals must not produce another renewal attempt.
+    await vi.advanceTimersByTimeAsync(9_000);
+    expect(queryMock).toHaveBeenCalledTimes(2);
+
+    resolveJob("completed");
+    await expect(result).resolves.toBe("completed");
+
+    // The callback's own result still comes through - loss detection does
+    // not cancel in-flight work, it only stops pretending the lease is
+    // still held - and release still fires unconditionally on the way out.
+    expect(queryMock).toHaveBeenCalledTimes(3);
+    expect(queryCallAt(2)[0]).toMatch(/delete from job_leases/i);
+  });
 });

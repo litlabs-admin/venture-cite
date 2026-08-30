@@ -47,7 +47,15 @@ function createTransaction(rows: Rows) {
         work(transaction),
       ),
     },
-    calls: { select, insert, update, execute, values: chain.values, set: chain.set },
+    calls: {
+      select,
+      insert,
+      update,
+      execute,
+      values: chain.values,
+      set: chain.set,
+      where: chain.where,
+    },
   };
 }
 
@@ -166,7 +174,13 @@ describe("request brand repository", () => {
 
     await expect(repository.update("brand-b", { name: "Changed" })).resolves.toBeUndefined();
     expect(calls.set).toHaveBeenCalledWith(expect.objectContaining({ name: "Changed" }));
-    expect(USER_B_ID).not.toBe(USER_A_ID);
+
+    const predicate = calls.where.mock.calls[0]?.[0] as SQL;
+    expect(predicate).toBeDefined();
+    const query = new PgDialect().sqlToQuery(predicate);
+    expect(query.sql).toContain('"brands"."user_id" =');
+    expect(query.params).toContain(USER_A_ID);
+    expect(query.params).not.toContain(USER_B_ID);
   });
 
   it("uses the content request role for deletion preview counts", async () => {
