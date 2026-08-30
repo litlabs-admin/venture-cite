@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getAccessToken } from "@/lib/authStore";
@@ -223,13 +224,24 @@ export default function Welcome() {
   // brands - this page is first-run only, so send them to the app rather than
   // asking them to set up a brand they set up months ago. Scoped to the input
   // scene so it can never fire over a run in progress.
+  //
+  // A failed `/api/brands` must NOT read the same as "confirmed zero
+  // brands" - `data` stays `undefined` on error, which used to make
+  // `brandCount` fall back to 0 exactly like a genuinely brand-less
+  // account. That sent a returning customer with real brands straight back
+  // through onboarding (and risked a duplicate brand) on nothing more than
+  // a transient fetch failure. `isSuccess`/`isError` below distinguish
+  // "confirmed zero" from "couldn't check" - see the render branches below.
   const existingBrands = useQuery<{ success: boolean; data: unknown[] }>({
     queryKey: ["/api/brands"],
+    meta: { suppressErrorToast: true },
   });
   const brandCount = existingBrands.data?.data?.length ?? 0;
   useEffect(() => {
-    if (scene === "input" && brandCount > 0) void navigate({ to: "/dashboard" });
-  }, [scene, brandCount, navigate]);
+    if (scene === "input" && existingBrands.isSuccess && brandCount > 0) {
+      void navigate({ to: "/dashboard" });
+    }
+  }, [scene, brandCount, existingBrands.isSuccess, navigate]);
 
   const [newBrandId, setNewBrandId] = useState<string | null>(null);
 
@@ -255,7 +267,11 @@ export default function Welcome() {
   // Mirrors the monitor-overview pattern: poll every 3s while the pipeline
   // is non-terminal, stop once it completes or fails. The work continues
   // server-side regardless of whether this tab is open.
-  const { data: autopilotResp } = useQuery<{ success: boolean; data: AutopilotData | null }>({
+  const {
+    data: autopilotResp,
+    isError: autopilotIsError,
+    refetch: refetchAutopilotStatus,
+  } = useQuery<{ success: boolean; data: AutopilotData | null }>({
     queryKey: ["autopilot-status", newBrandId],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/onboarding/autopilot-status/${newBrandId}`);
@@ -264,8 +280,18 @@ export default function Welcome() {
     enabled: scene === "activating" && !!newBrandId,
     refetchInterval: (q) => {
       const status = (q.state.data as { data?: AutopilotData | null } | undefined)?.data?.status;
-      return status && status !== "completed" && status !== "failed" ? 3000 : false;
+      // Keep polling through a transient error too. The old `status && ...`
+      // guard returned `false` (stop polling, forever) the instant `status`
+      // was undefined - which is exactly what happens on every single
+      // failed check, since a rejected fetch never produces an `autopilot`
+      // to read `.status` off of. Only a genuinely terminal status should
+      // stop the poll.
+      return status === "completed" || status === "failed" ? false : 3000;
     },
+    // ActivationPanel renders its own inline state for a failing check
+    // (see `autopilotIsError` below) - a stacked global toast on top of
+    // that, once every 3 seconds, would just be noise.
+    meta: { suppressErrorToast: true },
   });
   const autopilot = autopilotResp?.data ?? null;
 
@@ -523,7 +549,51 @@ export default function Welcome() {
 
   return (
     <PanelPage className="flex items-center justify-center p-6">
-      {scene === "input" && (
+      {/* A failed /api/brands check must render as a distinct, honest
+          state - not silently fall through to the same brand-creation form
+          a genuinely brand-less account sees (see the `existingBrands`
+          comment above for why that used to happen), and not a blank panel
+          during the brief initial load either. */}
+      {scene === "input" && existingBrands.isLoading && (
+        <Reveal className="w-full max-w-[480px]">
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
+              <div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
+              <div className="mt-3 h-4 w-full animate-pulse rounded bg-muted" />
+              <div className="mt-1 h-4 w-4/5 animate-pulse rounded bg-muted" />
+              <div className="mt-6 h-10 w-full animate-pulse rounded bg-muted" />
+            </Panel>
+          </PanelRow>
+        </Reveal>
+      )}
+
+      {scene === "input" && existingBrands.isError && (
+        <Reveal className="w-full max-w-[480px]">
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
+              <h1 className="text-page font-semibold tracking-tight text-foreground">
+                {"Couldn't check your account"}
+              </h1>
+              <p className="mt-2 text-caption text-muted-foreground">
+                {
+                  "We couldn't tell whether you already have a brand set up here. Starting a new one before checking again could create a duplicate."
+                }
+              </p>
+              <Button
+                className="mt-6 w-full"
+                variant="outline"
+                onClick={() => existingBrands.refetch()}
+                data-testid="button-retry-brand-check"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try again
+              </Button>
+            </Panel>
+          </PanelRow>
+        </Reveal>
+      )}
+
+      {scene === "input" && existingBrands.isSuccess && (
         <Reveal className="w-full max-w-[480px]">
           <PanelRow cols={1} last>
             <Panel width="wide" border="last">
@@ -536,7 +606,11 @@ export default function Welcome() {
               </p>
 
               <div className="mt-6 space-y-2">
+                <Label htmlFor="welcome-domain" className="sr-only">
+                  Your website
+                </Label>
                 <Input
+                  id="welcome-domain"
                   autoFocus
                   data-testid="input-website"
                   placeholder="yourbrand.com"
@@ -680,8 +754,13 @@ export default function Welcome() {
                   </div>
                 )}
                 <div className="flex-1">
-                  <FieldLabel label="Brand name" touched={touchedFields.has("name")} />
+                  <FieldLabel
+                    label="Brand name"
+                    touched={touchedFields.has("name")}
+                    htmlFor="confirm-brand-name"
+                  />
                   <Input
+                    id="confirm-brand-name"
                     value={editName}
                     onChange={(e) => {
                       setEditName(e.target.value);
@@ -694,8 +773,13 @@ export default function Welcome() {
 
               <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <FieldLabel label="Industry" touched={touchedFields.has("industry")} />
+                  <FieldLabel
+                    label="Industry"
+                    touched={touchedFields.has("industry")}
+                    htmlFor="confirm-industry"
+                  />
                   <Input
+                    id="confirm-industry"
                     value={editIndustry}
                     onChange={(e) => {
                       setEditIndustry(e.target.value);
@@ -707,8 +791,10 @@ export default function Welcome() {
                   <FieldLabel
                     label="Target audience"
                     touched={touchedFields.has("targetAudience")}
+                    htmlFor="confirm-target-audience"
                   />
                   <Input
+                    id="confirm-target-audience"
                     value={editTargetAudience}
                     onChange={(e) => {
                       setEditTargetAudience(e.target.value);
@@ -719,8 +805,13 @@ export default function Welcome() {
               </div>
 
               <div className="mt-4">
-                <FieldLabel label="Description" touched={touchedFields.has("description")} />
+                <FieldLabel
+                  label="Description"
+                  touched={touchedFields.has("description")}
+                  htmlFor="confirm-description"
+                />
                 <Textarea
+                  id="confirm-description"
                   rows={3}
                   value={editDescription}
                   onChange={(e) => {
@@ -731,8 +822,13 @@ export default function Welcome() {
               </div>
 
               <div className="mt-4">
-                <FieldLabel label="Brand voice" touched={touchedFields.has("brandVoice")} />
+                <FieldLabel
+                  label="Brand voice"
+                  touched={touchedFields.has("brandVoice")}
+                  htmlFor="confirm-brand-voice"
+                />
                 <Textarea
+                  id="confirm-brand-voice"
                   rows={2}
                   value={editBrandVoice}
                   onChange={(e) => {
@@ -744,6 +840,7 @@ export default function Welcome() {
 
               <TagField
                 label="Products"
+                htmlId="confirm-products"
                 values={editProducts}
                 touched={touchedFields.has("products")}
                 onChange={(v) => {
@@ -753,6 +850,7 @@ export default function Welcome() {
               />
               <TagField
                 label="Key values"
+                htmlId="confirm-key-values"
                 values={editKeyValues}
                 touched={touchedFields.has("keyValues")}
                 onChange={(v) => {
@@ -762,6 +860,7 @@ export default function Welcome() {
               />
               <TagField
                 label="Unique selling points"
+                htmlId="confirm-usps"
                 values={editUsps}
                 touched={touchedFields.has("usps")}
                 onChange={(v) => {
@@ -873,8 +972,10 @@ export default function Welcome() {
           <ActivationPanel
             brandName={editName || scrapedData?.brandName || "your brand"}
             autopilot={autopilot}
+            autopilotIsError={autopilotIsError}
             onGoToDashboard={() => navigate({ to: "/dashboard", search: { brandId: newBrandId } })}
             onRetry={() => retryMutation.mutate()}
+            onRefetchStatus={() => refetchAutopilotStatus()}
             retrying={retryMutation.isPending}
           />
         </Reveal>
@@ -889,31 +990,46 @@ export default function Welcome() {
 // "this finishes without you" copy, and a non-blocking path forward.
 // ---------------------------------------------------------------------------
 
-function ActivationPanel({
+export function ActivationPanel({
   brandName,
   autopilot,
+  autopilotIsError,
   onGoToDashboard,
   onRetry,
+  onRefetchStatus,
   retrying,
 }: {
   brandName: string;
   autopilot: AutopilotData | null;
+  autopilotIsError: boolean;
   onGoToDashboard: () => void;
   onRetry: () => void;
+  onRefetchStatus: () => void;
   retrying: boolean;
 }) {
   const status: AutopilotStatus = autopilot?.status ?? "pending";
-  const failed = status === "failed";
+  const jobFailed = status === "failed";
   const done = status === "completed";
+  // The status *check* can fail independently of the pipeline job itself
+  // failing (network blip, a 500 on this one endpoint). Before this fix
+  // that was indistinguishable from "still working": `jobFailed` can only
+  // become true by reading `autopilot.status`, and a rejected fetch never
+  // produces an `autopilot` at all - so a persistently-erroring status
+  // check showed "Working" forever, with the Retry button (which only
+  // rendered on `jobFailed`) never appearing.
+  const checkFailed = autopilotIsError && !done;
+  const failed = jobFailed || checkFailed;
   const activeIndex = activeIndexFor(status);
   const citTotal = autopilot?.progress?.citationsTotal ?? 0;
   const citRun = autopilot?.progress?.citationsRun ?? 0;
 
   const verdict = done
     ? `${brandName}'s AI-visibility baseline is ready.`
-    : failed
+    : jobFailed
       ? "Setup stopped partway. Your brand is saved - retry, or pick it up from the dashboard."
-      : `We're establishing how AI engines represent ${brandName}. This runs on its own.`;
+      : checkFailed
+        ? "We couldn't check your setup's progress just now. Your brand is saved and setup may still be finishing in the background."
+        : `We're establishing how AI engines represent ${brandName}. This runs on its own.`;
 
   return (
     <PanelRow cols={1} last>
@@ -977,12 +1093,16 @@ function ActivationPanel({
                         "text-data font-medium uppercase tracking-wide",
                         state === "done"
                           ? "text-primary"
-                          : state === "working"
+                          : state === "working" && !failed
                             ? "text-foreground"
                             : "text-muted-foreground/60",
                       )}
                     >
-                      {state === "done" ? "Done" : state === "working" ? "Working" : "Queued"}
+                      {state === "done"
+                        ? "Done"
+                        : state === "working" && !failed
+                          ? "Working"
+                          : "Queued"}
                     </span>
                   </div>
                   <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
@@ -999,9 +1119,16 @@ function ActivationPanel({
           })}
         </ol>
 
-        {failed && autopilot?.error ? (
+        {jobFailed && autopilot?.error ? (
           <div className="mt-5 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-caption text-destructive">
             {autopilot.error}
+          </div>
+        ) : null}
+        {checkFailed ? (
+          <div className="mt-5 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-caption text-destructive">
+            {
+              "We couldn't reach the server to check progress. Setup may still be running - try checking again."
+            }
           </div>
         ) : null}
 
@@ -1013,9 +1140,14 @@ function ActivationPanel({
           </p>
           <div className="flex gap-2">
             {failed ? (
-              <Button variant="outline" size="sm" onClick={onRetry} disabled={retrying}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={jobFailed ? onRetry : onRefetchStatus}
+                disabled={retrying}
+              >
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                {retrying ? "Retrying…" : "Retry"}
+                {retrying ? "Retrying…" : jobFailed ? "Retry" : "Check again"}
               </Button>
             ) : null}
             <Button
@@ -1034,10 +1166,20 @@ function ActivationPanel({
   );
 }
 
-function FieldLabel({ label, touched }: { label: string; touched: boolean }) {
+export function FieldLabel({
+  label,
+  touched,
+  htmlFor,
+}: {
+  label: string;
+  touched: boolean;
+  htmlFor: string;
+}) {
   return (
     <div className="mb-1.5 flex items-center gap-2">
-      <label className="text-caption font-medium text-foreground">{label}</label>
+      <label htmlFor={htmlFor} className="text-caption font-medium text-foreground">
+        {label}
+      </label>
       {!touched ? (
         <Badge variant="secondary" className="text-label font-normal">
           auto-detected
@@ -1047,13 +1189,15 @@ function FieldLabel({ label, touched }: { label: string; touched: boolean }) {
   );
 }
 
-function TagField({
+export function TagField({
   label,
+  htmlId,
   values,
   touched,
   onChange,
 }: {
   label: string;
+  htmlId: string;
   values: string[];
   touched: boolean;
   onChange: (next: string[]) => void;
@@ -1068,7 +1212,7 @@ function TagField({
   };
   return (
     <div className="mt-4">
-      <FieldLabel label={label} touched={touched} />
+      <FieldLabel label={label} touched={touched} htmlFor={htmlId} />
       <div className="flex flex-wrap gap-2 rounded-md border bg-background p-2">
         {values.map((v, i) => (
           <span
@@ -1087,6 +1231,7 @@ function TagField({
           </span>
         ))}
         <input
+          id={htmlId}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {

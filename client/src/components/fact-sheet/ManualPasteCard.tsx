@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 interface Props {
   runId: string;
@@ -23,7 +24,15 @@ export function ManualPasteCard({ runId: _runId, onSubmit, onManualFill, busy }:
         </p>
       </div>
       <div className="space-y-3">
+        {/* The heading above already gives sighted users context, so the
+            label stays visually hidden - but the textarea had no
+            programmatic name at all before this (a placeholder is not an
+            accessible name and disappears once typed). */}
+        <Label htmlFor="manual-paste-text" className="sr-only">
+          {"Paste your website's About text"}
+        </Label>
         <Textarea
+          id="manual-paste-text"
           rows={12}
           value={text}
           onChange={(e) => setText(e.target.value)}

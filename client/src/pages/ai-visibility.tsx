@@ -1060,32 +1060,43 @@ export default function AIVisibility() {
                       className={`px-4 ${isCompleted ? "bg-muted" : ""}`}
                       data-testid={`step-${step.id}`}
                     >
-                      <AccordionTrigger className="hover:no-underline py-4">
-                        <div className="flex items-center gap-4 text-left w-full">
-                          <Checkbox
-                            checked={isCompleted}
-                            onCheckedChange={() => toggleStep(engine.id, step.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            data-testid={`checkbox-${step.id}`}
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium">
-                                Step {index + 1}: {step.title}
-                              </span>
-                              {getPriorityBadge(step.priority)}
+                      {/* The checkbox used to live INSIDE AccordionTrigger's
+                          button - a Radix Checkbox renders `<button
+                          role="checkbox">`, so that was a button nested
+                          inside a button: invalid HTML with undefined
+                          keyboard behaviour (WCAG 4.1.1/4.1.2). It is now a
+                          sibling of the trigger, in a shared flex row, so
+                          both stay independently focusable and clickable. */}
+                      <div className="flex items-center gap-4 py-1">
+                        <Checkbox
+                          checked={isCompleted}
+                          onCheckedChange={() => toggleStep(engine.id, step.id)}
+                          aria-label={`Mark step ${index + 1}, ${step.title}, as complete`}
+                          data-testid={`checkbox-${step.id}`}
+                        />
+                        <div className="flex-1">
+                          <AccordionTrigger className="hover:no-underline py-3">
+                            <div className="flex items-center gap-4 text-left w-full">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-medium">
+                                    Step {index + 1}: {step.title}
+                                  </span>
+                                  {getPriorityBadge(step.priority)}
+                                </div>
+                                <p className="text-caption text-muted-foreground mt-1">
+                                  {step.description}
+                                </p>
+                              </div>
+                              {isCompleted ? (
+                                <CheckCircle2 className="w-5 h-5 text-foreground shrink-0" />
+                              ) : (
+                                <Circle className="w-5 h-5 text-muted-foreground/40 shrink-0" />
+                              )}
                             </div>
-                            <p className="text-caption text-muted-foreground mt-1">
-                              {step.description}
-                            </p>
-                          </div>
-                          {isCompleted ? (
-                            <CheckCircle2 className="w-5 h-5 text-foreground shrink-0" />
-                          ) : (
-                            <Circle className="w-5 h-5 text-muted-foreground/40 shrink-0" />
-                          )}
+                          </AccordionTrigger>
                         </div>
-                      </AccordionTrigger>
+                      </div>
                       <AccordionContent className="pb-4">
                         <div className="ml-10 space-y-4">
                           <div className="bg-muted p-4 rounded-lg">

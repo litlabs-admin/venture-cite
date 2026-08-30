@@ -1,5 +1,31 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, ExternalLink, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowRightLeft, Download, ExternalLink, Plus, Search, Trash2, Upload } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   BRANDS,
   BRAND_SWATCH,
@@ -286,6 +312,7 @@ export function Board({
                     ticket={t}
                     dragRef={dragRef}
                     onOpen={() => setEditing(t)}
+                    onMove={move}
                   />
                 ))}
                 {!items.length && (
@@ -327,18 +354,37 @@ function TicketCard({
   ticket: t,
   dragRef,
   onOpen,
+  onMove,
 }: {
   ticket: Ticket;
   dragRef: React.MutableRefObject<string | null>;
   onOpen: () => void;
+  onMove: (id: string, column: Column) => void;
 }) {
+  // Native HTML5 drag-and-drop (the `draggable`/onDragStart/onDragEnd below)
+  // has no keyboard path and doesn't work as a drag source in most mobile
+  // browsers - so `role="button"`/`tabIndex`/`onKeyDown` give keyboard users
+  // a way to OPEN the card (matching the geo-tools MentionCard pattern), and
+  // the "Move to" menu below gives every input a way to change its column
+  // without depending on drag at all.
+  function handleKeyDown(e: KeyboardEvent<HTMLElement>) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onOpen();
+    }
+  }
+
   return (
     <article
+      role="button"
+      tabIndex={0}
       draggable
       onDragStart={() => (dragRef.current = t.id)}
       onDragEnd={() => (dragRef.current = null)}
       onClick={onOpen}
-      className="cursor-pointer rounded-md border border-vc-default bg-vc-surface p-2.5 transition-colors hover:border-vc-hover"
+      onKeyDown={handleKeyDown}
+      aria-label={`${t.title}. ${KIND_LABEL[t.kind]}, ${WEIGHT_LABEL[t.weight]} weight${t.brand ? `, ${t.brand}` : ""}. Press Enter to open.`}
+      className="cursor-pointer rounded-md border border-vc-default bg-vc-surface p-2.5 transition-colors hover:border-vc-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-vc-accent"
     >
       <div className="flex items-center gap-1.5">
         <span
@@ -346,7 +392,30 @@ function TicketCard({
           style={{ background: KIND_SWATCH[t.kind] }}
         />
         <span className="text-xs uppercase tracking-wider text-vc-label">{KIND_LABEL[t.kind]}</span>
-        <span className="ml-auto text-xs text-vc-tertiary">{WEIGHT_LABEL[t.weight]}</span>
+        <span className="text-xs text-vc-tertiary">{WEIGHT_LABEL[t.weight]}</span>
+        <div
+          className="ml-auto"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={`Move "${t.title}" to another column`}
+              className="flex h-5 w-5 items-center justify-center rounded text-vc-tertiary transition-colors hover:bg-vc-muted hover:text-vc-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-vc-accent"
+            >
+              <ArrowRightLeft className="h-3 w-3" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel className="text-xs text-vc-tertiary">Move to</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {COLUMNS.filter((c) => c.key !== t.column).map((c) => (
+                <DropdownMenuItem key={c.key} onSelect={() => onMove(t.id, c.key)}>
+                  {c.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <h3 className="mt-1.5 text-sm font-medium leading-snug text-vc-primary">{t.title}</h3>
@@ -393,37 +462,28 @@ function TicketDialog({
 }) {
   const [draft, setDraft] = useState<Ticket>(ticket);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   const field =
     "w-full rounded-md border border-vc-default bg-transparent px-2 py-1.5 text-sm text-vc-primary outline-none focus:border-vc-accent";
   const label = "text-xs uppercase tracking-wider text-vc-label";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[85vh] w-[600px] overflow-y-auto rounded-lg border border-vc-default bg-vc-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between">
-          <h2 className="text-sm font-semibold text-vc-primary">Task</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-vc-tertiary hover:text-vc-primary"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    // A hand-rolled `fixed inset-0` overlay with a manual `window`
+    // keydown listener for Escape has no `role="dialog"` and no focus
+    // trap - Tab could walk straight out to the page behind it. Radix's
+    // Dialog primitive (already used elsewhere in the app - see
+    // client/src/pages/brands.tsx) gives both for free: role, aria-modal,
+    // focus trap, Escape-to-close, and restoring focus to the trigger
+    // on close.
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-[600px] max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Task</DialogTitle>
+          <DialogDescription className="sr-only">
+            {"Edit this task's details, then save or delete it."}
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-1 space-y-3">
           <label className="block">
             <span className={label}>Title</span>
             <input
@@ -560,13 +620,38 @@ function TicketDialog({
         </div>
 
         <div className="mt-5 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => onDelete(draft.id)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-vc-default px-2.5 text-xs text-vc-tertiary transition-colors hover:text-[color:var(--negative)]"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> Delete
-          </button>
+          {/* This board is shared and public with no undo (see the module
+              header comment) - deleting instantly on click had no guard
+              against a stray tap. Same AlertDialog confirmation pattern as
+              articles.tsx's destructive deletes. */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-vc-default px-2.5 text-xs text-vc-tertiary transition-colors hover:text-[color:var(--negative)]"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Delete
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{`Delete "${draft.title || "this task"}"?`}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This board is shared with everyone who has the link and has no undo. The task will
+                  be gone for good.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => onDelete(draft.id)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete permanently
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -585,7 +670,7 @@ function TicketDialog({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

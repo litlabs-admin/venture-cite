@@ -1,7 +1,7 @@
 // Tour engine targets (literal data-tour-id strings for verifier):
 //   data-tour-id="brands.firstRow"
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { queryClient, apiRequest, isApiError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
@@ -321,27 +321,57 @@ export default function Brands() {
     }
   }
 
-  function handleEdit(brand: Brand) {
-    setEditingBrand(brand);
-    form.reset({
-      name: brand.name,
-      companyName: brand.companyName,
-      industry: brand.industry,
-      description: brand.description ?? "",
-      website: brand.website ?? "",
-      tone: (brand.tone ?? "professional") as
-        "professional" | "casual" | "friendly" | "formal" | "conversational" | "authoritative",
-      targetAudience: brand.targetAudience ?? "",
-      products: Array.isArray(brand.products) ? brand.products.join(", ") : "",
-      keyValues: Array.isArray(brand.keyValues) ? brand.keyValues.join(", ") : "",
-      uniqueSellingPoints: Array.isArray(brand.uniqueSellingPoints)
-        ? brand.uniqueSellingPoints.join(", ")
-        : "",
-      brandVoice: brand.brandVoice ?? "",
-      sampleContent: brand.sampleContent ?? "",
-      nameVariations: Array.isArray(brand.nameVariations) ? brand.nameVariations.join(", ") : "",
-    });
-  }
+  const handleEdit = useCallback(
+    (brand: Brand) => {
+      setEditingBrand(brand);
+      form.reset({
+        name: brand.name,
+        companyName: brand.companyName,
+        industry: brand.industry,
+        description: brand.description ?? "",
+        website: brand.website ?? "",
+        tone: (brand.tone ?? "professional") as
+          "professional" | "casual" | "friendly" | "formal" | "conversational" | "authoritative",
+        targetAudience: brand.targetAudience ?? "",
+        products: Array.isArray(brand.products) ? brand.products.join(", ") : "",
+        keyValues: Array.isArray(brand.keyValues) ? brand.keyValues.join(", ") : "",
+        uniqueSellingPoints: Array.isArray(brand.uniqueSellingPoints)
+          ? brand.uniqueSellingPoints.join(", ")
+          : "",
+        brandVoice: brand.brandVoice ?? "",
+        sampleContent: brand.sampleContent ?? "",
+        nameVariations: Array.isArray(brand.nameVariations) ? brand.nameVariations.join(", ") : "",
+      });
+    },
+    [form],
+  );
+
+  // ScrapeFailureState.tsx (the fact-sheet failure banners) links here as
+  // `/brands?edit=<brandId>` so a user bounced back from a failed scrape
+  // lands straight in the Edit dialog for that brand, rather than a list
+  // they have to search through themselves. `/_app/brands` declares no
+  // `validateSearch` schema, so this reads the raw query string directly -
+  // same pattern brand-fact-sheet.tsx already uses for its own `autoScrape`
+  // param (src/routes/** is off-limits for this task, so a typed
+  // `useSearch()` route schema isn't an option here regardless).
+  useEffect(() => {
+    if (typeof window === "undefined" || !brands) return;
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get("edit");
+    if (!editId) return;
+    const match = brands.find((b) => b.id === editId);
+    // handleEdit (not a bare setEditingBrand) - it also seeds the edit
+    // form's fields from the brand, which this effect must not skip.
+    if (match) handleEdit(match);
+    // Strip the param either way - a dead/stale id must not leave the URL
+    // permanently claiming an edit that never happened, and a refresh must
+    // not re-trigger the dialog after the user has closed it.
+    params.delete("edit");
+    const newSearch = params.toString();
+    const newUrl =
+      window.location.pathname + (newSearch ? `?${newSearch}` : "") + window.location.hash;
+    window.history.replaceState(null, "", newUrl);
+  }, [brands, handleEdit]);
 
   function handleDelete(id: string) {
     deleteMutation.mutate(id);
