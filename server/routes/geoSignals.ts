@@ -172,6 +172,14 @@ export function setupGeoSignalsRoutes(app: Express): void {
         }
         res.json({ success: true, data: { optimizedContent } });
       } catch (err) {
+        // Translate ownership failures before the generic 500, same as
+        // /analyze above. Without this a cross-tenant brandId answered 500
+        // while a nonexistent one answered 404, and that difference is
+        // exactly what the anti-enumeration policy exists to remove: a 500
+        // confirms the brand exists and belongs to someone else.
+        if (err instanceof OwnershipError) {
+          return res.status(err.status).json({ success: false, error: err.message });
+        }
         logger.error({ err }, "geo-signals/optimize-chunks failed");
         captureAndFlush(err, { tags: { source: "geo-signals/optimize-chunks" } });
         res.status(500).json({ success: false, error: "Failed to optimize chunks" });
