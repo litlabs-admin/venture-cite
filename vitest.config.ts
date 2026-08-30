@@ -21,6 +21,11 @@ export default defineConfig({
     // be excluded explicitly. Run them with `npm run test:e2e`.
     exclude: ["node_modules", "dist", "build", "coverage", "tests/e2e/**"],
     setupFiles: ["./tests/setup.ts"],
+    // Runs once per run, before any file loads. Repairs the migration-0112
+    // role grants that an interrupted integration run can leave stripped -
+    // see tests/globalSetup.ts. A no-op unless TEST_DATABASE_URL points at an
+    // approved local Supabase target, so unit-only runs are untouched.
+    globalSetup: ["./tests/globalSetup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

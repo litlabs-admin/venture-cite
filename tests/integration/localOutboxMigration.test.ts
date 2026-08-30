@@ -8,6 +8,7 @@ import {
   ROLE_MIGRATION_LOCK_KEY,
   removePrefixedRoles,
   removeRoleIfExists,
+  restoreManagedRoleSelfGrants,
   revokeManagedRoleMemberships,
 } from "./localRoleCleanup";
 
@@ -105,6 +106,11 @@ describeIfLocal("local transactional outbox migration", () => {
           await removeRoleIfExists(pool, workerRole);
           await removeRoleIfExists(pool, contentRole);
           await removeRoleIfExists(pool, requestRole);
+          // Put back the self-grant beforeAll revoked, now that the replay is
+          // finished. revokeManagedRoleMemberships has to strip it so 0096 can
+          // be replayed, but nothing else restores it, and the next file that
+          // needs SET ROLE would fail with SQLSTATE 42501.
+          await restoreManagedRoleSelfGrants(pool);
         } finally {
           try {
             if (lockAcquired) {

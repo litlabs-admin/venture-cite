@@ -16,6 +16,7 @@ import {
   ROLE_MIGRATION_LOCK_KEY,
   removePrefixedRoles,
   removeRoleIfExists,
+  restoreManagedRoleSelfGrants,
   revokeManagedRoleMemberships,
 } from "./localRoleCleanup";
 
@@ -248,6 +249,11 @@ describeIfLocal("content request database RLS", () => {
           if (runtimeRoleExists.rowCount === 1) {
             await removeRoleIfExists(ownerPool, runtimeRole);
           }
+          // Put back the self-grant beforeAll revoked, now that the replay is
+          // finished. revokeManagedRoleMemberships has to strip it so 0096 can
+          // be replayed, but nothing else restores it, and the next file that
+          // needs SET ROLE would fail with SQLSTATE 42501.
+          await restoreManagedRoleSelfGrants(ownerPool);
         } finally {
           try {
             if (ownerLockAcquired) {

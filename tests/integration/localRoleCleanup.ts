@@ -20,7 +20,66 @@ const MANAGED_ROLE_NAMES = [
 ] as const;
 
 /**
+ * Put back the self-grant migration 0112 confers, if it is not already there.
+ *
+ * 0112 runs `GRANT <role> TO <current_user> WITH ADMIN FALSE, INHERIT FALSE,
+ * SET TRUE`, and that SET option is what lets application code run
+ * `set local role venturecite_outbox_worker`. Without it Postgres answers
+ * SQLSTATE 42501, "permission denied to set role".
+ *
+ * revokeManagedRoleMemberships has to remove that row: migration 0096 raises
+ * "venturecite_request has unexpected role memberships" if any extra
+ * membership exists when it is replayed, so the revoke is a precondition for
+ * every suite that replays it. But none of those suites replays 0112, and the
+ * ledger already lists 0112 as applied, so nothing put the row back. The suite
+ * became order-dependent: whichever file ran afterwards and needed SET ROLE
+ * failed with 42501, and the failure count changed between runs of identical
+ * code.
+ *
+ * Call this from the teardown of any suite that calls
+ * revokeManagedRoleMemberships, after its migration replay is finished. It
+ * cannot go inside the revoke itself - that would reintroduce the membership
+ * 0096 refuses.
+ */
+export async function restoreManagedRoleSelfGrants(connection: QueryConnection): Promise<void> {
+  const present = await existingRoleNames(connection, MANAGED_ROLE_NAMES);
+  if (present.size === 0) return;
+
+  // Read the grantee and interpolate it as an identifier. Writing
+  // `grant ... to current_user` directly crashes PostgreSQL 17.6 - see the
+  // reproduction noted in tests/integration/rlsDefenceInDepth.test.ts.
+  const granteeResult = await connection.query<{ grantee: string }>(
+    "select current_user as grantee",
+  );
+  const grantee = granteeResult.rows[0]?.grantee;
+  if (!grantee) return;
+
+  for (const roleName of MANAGED_ROLE_NAMES) {
+    if (!present.has(roleName)) continue;
+    const existing = await connection.query(
+      `select 1
+         from pg_auth_members as membership
+         join pg_roles as granted on granted.oid = membership.roleid
+         join pg_roles as member on member.oid = membership.member
+        where granted.rolname = $1
+          and member.rolname = $2
+          and membership.grantor = member.oid`,
+      [roleName, grantee],
+    );
+    if ((existing.rowCount ?? 0) > 0) continue;
+    await connection.query(
+      `grant ${quoteIdentifier(roleName)} to ${quoteIdentifier(grantee)} with admin false, inherit false, set true`,
+    );
+  }
+}
+
+/**
  * Revoke stale managed-role grants from a restored local test database.
+ *
+ * This deliberately also removes migration 0112's self-grant, because 0096
+ * refuses to replay while any extra membership exists. That makes the helper
+ * lossy: pair every call with restoreManagedRoleSelfGrants in the caller's
+ * teardown, or the rest of the run loses the ability to SET ROLE.
  *
  * Call this only after the destructive database guard accepts the local target.
  */
