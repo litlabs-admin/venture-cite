@@ -1,0 +1,324 @@
+// Brand Fact Sheet v2 source-extraction service (scrape-one/search-llm/
+// user-enrich/paste). Extracted verbatim from server/routes/factSheetV2.ts
+// (phase B7-16). No Express types - ownership enforcement (`requireBrand`)
+// and run/page lookups stay in the route; each function takes an
+// already-loaded run/brand/page and returns plain data or throws.
+
+import OpenAI from "openai";
+import { storage } from "../storage";
+import { openai } from "../lib/routesShared";
+import { runStaticSource } from "../lib/factAgent/v2/sourceStatic";
+import { runSearchSource } from "../lib/factAgent/v2/sourceSearch";
+import { runUserEnrichSource } from "../lib/factAgent/v2/sourceUserEnrich";
+import { persistUserFacts } from "../lib/factAgent/v2/persistUserFacts";
+import { safeFetchTextWithLockedIp } from "../lib/ssrf";
+import { createRobotsCache } from "../lib/factAgent/robotsCache";
+import { persistFacts } from "../lib/factAgent/persistFacts";
+import { callWithFailover, type ProviderClient } from "../lib/factAgent/v2/llmFailover";
+import { MODELS, OPENROUTER_BASE_URL } from "../lib/modelConfig";
+import { persistPasteFacts } from "../lib/factAgent/v2/persistPasteFacts";
+import { buildExtractionPrompt, parseFactsWithRepair } from "../lib/factAgent/v2/extractionPrompt";
+import { LLM_CALL_TIMEOUT_MS } from "../lib/factAgent/v2/vercelBudget";
+import type { Brand } from "@shared/schema";
+
+// OpenAI primary provider client adapter - wraps the existing singleton.
+//
+// 2026-05-28: honour the prompt's `responseFormat` when present. The v2
+// extraction prompt sends a strict json_schema; without passing it
+// through here, the route handlers (scrape-one / search-llm / paste)
+// received json_object responses that produced factKey strings
+// outside the controlled vocab - and our post-parse vocab filter
+// dropped them all, yielding zero facts on the dev server.
+const openaiProvider: ProviderClient = {
+  name: "openai",
+  async call(prompt) {
+    const messages =
+      typeof prompt === "string"
+        ? [{ role: "user" as const, content: prompt }]
+        : [
+            { role: "system" as const, content: prompt.system },
+            { role: "user" as const, content: prompt.user },
+          ];
+    const responseFormat =
+      typeof prompt === "object" && prompt && "responseFormat" in prompt && prompt.responseFormat
+        ? prompt.responseFormat
+        : { type: "json_object" as const };
+    const res = await openai.chat.completions.create({
+      model: MODELS.misc,
+      response_format: responseFormat as never,
+      messages,
+    });
+    return res.choices?.[0]?.message?.content ?? "";
+  },
+};
+
+// PROJECT POLICY: every non-GPT model call MUST go through OpenRouter.
+// Direct Anthropic / Google / Perplexity SDKs are not used in this codebase.
+// Claude (and any other non-OpenAI model we add later) is reached via the
+// OpenAI SDK pointed at OpenRouter's OpenAI-compatible endpoint.
+//
+// Built lazily so a missing OPENROUTER_API_KEY just disables the secondary
+// provider (single-provider extraction still works) instead of crashing
+// at import time.
+const openrouterClient = process.env.OPENROUTER_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL: OPENROUTER_BASE_URL,
+      // Tier-aware: 6.3s Hobby / 25s Pro.
+      timeout: LLM_CALL_TIMEOUT_MS,
+      maxRetries: 1,
+    })
+  : null;
+
+const openrouterClaudeProvider: ProviderClient | null = openrouterClient
+  ? {
+      // "anthropic" is the slot bucket in llm_concurrency_slots - sized for
+      // Claude-family concurrent calls. The actual network egress is via
+      // OpenRouter, but the model is Claude, so we account for it there.
+      // Claude via OpenRouter doesn't honour OpenAI's json_schema mode
+      // yet - we send json_object and rely on the Zod post-validation +
+      // the post-parse vocab filter in extractionPrompt.ts to catch any
+      // shape drift.
+      name: "anthropic",
+      async call(prompt) {
+        const messages =
+          typeof prompt === "string"
+            ? [{ role: "user" as const, content: prompt }]
+            : [
+                { role: "system" as const, content: prompt.system },
+                { role: "user" as const, content: prompt.user },
+              ];
+        const res = await openrouterClient.chat.completions.create({
+          model: MODELS.citationClaude,
+          response_format: { type: "json_object" },
+          messages,
+        });
+        return res.choices?.[0]?.message?.content ?? "";
+      },
+    }
+  : null;
+
+// POST /api/brand-fact-sheet/scrape-one
+export async function scrapeFactSheetPage(params: {
+  runId: string;
+  brand: Brand;
+  page: { id: string; url: string };
+  startedAt: number;
+}) {
+  const { runId, brand, page, startedAt } = params;
+
+  // GPT (OpenAI direct) is the primary extractor. Claude is the
+  // secondary model and is reached ONLY via OpenRouter per project
+  // policy - no direct Anthropic SDK. callWithFailover invokes the
+  // secondary on transient errors (5xx/429/network) from the primary.
+  const providers: ProviderClient[] = [openaiProvider];
+  if (openrouterClaudeProvider) providers.push(openrouterClaudeProvider);
+  const llm = (prompt: string | { system: string; user: string }) =>
+    callWithFailover(providers, prompt, runId);
+
+  const robotsCache = createRobotsCache(brand.website ?? "", (url) =>
+    safeFetchTextWithLockedIp(url, {}),
+  );
+
+  const outcome = await runStaticSource({
+    url: page.url,
+    brandUrl: brand.website ?? "",
+    brandName: brand.name,
+    industry: brand.industry ?? null,
+    runId,
+    // Task 8a extended safeFetchTextWithLockedIp to return headers,
+    // which is what pageGuards.isWafBlocked needs to detect cf-ray.
+    fetcher: (url, opts) =>
+      safeFetchTextWithLockedIp(url, opts ?? {}).then((r) => ({
+        status: r.status,
+        text: r.text,
+        contentType: r.contentType,
+        headers: r.headers,
+      })),
+    llm,
+    robotsCache,
+  });
+
+  // Persist results
+  await storage.updateScrapePageStatus(page.id, outcome.status as never, {
+    bytes: outcome.bytes,
+    statusCode: outcome.statusCode,
+    lang: outcome.diagnostics.lang,
+    factCount: outcome.facts.length,
+    errorKind: outcome.errorKind,
+    errorMessage: outcome.errorMessage,
+  });
+  if (outcome.facts.length > 0) {
+    await persistFacts(outcome.facts, {
+      brandId: brand.id,
+      runId,
+      sourceUrl: page.url,
+    });
+  }
+  await storage.incrementScrapeRunCounters(runId, {
+    pagesFetched: outcome.status === "done" ? 1 : 0,
+    pagesFailed: outcome.errorKind ? 1 : 0,
+    factsExtracted: outcome.facts.length,
+  });
+
+  await storage.insertFactScrapeLog({
+    runId,
+    source: "static_pages",
+    status:
+      outcome.status === "done"
+        ? "done"
+        : outcome.status.startsWith("skipped_")
+          ? "skipped"
+          : "failed",
+    factCount: outcome.facts.length,
+    latencyMs: Date.now() - startedAt,
+    errorKind: outcome.errorKind ?? undefined,
+    diagnostics: outcome.diagnostics,
+  });
+
+  return {
+    status: outcome.status,
+    factCount: outcome.facts.length,
+    canonicalRedirect: outcome.canonicalRedirect,
+    discoveredUrls: outcome.discoveredUrls,
+    diagnostics: outcome.diagnostics,
+  };
+}
+
+// POST /api/brand-fact-sheet/search-llm
+export async function searchFactSheetLlm(params: {
+  runId: string;
+  brand: Brand;
+  startedAt: number;
+}) {
+  const { runId, brand, startedAt } = params;
+
+  const outcome = await runSearchSource({
+    brandId: brand.id,
+    brandUrl: brand.website ?? "",
+    brandName: brand.name,
+    industry: brand.industry ?? null,
+    runId,
+  });
+
+  if (outcome.facts.length > 0) {
+    await persistFacts(outcome.facts, {
+      brandId: brand.id,
+      runId,
+      sourceUrl: brand.website ?? "",
+    });
+  }
+
+  await storage.insertFactScrapeLog({
+    runId,
+    source: "search_llm",
+    status: outcome.status,
+    factCount: outcome.facts.length,
+    latencyMs: Date.now() - startedAt,
+    errorKind: outcome.errorKind ?? undefined,
+    diagnostics: outcome.diagnostics,
+  });
+
+  return {
+    status: outcome.status,
+    factCount: outcome.facts.length,
+    errorKind: outcome.errorKind,
+    diagnostics: outcome.diagnostics,
+  };
+}
+
+// POST /api/brand-fact-sheet/user-enrich
+export async function enrichFactSheetFromUser(params: {
+  runId: string;
+  brand: Brand;
+  startedAt: number;
+}) {
+  const { runId, brand, startedAt } = params;
+
+  const outcome = await runUserEnrichSource({
+    brand: {
+      id: brand.id,
+      name: brand.name,
+      description: brand.description,
+      industry: brand.industry,
+      website: brand.website,
+      products: brand.products as string[] | null,
+      targetAudience: brand.targetAudience,
+      uniqueSellingPoints: brand.uniqueSellingPoints as string[] | null,
+      keyValues: Array.isArray(brand.keyValues)
+        ? brand.keyValues.join(", ")
+        : (brand.keyValues ?? null),
+      brandVoice: brand.brandVoice,
+      tone: brand.tone,
+    },
+    runId,
+  });
+
+  // Always call persistUserFacts (even on 0 facts) so existing
+  // source='user' rows get cleared when the user empties their
+  // onboarding fields.
+  await persistUserFacts(outcome.facts, {
+    brandId: brand.id,
+    runId,
+  });
+
+  await storage.insertFactScrapeLog({
+    runId,
+    source: "user_enrich",
+    status: outcome.status,
+    factCount: outcome.facts.length,
+    latencyMs: Date.now() - startedAt,
+    errorKind: outcome.errorKind ?? undefined,
+    diagnostics: outcome.diagnostics,
+  });
+
+  return {
+    status: outcome.status,
+    factCount: outcome.facts.length,
+    diagnostics: outcome.diagnostics,
+  };
+}
+
+// POST /api/brand-fact-sheet/runs/:runId/paste
+export async function extractFactSheetFromPaste(params: {
+  runId: string;
+  brand: Brand;
+  text: string;
+  startedAt: number;
+}) {
+  const { runId, brand, text, startedAt } = params;
+
+  const providers: ProviderClient[] = [openaiProvider];
+  if (openrouterClaudeProvider) providers.push(openrouterClaudeProvider);
+  const llm = (prompt: string | { system: string; user: string }) =>
+    callWithFailover(providers, prompt, runId);
+
+  const prompt = buildExtractionPrompt(text, {
+    brandUrl: brand.website ?? "",
+    brandName: brand.name,
+    industry: brand.industry ?? null,
+  });
+  const result = await parseFactsWithRepair(prompt, llm);
+
+  const tagged = result.facts.map((f) => ({
+    ...f,
+    sourceUrl: brand.website ?? f.sourceUrl,
+  }));
+
+  await persistPasteFacts(tagged, { brandId: brand.id, runId });
+
+  await storage.insertFactScrapeLog({
+    runId,
+    source: "paste",
+    status: "done",
+    factCount: tagged.length,
+    latencyMs: Date.now() - startedAt,
+    diagnostics: { repairUsed: result.repairUsed, inputLength: text.length },
+  });
+
+  return {
+    status: "done" as const,
+    factCount: tagged.length,
+    diagnostics: { repairUsed: result.repairUsed },
+  };
+}

@@ -15,9 +15,31 @@ import { isAuthenticated } from "../auth";
 import { requireUser, requireBrand, OwnershipError } from "../lib/ownership";
 import { asyncHandler } from "../lib/asyncHandler";
 import { sendError } from "../lib/routesShared";
-import { storage } from "../storage";
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
+import {
+  FACT_SHEET_TERMINAL_STATUSES,
+  listFactSheetRuns,
+  getLatestCompletedFactSheetRun,
+  getFactSheetRunById,
+  listFactSheetRunPages,
+  cancelFactSheetRun,
+  getFactSheetCostStatus,
+  setFactSheetScrapeEnabled,
+} from "../services/factSheetRuns";
+import {
+  getFactSheetFactById,
+  acceptFactSheetFact,
+  dismissFactSheetFact,
+  bulkAcceptFactSheetConflicts,
+  getFactSheetDiff,
+} from "../services/factSheetFacts";
+import {
+  parseLastEventId,
+  getNewFactSheetPages,
+  getNewFactSheetFacts,
+  getFactSheetSourceUpdateEvents,
+} from "../services/factSheetStream";
 
 // SSE_SLICE_BUDGET_MS derives from VERCEL_FUNCTION_BUDGET_MS so the
 // same code runs cleanly on Hobby (9 s slice + reconnect) and Pro
@@ -25,8 +47,6 @@ import { captureAndFlush } from "../lib/sentryReport";
 import { SSE_SLICE_BUDGET_MS } from "../lib/factAgent/v2/vercelBudget";
 const SSE_TICK_MS = 500;
 const SSE_HEARTBEAT_MS = 15_000;
-
-const TERMINAL_STATUSES = ["completed", "failed", "timeout", "cancelled"];
 
 export function setupFactSheetRoutes(app: Express): void {
   // ────────────────────────────────────────────────────────────────────────
@@ -54,7 +74,7 @@ export function setupFactSheetRoutes(app: Express): void {
         }
         const { brandId, limit } = parsed.data;
         await requireBrand(brandId, user.id);
-        const runs = await storage.listScrapeRunsForBrand(brandId, limit);
+        const runs = await listFactSheetRuns(brandId, limit);
         return res.status(200).json({ success: true, runs });
       } catch (error) {
         if (error instanceof OwnershipError) {
@@ -99,11 +119,7 @@ export function setupFactSheetRoutes(app: Express): void {
         const { brandId } = parsed.data;
         await requireBrand(brandId, user.id);
 
-        // Goes through storage rather than querying db directly. This module is
-        // imported by route tests that mock `storage`; a direct `db` import
-        // pulls in the real connection at module load, which throws without
-        // DATABASE_URL and took seven factSheet specs down at collection time.
-        const run = await storage.getLatestCompletedScrapeRun(brandId);
+        const run = await getLatestCompletedFactSheetRun(brandId);
 
         return res.status(200).json({ success: true, run: run ?? null });
       } catch (error) {
@@ -124,14 +140,14 @@ export function setupFactSheetRoutes(app: Express): void {
     asyncHandler(async (req: Request, res: Response) => {
       try {
         const user = requireUser(req);
-        const run = await storage.getScrapeRunById(req.params.runId);
+        const run = await getFactSheetRunById(req.params.runId);
         if (!run) {
           return res.status(404).json({ success: false, error: "Run not found" });
         }
         // Ownership: load brand to verify user.id matches; anti-enumeration 404.
         await requireBrand(run.brandId, user.id);
 
-        const pages = await storage.listScrapePagesForRun(run.id);
+        const pages = await listFactSheetRunPages(run.id);
         return res.status(200).json({ success: true, run, pages });
       } catch (error) {
         if (error instanceof OwnershipError) {
@@ -152,24 +168,22 @@ export function setupFactSheetRoutes(app: Express): void {
     asyncHandler(async (req: Request, res: Response) => {
       try {
         const user = requireUser(req);
-        const run = await storage.getScrapeRunById(req.params.runId);
+        const run = await getFactSheetRunById(req.params.runId);
         if (!run) {
           return res.status(404).json({ success: false, error: "Run not found" });
         }
         await requireBrand(run.brandId, user.id);
 
-        if (TERMINAL_STATUSES.includes(run.status)) {
+        const result = await cancelFactSheetRun(run);
+        if (result.outcome === "already_terminal") {
           return res.status(409).json({
             success: false,
             code: "already_terminal",
-            status: run.status,
+            status: result.status,
             error: "Run is already in a terminal state.",
           });
         }
-
-        // CAS: atomic transition only if status is still non-terminal.
-        const updated = await storage.transitionScrapeRunStatusCAS(run.id, run.status, "cancelled");
-        if (!updated) {
+        if (result.outcome === "status_changed") {
           return res.status(409).json({
             success: false,
             code: "status_changed",
@@ -177,7 +191,6 @@ export function setupFactSheetRoutes(app: Express): void {
           });
         }
 
-        logger.info({ runId: run.id, brandId: run.brandId }, "factSheet.runs.cancel: ok");
         return res.status(200).json({ success: true });
       } catch (error) {
         if (error instanceof OwnershipError) {
@@ -207,7 +220,7 @@ export function setupFactSheetRoutes(app: Express): void {
       let userIdInitial: string;
       try {
         const user = requireUser(req);
-        const initialRun = await storage.getScrapeRunById(req.params.runId);
+        const initialRun = await getFactSheetRunById(req.params.runId);
         if (!initialRun) {
           return res.status(404).json({ success: false, error: "Run not found" });
         }
@@ -265,7 +278,7 @@ export function setupFactSheetRoutes(app: Express): void {
             break;
           }
 
-          const run = await storage.getScrapeRunById(runIdInitial);
+          const run = await getFactSheetRunById(runIdInitial);
           if (!run) {
             sseWrite(res, "error", { kind: "not_found", message: "Run disappeared" });
             break;
@@ -279,74 +292,24 @@ export function setupFactSheetRoutes(app: Express): void {
             planEmitted = true;
           }
 
-          const pages = await storage.listScrapePagesForRun(runIdInitial);
-          for (const p of pages) {
-            const pid = String((p as any).id);
-            if (lastPageId === "" || pid > lastPageId) {
-              sseWrite(res, "page", {
-                id: (p as any).id,
-                url: (p as any).url,
-                status: (p as any).status,
-                factCount: (p as any).factCount ?? 0,
-                bytes: (p as any).bytes ?? null,
-                errorKind: (p as any).errorKind ?? null,
-                lang: (p as any).lang ?? null,
-              });
-              lastPageId = pid;
-            }
+          const pageUpdate = await getNewFactSheetPages(runIdInitial, lastPageId);
+          for (const ev of pageUpdate.events) {
+            sseWrite(res, "page", ev);
           }
+          lastPageId = pageUpdate.lastPageId;
 
-          const facts = await storage.listFactsByRunIdSince(runIdInitial, lastFactId || null, 100);
-          for (const f of facts) {
-            sseWrite(res, "fact", {
-              id: (f as any).id,
-              domain: (f as any).domain,
-              subcategory: (f as any).subcategory,
-              factKey: (f as any).factKey,
-              factValue: (f as any).factValue,
-              valueType: (f as any).valueType,
-              valuePayload: (f as any).valuePayload,
-              confidence: (f as any).confidence,
-              sourceUrl: (f as any).sourceUrl,
-              sourceExcerpt: (f as any).sourceExcerpt,
-            });
-            lastFactId = String((f as any).id);
+          const factUpdate = await getNewFactSheetFacts(runIdInitial, lastFactId);
+          for (const ev of factUpdate.events) {
+            sseWrite(res, "fact", ev);
           }
+          lastFactId = factUpdate.lastFactId;
 
           // ---- Source update events ----
-          // Emit one event per v2 source (user_enrich, static_pages,
-          // search_llm) whenever a log row exists for that source.
-          // We read the full log list each tick and keep the latest entry
-          // per source, so clients always see the most-recent status even if
-          // an earlier tick was missed.
           try {
-            const logs = await storage.listFactScrapeLogsForRun(runIdInitial);
-            const bySource = new Map<string, (typeof logs)[number]>();
-            for (const l of logs) bySource.set(l.source, l);
-
-            const sourceMapping = [
-              { dbSource: "user_enrich", emit: "userEnrich" },
-              { dbSource: "static_pages", emit: "staticPages" },
-              { dbSource: "search_llm", emit: "searchLlm" },
-            ] as const;
-
-            for (const m of sourceMapping) {
-              const latest = bySource.get(m.dbSource);
-              if (latest) {
-                const payload = {
-                  source: m.emit,
-                  status:
-                    latest.status === "done"
-                      ? "done"
-                      : latest.status === "failed"
-                        ? "failed"
-                        : "in_progress",
-                  facts: latest.factCount,
-                  errorKind: latest.errorKind,
-                };
-                res.write(`event: source-update\n`);
-                res.write(`data: ${JSON.stringify(payload)}\n\n`);
-              }
+            const sourceUpdateEvents = await getFactSheetSourceUpdateEvents(runIdInitial);
+            for (const payload of sourceUpdateEvents) {
+              res.write(`event: source-update\n`);
+              res.write(`data: ${JSON.stringify(payload)}\n\n`);
             }
           } catch (err) {
             logger.warn({ err, runId: runIdInitial }, "SSE: source-update emit failed (non-fatal)");
@@ -370,7 +333,7 @@ export function setupFactSheetRoutes(app: Express): void {
             });
           }
 
-          if (TERMINAL_FOR_STREAM.includes(run.status)) {
+          if (FACT_SHEET_TERMINAL_STATUSES.includes(run.status)) {
             sseWrite(res, "done", {
               status: run.status,
               stats: {
@@ -430,25 +393,13 @@ export function setupFactSheetRoutes(app: Express): void {
             error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
-        const fact = await storage.getBrandFactById(req.params.factId);
+        const fact = await getFactSheetFactById(req.params.factId);
         if (!fact) {
           return res.status(404).json({ success: false, error: "Fact not found" });
         }
         await requireBrand(fact.brandId, user.id);
 
-        const updated = await storage.acceptFact(fact.id, {
-          dismissOtherSide: parsed.data.dismissOtherSide,
-        });
-        logger.info(
-          {
-            brandId: fact.brandId,
-            factId: fact.id,
-            domain: (fact as any).domain,
-            subcategory: (fact as any).subcategory,
-            factKey: (fact as any).factKey,
-          },
-          "factSheet.facts.accept",
-        );
+        const updated = await acceptFactSheetFact(fact, parsed.data.dismissOtherSide);
         return res.status(200).json({ success: true, fact: updated });
       } catch (error) {
         if (error instanceof OwnershipError) {
@@ -468,23 +419,13 @@ export function setupFactSheetRoutes(app: Express): void {
     asyncHandler(async (req: Request, res: Response) => {
       try {
         const user = requireUser(req);
-        const fact = await storage.getBrandFactById(req.params.factId);
+        const fact = await getFactSheetFactById(req.params.factId);
         if (!fact) {
           return res.status(404).json({ success: false, error: "Fact not found" });
         }
         await requireBrand(fact.brandId, user.id);
 
-        const updated = await storage.dismissFact(fact.id);
-        logger.info(
-          {
-            brandId: fact.brandId,
-            factId: fact.id,
-            domain: (fact as any).domain,
-            subcategory: (fact as any).subcategory,
-            factKey: (fact as any).factKey,
-          },
-          "factSheet.facts.dismiss",
-        );
+        const updated = await dismissFactSheetFact(fact);
         return res.status(200).json({ success: true, fact: updated });
       } catch (error) {
         if (error instanceof OwnershipError) {
@@ -521,19 +462,7 @@ export function setupFactSheetRoutes(app: Express): void {
         const { brandId, side, domain, runId } = parsed.data;
         await requireBrand(brandId, user.id);
 
-        const conflicts = await storage.getBrandFactSheetConflicts(brandId);
-        let affected = 0;
-        for (const pair of conflicts) {
-          if (domain && (pair.userFact as any).domain !== domain) continue;
-          // MEDIUM 7: honor runId scope when provided.
-          if (runId && (pair.scrapedFact as any).runId !== runId) continue;
-          const keep = side === "user" ? pair.userFact : pair.scrapedFact;
-          const drop = side === "user" ? pair.scrapedFact : pair.userFact;
-          await storage.acceptFact(keep.id, { dismissOtherSide: false });
-          await storage.dismissFact(drop.id);
-          affected += 1;
-        }
-        logger.info({ brandId, side, domain, runId, affected }, "factSheet.facts.bulkAccept");
+        const affected = await bulkAcceptFactSheetConflicts({ brandId, side, domain, runId });
         return res.status(200).json({ success: true, affected });
       } catch (error) {
         if (error instanceof OwnershipError) {
@@ -565,14 +494,7 @@ export function setupFactSheetRoutes(app: Express): void {
           });
         }
         await requireBrand(parsed.data.brandId, user.id);
-        const flat = await storage.getBrandFactSheetConflicts(parsed.data.brandId);
-        // CRITICAL 1: client expects domain-grouped record, not flat array.
-        const conflicts: Record<string, typeof flat> = {};
-        for (const pair of flat) {
-          const domain = (pair.userFact as any).domain as string;
-          if (!conflicts[domain]) conflicts[domain] = [];
-          conflicts[domain].push(pair);
-        }
+        const conflicts = await getFactSheetDiff(parsed.data.brandId);
         return res.status(200).json({ success: true, conflicts });
       } catch (error) {
         if (error instanceof OwnershipError) {
@@ -612,13 +534,9 @@ export function setupFactSheetRoutes(app: Express): void {
         // Ownership: anti-enumeration 404 via requireBrand.
         await requireBrand(brandId, user.id);
 
-        const monthKey = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-        const cap = await storage.getMonthlyCostCap(brandId, monthKey);
+        const status = await getFactSheetCostStatus(brandId);
 
-        return res.status(200).json({
-          factScrapeCents: cap?.factScrapeCents ?? 0,
-          monthlyCapCents: cap?.monthlyCapCents ?? 500,
-        });
+        return res.status(200).json(status);
       } catch (error) {
         if (error instanceof OwnershipError) {
           // Cross-tenant returns 404 (per CLAUDE.md anti-enumeration policy).
@@ -650,14 +568,7 @@ export function setupFactSheetRoutes(app: Express): void {
           });
         }
         await requireBrand(req.params.brandId, user.id);
-        const updated = await storage.setBrandFactScrapeEnabled(
-          req.params.brandId,
-          parsed.data.enabled,
-        );
-        logger.info(
-          { brandId: req.params.brandId, enabled: parsed.data.enabled },
-          "factSheet.brand.toggleEnabled",
-        );
+        const updated = await setFactSheetScrapeEnabled(req.params.brandId, parsed.data.enabled);
         return res.status(200).json({ success: true, factScrapeEnabled: updated });
       } catch (error) {
         if (error instanceof OwnershipError) {
@@ -669,17 +580,6 @@ export function setupFactSheetRoutes(app: Express): void {
   );
 }
 
-// Reconnect cursor format: "<lastPageId>:<lastFactId>" (both ascending row ids).
-// Both halves optional; an empty half = -infinity (replay from start).
-function parseLastEventId(raw: string | undefined): {
-  lastPageId: string;
-  lastFactId: string;
-} {
-  if (!raw) return { lastPageId: "", lastFactId: "" };
-  const [p = "", f = ""] = raw.split(":");
-  return { lastPageId: p, lastFactId: f };
-}
-
 function sseWrite(res: Response, event: string, data: unknown): void {
   try {
     res.write(`event: ${event}\n`);
@@ -688,5 +588,3 @@ function sseWrite(res: Response, event: string, data: unknown): void {
     // Write after end - ignore.
   }
 }
-
-const TERMINAL_FOR_STREAM = ["completed", "failed", "timeout", "cancelled"];

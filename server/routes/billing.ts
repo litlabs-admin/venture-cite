@@ -19,6 +19,11 @@ import { isAuthenticated } from "../auth";
 import { logger } from "../lib/logger";
 import { PLAN_PRICE_CENTS, SELLABLE_TIERS, TRIAL_DAYS, type SellableTier } from "@shared/schema";
 import { captureAndFlush } from "../lib/sentryReport";
+import {
+  getStripeProductCatalog,
+  createBillingPortalSession,
+  listBillingInvoices,
+} from "../services/billing";
 
 // When the current period ends, in unix seconds.
 //
@@ -153,12 +158,10 @@ export function setupBillingRoutes(app: Express): void {
         });
       }
       try {
-        const { getUncachableStripeClient } = await import("../stripeClient");
-        const stripe = await getUncachableStripeClient();
-        const session = await stripe.billingPortal.sessions.create({
-          customer: dbUser.stripeCustomerId,
-          return_url: appUrl("/settings"),
-        });
+        const session = await createBillingPortalSession(
+          dbUser.stripeCustomerId,
+          appUrl("/settings"),
+        );
         return res.json({ success: true, url: session.url });
       } catch (err: unknown) {
         logger.error({ err, userId: sessionUser.id }, "billing.portal-session failed");
@@ -197,43 +200,7 @@ export function setupBillingRoutes(app: Express): void {
     "/api/stripe/products",
     asyncHandler(async (_req, res) => {
       try {
-        const { getStripeClient } = await import("../stripeClient");
-        const stripe = getStripeClient();
-
-        const [productsResult, pricesResult] = await Promise.all([
-          stripe.products.list({ limit: 100, active: true }),
-          stripe.prices.list({ limit: 100, active: true }),
-        ]);
-
-        const validProducts = productsResult.data.filter((p: any) => p.metadata?.tier);
-        const productsMap = new Map<string, any>();
-
-        for (const product of validProducts) {
-          productsMap.set(product.id, {
-            id: product.id,
-            name: product.name,
-            description: product.description,
-            metadata: product.metadata,
-            prices: [],
-          });
-        }
-
-        for (const price of pricesResult.data) {
-          const productId =
-            typeof price.product === "string" ? price.product : (price.product as any).id;
-          if (productsMap.has(productId)) {
-            productsMap.get(productId).prices.push({
-              id: price.id,
-              unit_amount: price.unit_amount,
-              currency: price.currency,
-              recurring: price.recurring,
-            });
-          }
-        }
-
-        const sorted = Array.from(productsMap.values()).sort(
-          (a, b) => (a.prices[0]?.unit_amount ?? 0) - (b.prices[0]?.unit_amount ?? 0),
-        );
+        const sorted = await getStripeProductCatalog();
 
         // testMode rides along on the response the pricing page and the
         // billing panel already fetch, so the banner needs no extra request.
@@ -641,30 +608,8 @@ export function setupBillingRoutes(app: Express): void {
       // No billing account yet is an empty list, not an error.
       if (!dbUser?.stripeCustomerId) return res.json({ success: true, data: [] });
       try {
-        const { getStripeClient } = await import("../stripeClient");
-        const stripe = getStripeClient();
-        const invoices = await stripe.invoices.list({
-          customer: dbUser.stripeCustomerId,
-          limit: 24,
-        });
-        return res.json({
-          success: true,
-          data: invoices.data
-            // A draft is not a bill anyone owes yet; listing one reads as a
-            // surprise charge.
-            .filter((inv) => inv.status && inv.status !== "draft")
-            .map((inv) => ({
-              id: inv.id,
-              number: inv.number,
-              status: inv.status,
-              amountPaid: inv.amount_paid,
-              amountDue: inv.amount_due,
-              currency: inv.currency,
-              created: inv.created,
-              hostedInvoiceUrl: inv.hosted_invoice_url,
-              invoicePdf: inv.invoice_pdf,
-            })),
-        });
+        const data = await listBillingInvoices(dbUser.stripeCustomerId);
+        return res.json({ success: true, data });
       } catch (err) {
         logger.error({ err, userId: sessionUser.id }, "billing.invoices failed");
         captureAndFlush(err, { tags: { source: "billing.invoices" } });

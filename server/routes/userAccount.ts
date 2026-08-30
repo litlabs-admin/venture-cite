@@ -11,22 +11,14 @@
 // or full data exfil.
 
 import type { Express, Request } from "express";
-import { eq, inArray } from "drizzle-orm";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import { supabaseAdmin } from "../supabase";
-import { supabaseAuth } from "../lib/supabaseAuth";
 import { isAuthenticated } from "../auth";
-import { db } from "../db";
-import * as schema from "@shared/schema";
-import { validatePassword } from "@shared/passwordPolicy";
-import { users } from "@shared/schema";
 import { logger } from "../lib/logger";
 import { logAudit } from "../lib/audit";
 import { authRateKey } from "../lib/authRateKey";
 import { asyncHandler } from "../lib/routesShared";
-import { createRequestActor } from "../lib/requestActor";
-import { requestData } from "../data/requestData";
-import type { RequestUserProfilePatch } from "../data/requestUserRepository";
+import { buildUserExport, scheduleAccountDeletion } from "../services/userGdpr";
+import { applyProfileUpdate, changeUserPassword } from "../services/userSettings";
 import {
   NOTIFICATION_TYPES,
   getPreferences,
@@ -35,7 +27,6 @@ import {
 } from "../lib/notificationPrefs";
 
 import { captureAndFlush } from "../lib/sentryReport";
-const GRACE_PERIOD_DAYS = 30;
 
 // User-id-keyed rate limit for the export endpoint. 1 per 24h per user
 // is the GDPR-friendly default - Art. 12(5) lets you refuse "manifestly
@@ -56,95 +47,6 @@ const exportRateLimit = rateLimit({
     error: "Export already requested today. Try again in 24 hours.",
   },
 });
-
-// Sensitive fields stripped from the user row before export.
-//   - passwordHash: never leaves the server.
-//   - bufferAccessToken: encrypted blob is useless to the user and
-//     hands attackers the ciphertext layer.
-//   - stripeCustomerId / stripeSubscriptionId: internal billing IDs.
-function sanitizeUserRow(row: typeof users.$inferSelect): Record<string, unknown> {
-  const {
-    passwordHash: _ph,
-    bufferAccessToken: _bat,
-    stripeCustomerId: _scid,
-    stripeSubscriptionId: _ssid,
-    ...rest
-  } = row;
-  void _ph;
-  void _bat;
-  void _scid;
-  void _ssid;
-  return rest;
-}
-
-// Pull every row owned (directly or via brand) by this user.
-//
-// Coverage is explicit per-table rather than dynamic FK introspection -
-// new tables that should be exportable need to be added here. The audit
-// (audit/group-7-data-handling.md) is the source of truth for what's
-// considered user-owned.
-async function buildUserExport(userId: string): Promise<Record<string, unknown>> {
-  const [userRow] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!userRow) {
-    throw new Error("User row missing during export");
-  }
-
-  const userBrands = await db.select().from(schema.brands).where(eq(schema.brands.userId, userId));
-  const brandIds = userBrands.map((b) => b.id);
-
-  // Most child tables key by brand_id. articles also has user_id directly,
-  // but using brand_id keeps the contract uniform.
-  const byBrand = async <T>(table: { brandId: unknown }): Promise<T[]> => {
-    if (brandIds.length === 0) return [];
-    return (await db
-      .select()
-      .from(table as never)
-      .where(inArray((table as { brandId: never }).brandId, brandIds))) as T[];
-  };
-
-  const [
-    articles,
-    competitors,
-    citationRuns,
-    brandHallucinations,
-    brandMentions,
-    brandPrompts,
-    auditLogs,
-  ] = await Promise.all([
-    byBrand(schema.articles) as Promise<Array<typeof schema.articles.$inferSelect>>,
-    byBrand(schema.competitors),
-    byBrand(schema.citationRuns),
-    byBrand(schema.brandHallucinations),
-    byBrand(schema.brandMentions),
-    byBrand(schema.brandPrompts),
-    db.select().from(schema.auditLogs).where(eq(schema.auditLogs.userId, userId)),
-  ]);
-
-  // geoRankings keys off article_id (not brand_id) - second-pass query.
-  const articleIds = articles.map((a) => a.id);
-  const geoRankings =
-    articleIds.length === 0
-      ? []
-      : await db
-          .select()
-          .from(schema.geoRankings)
-          .where(inArray(schema.geoRankings.articleId, articleIds));
-
-  return {
-    exportedAt: new Date().toISOString(),
-    schemaVersion: 1,
-    user: sanitizeUserRow(userRow),
-    brands: userBrands,
-    articles,
-    competitors,
-    citationRuns,
-    brandHallucinations,
-    brandMentions,
-    brandPrompts,
-    geoRankings,
-    auditLogs,
-  };
-}
 
 // Schedule deletion. Slow rate (5 per IP per hour) so a hijacker who
 // briefly has a session can't immediately destroy data; the user has
@@ -196,64 +98,39 @@ export function setupUserAccountRoutes(app: Express) {
           });
         }
 
-        // Re-verify the password against Supabase to guard against session
-        // theft. Don't issue a new session - we just want the credential check.
-        // Use the dedicated auth client, not supabaseAdmin: signInWithPassword
-        // poisons the calling client's Authorization header and would break
-        // service-role Storage uploads (see server/lib/supabaseAuth.ts).
-        const { error: signInErr } = await supabaseAuth.auth.signInWithPassword({
+        const bearer = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+
+        const outcome = await scheduleAccountDeletion({
+          userId: user.id,
           email: user.email,
           password,
+          bearerToken: bearer,
         });
-        if (signInErr) {
+
+        if (outcome.kind === "invalid_password") {
           return res.status(401).json({ success: false, error: "Incorrect password." });
-        }
-
-        const now = new Date();
-        const scheduledFor = new Date(now.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
-
-        const [previous] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
-
-        await db
-          .update(users)
-          .set({ deletedAt: now, deletionScheduledFor: scheduledFor })
-          .where(eq(users.id, user.id));
-
-        // Revoke every session after the soft delete succeeds. The application
-        // gate rejects deleted users, but their refresh tokens must not remain
-        // valid while the grace period is active. This must stay non-fatal: the
-        // account is already deleted even when Supabase Auth is unavailable.
-        try {
-          const bearer = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
-          if (bearer) {
-            const { error: revokeError } = await supabaseAdmin.auth.admin.signOut(bearer, "global");
-            if (revokeError) throw revokeError;
-          }
-        } catch (revokeErr) {
-          logger.warn(
-            { err: revokeErr, userId: user.id },
-            "Failed to revoke sessions after account deletion",
-          );
-          captureAndFlush(revokeErr, { tags: { source: "user-delete-session-revocation" } });
         }
 
         await logAudit(req, {
           action: "user.delete.scheduled",
           entityType: "user",
           entityId: user.id,
-          before: previous ? { deletedAt: previous.deletedAt } : null,
-          after: { deletedAt: now.toISOString(), deletionScheduledFor: scheduledFor.toISOString() },
+          before: outcome.previousRow,
+          after: {
+            deletedAt: outcome.deletedAt.toISOString(),
+            deletionScheduledFor: outcome.scheduledFor.toISOString(),
+          },
         });
 
         logger.info(
-          { userId: user.id, scheduledFor: scheduledFor.toISOString() },
+          { userId: user.id, scheduledFor: outcome.scheduledFor.toISOString() },
           "user.delete: scheduled",
         );
 
         res.json({
           success: true,
-          message: `Account deletion scheduled for ${scheduledFor.toISOString().slice(0, 10)}. Contact support before then to cancel.`,
-          scheduledFor: scheduledFor.toISOString(),
+          message: `Account deletion scheduled for ${outcome.scheduledFor.toISOString().slice(0, 10)}. Contact support before then to cancel.`,
+          scheduledFor: outcome.scheduledFor.toISOString(),
         });
       } catch (err: unknown) {
         logger.error({ err }, "user.delete failed");
@@ -348,38 +225,14 @@ export function setupUserAccountRoutes(app: Express) {
             "Invalid input";
           return res.status(400).json({ success: false, error: errorMessage });
         }
-        const { firstName, lastName, timezone } = parsed.data;
 
-        // Validate timezone against the runtime's IANA list. Older Node
-        // versions without supportedValuesOf are tolerated (no-op check).
-        if (timezone) {
-          const valid: string[] =
-            typeof (Intl as unknown as { supportedValuesOf?: (k: string) => string[] })
-              .supportedValuesOf === "function"
-              ? (
-                  Intl as unknown as { supportedValuesOf: (k: string) => string[] }
-                ).supportedValuesOf("timeZone")
-              : [];
-          if (valid.length > 0 && !valid.includes(timezone)) {
-            return res.status(400).json({ success: false, error: "Invalid timezone" });
-          }
+        const outcome = await applyProfileUpdate(user.id, parsed.data);
+        if (outcome.kind === "invalid_timezone") {
+          return res.status(400).json({ success: false, error: "Invalid timezone" });
         }
-
-        // Empty-string firstName/lastName must NOT wipe the saved value.
-        // The client always sends all three fields; if its form briefly
-        // renders blank (e.g. before /auth/me hydrates), we'd overwrite
-        // the user's real name with "". Treat trimmed-empty as "skip".
-        const patch: RequestUserProfilePatch = {};
-        if (firstName && firstName.trim().length > 0) patch.firstName = firstName.trim();
-        if (lastName && lastName.trim().length > 0) patch.lastName = lastName.trim();
-        if (timezone) patch.timezone = timezone;
-
-        if (Object.keys(patch).length === 0) {
+        if (outcome.kind === "no_change") {
           return res.status(200).json({ success: true, noChange: true });
         }
-
-        const actor = createRequestActor(user.id);
-        await requestData.forActor(actor).users.updateProfile(patch);
         res.json({ success: true });
       } catch (err: unknown) {
         logger.error({ err }, "user.profile.update failed");
@@ -421,64 +274,24 @@ export function setupUserAccountRoutes(app: Express) {
           });
         }
         const { currentPassword, newPassword } = parsed.data;
+        const bearer = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
 
-        // Same shared strength policy as registration + the UIs. GoTrue also
-        // enforces its configured rules on admin.updateUserById below, but
-        // validating here keeps the message clear and the policy in one place.
-        const pwCheck = validatePassword(newPassword);
-        if (!pwCheck.ok) {
-          return res.status(400).json({ success: false, error: pwCheck.error });
+        const outcome = await changeUserPassword({
+          userId: user.id,
+          email: user.email,
+          currentPassword,
+          newPassword,
+          bearerToken: bearer,
+        });
+
+        if (outcome.kind === "weak_password") {
+          return res.status(400).json({ success: false, error: outcome.error });
         }
-
-        // Re-auth on the dedicated auth client (supabaseAuth), NOT
-        // supabaseAdmin. The old code used supabaseAdmin here "because the
-        // anon-key client was fragile" - but that is exactly what poisoned the
-        // shared service-role client's Authorization header and broke
-        // server-side Storage uploads with RLS errors. supabaseAuth prefers the
-        // anon key and falls back to the service key, so it works in every env
-        // without touching supabaseAdmin (see server/lib/supabaseAuth.ts).
-        const { data: signInData, error: signInError } = await supabaseAuth.auth.signInWithPassword(
-          {
-            email: user.email,
-            password: currentPassword,
-          },
-        );
-        if (signInError || !signInData?.user) {
+        if (outcome.kind === "wrong_current_password") {
           return res.status(401).json({ success: false, error: "Current password incorrect" });
         }
-
-        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-          password: newPassword,
-        });
-        if (updateError) {
-          // admin.updateUserById enforces password strength + leaked-password
-          // (HIBP) rules, so a rejected password is a user-actionable 4xx - not
-          // an upstream 502. Surface the real reason (e.g. "Password is known to
-          // be compromised") so the user can pick another; keep the generic 502
-          // only for genuine GoTrue/network failures (no internal detail leak).
-          const status = (updateError as { status?: number }).status;
-          const isClientError = typeof status === "number" && status >= 400 && status < 500;
-          logger.warn({ err: updateError, userId: user.id }, "user.password.update failed");
-          return res.status(isClientError ? 400 : 502).json({
-            success: false,
-            error: isClientError ? updateError.message : "Password update failed",
-          });
-        }
-
-        // Revoke all OTHER sessions (every device except the one used to
-        // make this call). Without this, a stolen-then-rotated password
-        // leaves attacker tokens valid on other devices. Non-fatal - the
-        // password change itself succeeded; logging is enough on failure.
-        try {
-          const bearer = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
-          if (bearer) {
-            await supabaseAdmin.auth.admin.signOut(bearer, "others");
-          }
-        } catch (revokeErr) {
-          logger.warn(
-            { err: revokeErr, userId: user.id },
-            "Failed to revoke other sessions after password change",
-          );
+        if (outcome.kind === "update_rejected") {
+          return res.status(outcome.status).json({ success: false, error: outcome.error });
         }
 
         await logAudit(req, {

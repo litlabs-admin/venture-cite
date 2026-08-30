@@ -10,47 +10,22 @@
 // flags to drive the checklist state.
 
 import type { Express, Response } from "express";
-import { eq, sql } from "drizzle-orm";
-import { db } from "../db";
-import { users, resolveTier } from "@shared/schema";
+import { resolveTier } from "@shared/schema";
 import { logger } from "../lib/logger";
 import { validateDomain } from "@shared/validateDomain";
-import { safeFetchText } from "../lib/ssrf";
-import { scrapeLogoUrl } from "../lib/logoScraper";
-import { extractPageContent, extractBodyText } from "../lib/pageText";
-import { downloadAndStoreLogo } from "../lib/logoStorage";
-import crypto from "crypto";
 import { requireUser, requireBrand, OwnershipError } from "../lib/ownership";
 import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
-import { getOpenrouterClient } from "../lib/factAgent/v2/openrouterClient";
-import {
-  BRAND_PROFILE_SYSTEM_PROMPT,
-  brandProfileSchema,
-  parseBrandProfile,
-  type BrandProfile,
-} from "../lib/brandProfilePrompt";
-import { MODELS } from "../lib/modelConfig";
-import { storage } from "../storage";
-import { withBrandQuota, isUsageLimitError } from "../lib/usageLimit";
 import type { Tier } from "../lib/llmPricing";
-import { runOnboardingAutopilot } from "../lib/onboardingAutopilot";
-
-/** Per-slice budget for a client-driven autopilot advance. Deliberately under
- *  a typical 60s function ceiling with room for the response to flush - the
- *  client simply polls again for the next slice. */
-const AUTOPILOT_SLICE_BUDGET_MS = 40_000;
-import { waitUntil } from "@vercel/functions";
+import { applyOnboardingStatePatch } from "../services/onboardingState";
+import { runOnboardingBrandScrape, type ScrapeEvent } from "../services/onboardingScrape";
+import {
+  confirmOnboardingBrand,
+  retryOnboardingAutopilot,
+  advanceOnboardingAutopilot,
+  getOnboardingAutopilotStatus,
+} from "../services/onboardingActivation";
 
 import { captureAndFlush } from "../lib/sentryReport";
-// Allowlist of field names the client can write into onboarding_state.
-// Add new keys as new flags appear in the UI.
-const ONBOARDING_FIELDS = new Set([
-  "guidedSeen",
-  "checklistDismissed",
-  "checklistExpanded",
-  "sidebarSeenAt",
-  "platformGuideCompletedSteps",
-]);
 
 export function setupOnboardingRoutes(app: Express) {
   app.patch(
@@ -67,36 +42,16 @@ export function setupOnboardingRoutes(app: Express) {
           return res.status(400).json({ success: false, error: "Body must be a JSON object." });
         }
 
-        // Filter to allowlisted keys. Anything else is silently ignored -
-        // the client gets a 200 either way so a slightly out-of-date client
-        // doesn't fail outright when the server has tightened the allowlist.
-        const patch: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(body)) {
-          if (ONBOARDING_FIELDS.has(key)) {
-            patch[key] = value;
-          }
-        }
-
-        if (Object.keys(patch).length === 0) {
-          // Nothing to write but caller did supply something - surface it
-          // as 400 so a client typo doesn't silently no-op forever.
+        const result = await applyOnboardingStatePatch(user.id, body as Record<string, unknown>);
+        if (result.kind === "no_fields") {
           return res.status(400).json({
             success: false,
             error: "No recognized onboarding fields in body.",
-            allowedFields: Array.from(ONBOARDING_FIELDS),
+            allowedFields: result.allowedFields,
           });
         }
 
-        // jsonb || jsonb merges keys (right wins). One query, atomic.
-        const [row] = await db
-          .update(users)
-          .set({
-            onboardingState: sql`COALESCE(${users.onboardingState}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`,
-          })
-          .where(eq(users.id, user.id))
-          .returning({ onboardingState: users.onboardingState });
-
-        res.json({ success: true, onboardingState: row?.onboardingState ?? {} });
+        res.json({ success: true, onboardingState: result.onboardingState });
       } catch (err) {
         logger.error({ err }, "onboarding state update failed");
         captureAndFlush(err, { tags: { source: "onboarding-state" } });
@@ -107,7 +62,7 @@ export function setupOnboardingRoutes(app: Express) {
 
   const activeScrapes = new Map<string, true>();
 
-  function sseWrite(res: Response, event: Record<string, unknown>): void {
+  function sseWrite(res: Response, event: ScrapeEvent): void {
     try {
       res.write(`data: ${JSON.stringify(event)}\n\n`);
     } catch (err) {
@@ -151,216 +106,11 @@ export function setupOnboardingRoutes(app: Express) {
       const homepageUrl = `https://${domain}`;
 
       try {
-        sseWrite(res, { type: "log", icon: "search", message: `Reading ${domain}…` });
+        const outcome = await runOnboardingBrandScrape(domain, homepageUrl, (event) =>
+          sseWrite(res, event),
+        );
 
-        let html = "";
-        let homepageStatus = 0;
-        try {
-          const fetched = await safeFetchText(homepageUrl, {
-            maxBytes: 2 * 1024 * 1024,
-            timeoutMs: 10_000,
-          });
-          homepageStatus = fetched.status;
-          html = fetched.text;
-        } catch (err) {
-          logger.warn({ err, domain }, "onboarding scrape: homepage fetch failed");
-        }
-
-        // extractPageContent puts the <head> metadata (title, description,
-        // Open Graph) in front of the body text. That is what makes a
-        // client-rendered site usable: humanarc.io's body strips to 53
-        // characters, well under the threshold below, but its head carries
-        // 488 characters describing the product. Before this the page read
-        // as empty and the LLM call was skipped entirely.
-        const page = extractPageContent(html, 8_000);
-        const pageText = page.text;
-
-        let logoUrl: string | null = null;
-        let scrapedLogoSource: string | null = null;
-        if (html && homepageStatus >= 200 && homepageStatus < 400) {
-          sseWrite(res, { type: "log", icon: "page", message: "Found your homepage." });
-          scrapedLogoSource = await scrapeLogoUrl(homepageUrl, html).catch(() => null);
-          if (scrapedLogoSource) {
-            sseWrite(res, { type: "log", icon: "check", message: "Detected brand logo." });
-            // Mirror it to Supabase Storage so we get a stable, CSP-friendly URL
-            // that survives source-site redesigns. Keyed by domain hash so
-            // re-scraping the same domain overwrites the file.
-            const key = crypto.createHash("sha1").update(domain).digest("hex").slice(0, 24);
-            logoUrl = await downloadAndStoreLogo(scrapedLogoSource, key);
-            if (!logoUrl) {
-              logger.warn({ scrapedLogoSource, domain }, "onboarding: logo store failed, dropping");
-            }
-          }
-        }
-
-        // Tracks whether an LLM call THREW, which is different from one that
-        // returned little. A thin site legitimately yields a thin profile and
-        // the user corrects it on the confirm screen - that is by design. A
-        // FAILED call produced the same empty object, and this endpoint
-        // reported both as success, so an OpenRouter timeout or rate limit
-        // reached the user as "we read your site and found nothing", with no
-        // error shown and nothing to retry. Measured against the real
-        // venturecite.com homepage this call takes 8.2-10.4s, so it fails
-        // often enough to matter.
-        let llmFailed = false;
-
-        const callBrandLLM = async (context: string): Promise<BrandProfile> => {
-          const client = getOpenrouterClient();
-          if (!client) throw new Error("AI service is not configured");
-          const completion = await client.chat.completions.create(
-            {
-              model: MODELS.brandAutofill,
-              response_format: { type: "json_object" },
-              temperature: 0.3,
-              messages: [
-                { role: "system", content: BRAND_PROFILE_SYSTEM_PROMPT },
-                { role: "user", content: context },
-              ],
-              // Was 1200, which this prompt routinely brushes against.
-              // Measured on the real venturecite.com homepage: completion
-              // lengths of 895, 902, 1182 and 1209 tokens across four runs.
-              // Above the cap the model stops mid-JSON, finish_reason comes
-              // back "length", parseBrandProfile cannot parse the truncated
-              // object and returns null - which used to become an empty
-              // profile reported as success. That is the coin flip behind
-              // "sometimes it fills the form, sometimes every field is
-              // blank" on content-rich sites. Headroom is cheap; a silent
-              // blank confirm screen is not.
-              max_tokens: 3000,
-            },
-            // This call had no timeout at all, so a hung provider held the
-            // request open until the platform killed the whole function -
-            // which closes the SSE stream with no error event and leaves
-            // the client waiting forever. 25s matches the sibling call in
-            // routes/brands.ts and sits under vercel.json's maxDuration.
-            { signal: AbortSignal.timeout(25_000) },
-          );
-          const choice = completion.choices[0];
-          const profile = parseBrandProfile(choice?.message?.content);
-          if (!profile) {
-            // Unparseable output is a failed call, not an empty website.
-            // Throwing routes it into the caller's catch, which sets
-            // llmFailed and surfaces a retryable error instead of an
-            // empty confirm screen.
-            throw new Error(
-              `brand profile unparseable (finish_reason=${choice?.finish_reason ?? "unknown"})`,
-            );
-          }
-          return profile;
-        };
-
-        let parsed: BrandProfile = brandProfileSchema.parse({});
-        if (pageText.length > 200) {
-          sseWrite(res, { type: "log", icon: "brain", message: "Analyzing homepage content…" });
-          parsed = await callBrandLLM(
-            `Website URL: ${homepageUrl}\n\nWebsite content:\n${pageText}`,
-          ).catch((err) => {
-            logger.warn({ err, domain }, "onboarding scrape: strategy 1 LLM failed");
-            llmFailed = true;
-            return brandProfileSchema.parse({});
-          });
-          if (parsed.name) {
-            sseWrite(res, {
-              type: "log",
-              icon: "check",
-              message: `Detected brand name: ${parsed.name}`,
-            });
-          }
-        }
-
-        const factsCount = (obj: BrandProfile): number => {
-          let n = 0;
-          for (const value of [
-            obj.name,
-            obj.industry,
-            obj.description,
-            obj.targetAudience,
-            obj.brandVoice,
-          ]) {
-            if (typeof value === "string" && value.trim()) n += 1;
-          }
-          for (const list of [obj.products, obj.keyValues, obj.uniqueSellingPoints]) {
-            if (Array.isArray(list) && list.length > 0) n += 1;
-          }
-          return n;
-        };
-
-        if (factsCount(parsed) < 3) {
-          sseWrite(res, {
-            type: "log",
-            icon: "retry",
-            message: "Thin results - trying sitemap…",
-          });
-          let sitemapText = "";
-          try {
-            const sitemap = await safeFetchText(`${homepageUrl}/sitemap.xml`, {
-              maxBytes: 512 * 1024,
-              timeoutMs: 8_000,
-            });
-            if (sitemap.status >= 200 && sitemap.status < 300) {
-              const urls = Array.from(sitemap.text.matchAll(/<loc>([^<]+)<\/loc>/gi))
-                .map((m) => m[1])
-                .filter((u) => /(about|team|company|story)/i.test(u))
-                .slice(0, 3);
-              const fetched: string[] = [];
-              for (const u of urls) {
-                try {
-                  const page = await safeFetchText(u, {
-                    maxBytes: 1 * 1024 * 1024,
-                    timeoutMs: 8_000,
-                  });
-                  if (page.status >= 200 && page.status < 300) {
-                    fetched.push(extractBodyText(page.text).slice(0, 4_000));
-                  }
-                } catch {
-                  /* skip */
-                }
-              }
-              sitemapText = fetched.join("\n\n---\n\n").slice(0, 8_000);
-            }
-          } catch (err) {
-            logger.warn({ err, domain }, "onboarding scrape: sitemap fetch failed");
-          }
-
-          if (sitemapText) {
-            const merged = await callBrandLLM(
-              `Website URL: ${homepageUrl}\n\nCombined page content:\n${pageText}\n\n${sitemapText}`,
-            ).catch((err) => {
-              logger.warn({ err, domain }, "onboarding scrape: strategy 2 LLM failed");
-              llmFailed = true;
-              return brandProfileSchema.parse({});
-            });
-            // A successful second pass clears the first pass's failure: an
-            // answer did arrive, so this is no longer an error to report.
-            if (merged.name) llmFailed = false;
-            for (const [k, v] of Object.entries(merged) as [keyof BrandProfile, unknown][]) {
-              const current = parsed[k];
-              if (!current || (Array.isArray(current) && current.length === 0)) {
-                (parsed as Record<string, unknown>)[k] = v;
-              }
-            }
-          }
-        }
-
-        // A third strategy used to live here: when the first two returned
-        // thin data it asked the model "What do you know about the domain
-        // X?" with NO page content at all. For any company below Wikipedia
-        // notability that is a hallucination generator, and it fired
-        // exactly when the user had least evidence to catch it - the
-        // output goes straight onto the "Confirm the brand" screen.
-        // Thin input must present as thin so the user corrects it.
-
-        // Report a failed read as a failure. Until now every path fell
-        // through to the `result` event below, so three different outcomes
-        // arrived at the confirm screen looking identical - a logo and
-        // empty fields:
-        //   1. the page had nothing to say (correct, user fills it in),
-        //   2. the LLM call threw (an error, and retrying often works),
-        //   3. the page could not be fetched at all (an error).
-        // Only the first is a legitimate result. The other two now surface,
-        // so the user retries instead of hand-filling a form because they
-        // were told their site is empty.
-        if (llmFailed && !parsed.name) {
+        if (outcome.kind === "llm_failed") {
           sseWrite(res, {
             type: "error",
             reason:
@@ -370,33 +120,17 @@ export function setupOnboardingRoutes(app: Express) {
           res.end();
           return;
         }
-        if (!html) {
+        if (outcome.kind === "unreachable") {
           sseWrite(res, {
             type: "error",
-            reason: `We could not reach ${domain}. Check the address is right and the site is online.`,
+            reason: `We could not reach ${outcome.domain}. Check the address is right and the site is online.`,
           });
           sseWrite(res, { type: "end" });
           res.end();
           return;
         }
 
-        const data = {
-          brandName: parsed.name ?? "",
-          companyName: parsed.companyName ?? "",
-          industry: parsed.industry ?? "",
-          description: parsed.description ?? "",
-          tone: parsed.tone ?? "",
-          products: parsed.products,
-          keyValues: parsed.keyValues,
-          uniqueSellingPoints: parsed.uniqueSellingPoints,
-          targetAudience: parsed.targetAudience ?? "",
-          brandVoice: parsed.brandVoice ?? "",
-          nameVariations: parsed.nameVariations,
-          logoUrl,
-          competitors: parsed.competitors,
-        };
-
-        sseWrite(res, { type: "result", data });
+        sseWrite(res, { type: "result", data: outcome.data });
         sseWrite(res, { type: "end" });
         res.end();
       } catch (err) {
@@ -429,89 +163,23 @@ export function setupOnboardingRoutes(app: Express) {
         }
 
         const tier = resolveTier(user) as Tier;
-        const schema = await import("@shared/schema");
 
-        let brand;
-        try {
-          brand = await withBrandQuota(user.id, tier, async (tx) => {
-            const [row] = await tx
-              .insert(schema.brands)
-              .values({
-                userId: user.id,
-                name: brandName,
-                companyName:
-                  typeof brandData.companyName === "string" && brandData.companyName.trim()
-                    ? brandData.companyName.trim()
-                    : brandName,
-                industry:
-                  typeof brandData.industry === "string" && brandData.industry.trim()
-                    ? brandData.industry.trim()
-                    : "General",
-                description:
-                  typeof brandData.description === "string" ? brandData.description : null,
-                website,
-                tone:
-                  typeof brandData.tone === "string" && brandData.tone.trim()
-                    ? brandData.tone.trim()
-                    : "professional",
-                targetAudience:
-                  typeof brandData.targetAudience === "string" ? brandData.targetAudience : null,
-                products: Array.isArray(brandData.products) ? brandData.products : [],
-                keyValues: Array.isArray(brandData.keyValues) ? brandData.keyValues : [],
-                uniqueSellingPoints: Array.isArray(brandData.uniqueSellingPoints)
-                  ? brandData.uniqueSellingPoints
-                  : [],
-                brandVoice: typeof brandData.brandVoice === "string" ? brandData.brandVoice : null,
-                nameVariations: Array.isArray(brandData.nameVariations)
-                  ? brandData.nameVariations
-                  : [],
-                logoUrl: typeof brandData.logoUrl === "string" ? brandData.logoUrl : null,
-                autopilotStatus: "pending",
-                autopilotStep: 0,
-              })
-              .returning();
-            return row;
-          });
-        } catch (err) {
-          if (isUsageLimitError(err)) {
-            return res.status(403).json({ success: false, error: err.message, limitReached: true });
-          }
-          throw err;
+        const result = await confirmOnboardingBrand({
+          userId: user.id,
+          tier,
+          brandName,
+          website,
+          brandData,
+          competitors,
+        });
+
+        if (result.kind === "quota_exceeded") {
+          return res
+            .status(403)
+            .json({ success: false, error: result.message, limitReached: true });
         }
 
-        for (const c of competitors) {
-          if (!c || typeof c.name !== "string" || !c.name.trim()) continue;
-          try {
-            await storage.createCompetitor({
-              brandId: brand.id,
-              name: c.name.trim().slice(0, 200),
-              domain: typeof c.domain === "string" ? c.domain.trim().slice(0, 200) : "",
-              industry: brand.industry || null,
-              description: typeof c.description === "string" ? c.description.slice(0, 500) : null,
-              discoveredBy: "manual",
-            } as any);
-          } catch (err) {
-            logger.warn({ err, brandId: brand.id }, "onboarding confirm: competitor insert failed");
-          }
-        }
-
-        // Kick off the full activation pipeline server-side and return
-        // immediately. The autopilot runs the phases IN ORDER -
-        // FactSheet kernel (Phase 0) → prompts grounded in that kernel →
-        // web-grounded citations - and is resumable: whatever doesn't
-        // finish within the deadline is driven to completion by the
-        // daily cron (resumeInFlightAutopilots) + the fact-scrape
-        // backstop. The fact scrape is no longer client-driven; the
-        // redesigned welcome screen just polls /autopilot-status.
-        waitUntil(
-          runOnboardingAutopilot(brand.id, user.id, {
-            deadlineMs: Date.now() + 50_000,
-          }).catch((err) => {
-            captureAndFlush(err, { tags: { source: "onboarding.ts:confirm-kickoff" } });
-          }),
-        );
-
-        res.json({ success: true, brandId: brand.id });
+        res.json({ success: true, brandId: result.brandId });
       } catch (err) {
         sendError(res, err, "Failed to confirm onboarding");
       }
@@ -530,35 +198,12 @@ export function setupOnboardingRoutes(app: Express) {
         }
         // Ownership check first (404 anti-enumeration on miss).
         const brand = await requireBrand(brandId, user.id);
-        // Atomic compare-and-swap: only transition the row when its
-        // current status is still "failed". Two simultaneous retries
-        // race here - only one wins; the loser gets 409. This also
-        // flips the row to "pending" BEFORE we return 200, so the
-        // client's immediate refetch sees the in-progress state
-        // instead of the stale "failed" banner.
-        const swapped = await storage.transitionAutopilotFromFailedToPending(brand.id);
-        if (!swapped) {
+        const result = await retryOnboardingAutopilot(brand, user.id);
+        if (result.kind === "not_failed") {
           return res
             .status(409)
             .json({ success: false, error: "Autopilot is not in a failed state" });
         }
-        logger.info(
-          {
-            brandId: brand.id,
-            userId: user.id,
-            prevStatus: brand.autopilotStatus,
-            prevError: brand.autopilotError,
-          },
-          "autopilot retry triggered",
-        );
-        // Use Vercel waitUntil so the retry survives serverless suspension
-        // after we respond. Matches the welcome→fact-scrape bridge pattern.
-        const deadlineMs = Date.now() + 50_000;
-        waitUntil(
-          runOnboardingAutopilot(brand.id, user.id, { deadlineMs }).catch((err) => {
-            captureAndFlush(err, { tags: { source: "onboarding.ts:autopilot-retry" } });
-          }),
-        );
         return res.json({ success: true });
       } catch (err) {
         if (err instanceof OwnershipError) {
@@ -569,62 +214,27 @@ export function setupOnboardingRoutes(app: Express) {
     }),
   );
 
-  // ─── Drive the activation pipeline forward ────────────────────────────────
-  //
-  // The status route above is READ-ONLY, and for a long time it was the only
-  // thing the client called while a brand was activating. That left the
-  // pipeline with a kickoff and no client-driven advance: the confirm handler
-  // starts autopilot with a ~50s budget, and anything that outlasts that
-  // budget (a fact scrape routinely takes ~2 minutes) parks the brand
-  // mid-pipeline waiting for a cron tick. Where no cron is actually invoking
-  // /api/cron/daily-orchestrator, that tick never comes and the brand simply
-  // stops - fact sheet written, no prompts, no citations, an empty dashboard,
-  // and a UI cheerfully polling a status that will never change.
-  //
-  // Citation runs and perception probes already solve this the other way
-  // round: the CLIENT drives the run one slice at a time and cron is only a
-  // backstop for an abandoned tab. This gives autopilot the same shape.
-  //
-  // Idempotent and lock-guarded: terminal runs no-op without taking the lock,
-  // and a busy lock returns current status rather than queueing a second
-  // slice, so several open tabs cannot repeat paid work.
   app.post(
     "/api/onboarding/autopilot-advance/:brandId",
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const brand = await storage.getBrandByIdForUser(req.params.brandId, user.id);
-        if (!brand) {
+        const result = await advanceOnboardingAutopilot(req.params.brandId, user.id);
+
+        if (result.kind === "not_found") {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
-
-        const status = brand.autopilotStatus ?? "idle";
-        const inFlight =
-          status === "pending" ||
-          status === "scraping_facts" ||
-          status === "generating_prompts" ||
-          status === "running_citations";
-
-        // Nothing to do. Cheap path - no lock, no work.
-        if (!inFlight) {
-          return res.json({ success: true, data: { status, advanced: false } });
+        if (result.kind === "idle") {
+          return res.json({ success: true, data: { status: result.status, advanced: false } });
         }
 
-        // No lock here: runOnboardingAutopilot takes the per-brand lock itself,
-        // so every entry point is covered and nesting the same key would make
-        // this call skip its own inner acquisition.
-        await runOnboardingAutopilot(brand.id, user.id, {
-          deadlineMs: Date.now() + AUTOPILOT_SLICE_BUDGET_MS,
-        });
-
-        const after = await storage.getBrandByIdForUser(brand.id, user.id);
         res.json({
           success: true,
           data: {
-            status: after?.autopilotStatus ?? status,
-            step: after?.autopilotStep ?? brand.autopilotStep ?? 0,
-            progress: after?.autopilotProgress ?? {},
-            error: after?.autopilotError ?? null,
+            status: result.status,
+            step: result.step,
+            progress: result.progress,
+            error: result.error,
             advanced: true,
           },
         });
@@ -639,21 +249,11 @@ export function setupOnboardingRoutes(app: Express) {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const brand = await storage.getBrandByIdForUser(req.params.brandId, user.id);
-        if (!brand) {
+        const status = await getOnboardingAutopilotStatus(req.params.brandId, user.id);
+        if (!status) {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
-        res.json({
-          success: true,
-          data: {
-            status: brand.autopilotStatus ?? "idle",
-            step: brand.autopilotStep ?? 0,
-            progress: brand.autopilotProgress ?? {},
-            error: brand.autopilotError ?? null,
-            startedAt: brand.autopilotStartedAt ?? null,
-            completedAt: brand.autopilotCompletedAt ?? null,
-          },
-        });
+        res.json({ success: true, data: status });
       } catch (err) {
         sendError(res, err, "Failed to fetch autopilot status");
       }

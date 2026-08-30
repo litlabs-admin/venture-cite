@@ -25,15 +25,20 @@
 
 import type { Express } from "express";
 import { z } from "zod";
-import { storage } from "../storage";
-import { MODELS } from "../lib/modelConfig";
 import { requireUser, requireArticle, requireBrand, getUserBrandIds } from "../lib/ownership";
 import { parsePagination } from "../lib/pagination";
-import { aiLimitMiddleware, openai, sendError, asyncHandler } from "../lib/routesShared";
+import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
 import { postToBuffer } from "../lib/bufferPost";
 import { createRequestActor } from "../lib/requestActor";
 import { contentRequestData } from "../data/contentRequestData";
 import { requestData } from "../data/requestData";
+import { metadataWithContent, distributeArticleToPlatforms } from "../services/articleDistribution";
+import {
+  createGeoRankingObservation,
+  listGeoRankingsForArticle,
+  listGeoRankingsForOwner,
+  listGeoRankingsByPlatformForOwner,
+} from "../services/geoRankings";
 
 const distributionCreateSchema = z.object({
   articleId: z.string().min(1),
@@ -48,13 +53,6 @@ const distributionFormatSchema = z.object({
 
 const bufferPostSchema = z.object({ channelId: z.string().min(1) });
 
-function metadataWithContent(metadata: unknown, content: string): Record<string, unknown> {
-  const current =
-    typeof metadata === "object" && metadata !== null && !Array.isArray(metadata) ? metadata : {};
-  return { ...current, content };
-}
-
-import { logger } from "../lib/logger";
 export function setupArticlesRoutes(app: Express): void {
   const nonEmptyText = z.string().refine((value) => value.trim().length > 0, {
     message: "Value cannot be empty",
@@ -441,156 +439,15 @@ export function setupArticlesRoutes(app: Express): void {
         const brand = article.brandId
           ? await requestData.forActor(actor).brands.get(article.brandId)
           : null;
-        // 2000-char prompt cap - keeps the per-platform LLM call cheap. TODO:
-        // make this brand-config or per-platform if we ever want long-form
-        // distribution copy.
-        const articleContent = article.content?.substring(0, 2000) || article.title || "";
-        const articleTitle = article.title ?? "Untitled";
 
         // Run platforms in parallel. Each call writes to its own
         // distribution row, so they don't contend. ~2× faster on multi-platform.
-        const results = await Promise.all(
-          platforms.map(async (platform: string) => {
-            const created = await contentRequestData
-              .forActor(actor)
-              .distributions.createMany([{ articleId: article.id, platform, status: "pending" }]);
-            const distribution = created[0];
-            if (!distribution) throw new Error("Distribution insert returned no row");
-
-            try {
-              const platformPrompts: Record<string, string> = {
-                LinkedIn: `Convert this article into a compelling LinkedIn post (max 3000 characters). Include:
-- A strong hook in the first line to stop scrolling
-- Key insights broken into short paragraphs
-- Relevant hashtags (5-8)
-- A call-to-action or question at the end
-- Professional but conversational tone
-${brand ? `Brand: ${brand.companyName}` : ""}
-
-Article title: ${articleTitle}
-Content: ${articleContent}`,
-                Medium: `Convert this article into a well-formatted Medium story. Include:
-- An engaging title and subtitle
-- Clean markdown formatting with headers, bold text, and quotes
-- A compelling introduction paragraph
-- Key sections maintained from the original
-- A strong conclusion
-- 3-5 relevant tags at the end (format: Tags: tag1, tag2, tag3)
-${brand ? `Brand: ${brand.companyName}` : ""}
-
-Article title: ${articleTitle}
-Content: ${articleContent}`,
-                Reddit: `Convert this article into a Reddit post suitable for industry subreddits. Include:
-- A descriptive, non-clickbait title
-- A "TL;DR" at the top
-- Key points in a readable format
-- Genuine, helpful tone (not promotional)
-- Discussion questions at the end to encourage engagement
-- Suggested subreddits to post in (format: Suggested subreddits: r/sub1, r/sub2)
-${brand ? `Brand: ${brand.companyName} (mention naturally, not as promotion)` : ""}
-
-Article title: ${articleTitle}
-Content: ${articleContent}`,
-                Twitter: `Convert this article into a single Twitter/X post.
-Hard constraint: total post must be ≤ 280 characters including hashtags. Do not exceed.
-Include:
-- A strong hook in the first sentence
-- 1–2 highly relevant hashtags
-- No preamble, no "Here's a post:" - output the post text only
-${brand ? `Brand: ${brand.companyName}` : ""}
-
-Article title: ${articleTitle}
-Content: ${articleContent}
-
-Reminder: total length ≤ 280 characters.`,
-                Facebook: `Convert this article into a Facebook post.
-Hard constraint: total post must be ≤ 2000 characters. Aim for under 1500 for engagement.
-Include:
-- A scroll-stopping opening sentence
-- 2–4 short paragraphs (Facebook engagement falls off past 2000 chars)
-- 1–2 emojis where natural, not forced
-- 3–5 relevant hashtags at the end
-- Conversational tone, not corporate
-${brand ? `Brand: ${brand.companyName}` : ""}
-
-Article title: ${articleTitle}
-Content: ${articleContent}
-
-Reminder: total length ≤ 2000 characters.`,
-                Instagram: `Convert this article into an Instagram caption.
-Hard constraints:
-- Total caption ≤ 2200 characters
-- The first 125 characters are critical - that's what shows before the "more" cut. Front-load the hook there.
-Include:
-- An attention-grabbing hook in the first 125 characters
-- Body paragraphs separated by blank lines (use line breaks, no markdown)
-- Up to 30 relevant hashtags grouped together at the end on a separate line, after a "." or "•••" separator
-- Friendly, authentic tone
-${brand ? `Brand: ${brand.companyName}` : ""}
-
-Article title: ${articleTitle}
-Content: ${articleContent}
-
-Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
-              };
-
-              const promptContent = platformPrompts[platform] || platformPrompts["LinkedIn"];
-
-              const formatResponse = await openai.chat.completions.create({
-                model: MODELS.distribution,
-                messages: [
-                  {
-                    role: "system",
-                    content: `You are a social media content expert who adapts long-form content for specific platforms. Create engaging, platform-native content that drives engagement.`,
-                  },
-                  { role: "user", content: promptContent },
-                ],
-                max_tokens: 2000,
-                temperature: 0.8,
-              });
-
-              const formattedContent = formatResponse.choices[0].message.content || "";
-
-              if (!formattedContent.trim()) {
-                logger.error(
-                  `[distribute] ${platform} returned empty content for article ${article.id}`,
-                );
-                await contentRequestData.forActor(actor).distributions.update(distribution.id, {
-                  status: "failed",
-                  error: "AI returned empty content",
-                });
-                return {
-                  platform,
-                  status: "failed" as const,
-                  error: "AI returned empty content - try again",
-                };
-              }
-
-              await contentRequestData.forActor(actor).distributions.update(distribution.id, {
-                status: "success",
-                distributedAt: new Date(),
-                metadata: { content: formattedContent },
-              });
-              return {
-                platform,
-                status: "success" as const,
-                content: formattedContent,
-                distributionId: distribution.id,
-                platformPostId: null as string | null,
-              };
-            } catch (apiError) {
-              await contentRequestData.forActor(actor).distributions.update(distribution.id, {
-                status: "failed",
-                error: apiError instanceof Error ? apiError.message : "Content formatting failed",
-              });
-              return {
-                platform,
-                status: "failed" as const,
-                error: "Failed to generate platform content",
-              };
-            }
-          }),
-        );
+        const results = await distributeArticleToPlatforms({
+          article,
+          brand,
+          platforms,
+          distributions: contentRequestData.forActor(actor).distributions,
+        });
 
         res.json({ success: true, data: results });
       } catch (error) {
@@ -661,15 +518,15 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
           return res.status(400).json({ success: false, error: "articleId is required" });
         }
         const article = await requireArticle(articleId, user.id);
-        const ranking = await storage.createGeoRanking({
+        const ranking = await createGeoRankingObservation({
           articleId,
           brandId: article.brandId,
           aiPlatform,
           prompt,
-          rank: rank ?? null,
-          isCited: isCited ? 1 : 0,
-          citationContext: citationContext ?? null,
-        } as any);
+          rank,
+          isCited,
+          citationContext,
+        });
         res.json({ success: true, data: ranking });
       } catch (error) {
         sendError(res, error, "Failed to create GEO ranking");
@@ -685,17 +542,12 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
         const articleId = req.query.articleId as string | undefined;
         if (articleId) {
           await requireArticle(articleId, user.id);
-          const rankings = await storage.getGeoRankings(articleId);
+          const rankings = await listGeoRankingsForArticle(articleId);
           return res.json({ success: true, data: rankings });
         }
         // No articleId: return rankings only for articles the user owns.
         const brandIds = await getUserBrandIds(user.id);
-        const allArticles = await storage.getArticles();
-        const articleIds = new Set(
-          allArticles.filter((a) => a.brandId && brandIds.has(a.brandId)).map((a) => a.id),
-        );
-        const allRankings = await storage.getGeoRankings();
-        const rankings = allRankings.filter((r: any) => r.articleId && articleIds.has(r.articleId));
+        const rankings = await listGeoRankingsForOwner(brandIds);
         res.json({ success: true, data: rankings });
       } catch (error) {
         sendError(res, error, "Failed to fetch GEO rankings");
@@ -709,12 +561,7 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
       try {
         const user = requireUser(req);
         const brandIds = await getUserBrandIds(user.id);
-        const allArticles = await storage.getArticles();
-        const articleIds = new Set(
-          allArticles.filter((a) => a.brandId && brandIds.has(a.brandId)).map((a) => a.id),
-        );
-        const all = await storage.getGeoRankingsByPlatform(req.params.platform);
-        const rankings = all.filter((r: any) => r.articleId && articleIds.has(r.articleId));
+        const rankings = await listGeoRankingsByPlatformForOwner(req.params.platform, brandIds);
         res.json({ success: true, data: rankings });
       } catch (error) {
         sendError(res, error, "Failed to fetch platform rankings");
