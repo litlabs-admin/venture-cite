@@ -84,6 +84,21 @@ if (databaseTest.kind === "ready") {
   beforeAll(removeFixtures);
   afterAll(removeFixtures);
 
+  // A claimed row is parsed through outboxCommandPayloadSchema, whose
+  // content_cost.record member requires every field below. An empty payload
+  // fails the parse with "No matching discriminator". These fixtures used to
+  // insert '{}', which never surfaced: claimNext threw on its kinds array
+  // long before any row reached the parse.
+  const VALID_CONTENT_COST_PAYLOAD = {
+    kind: "content_cost.record",
+    contentJobId: "job-fixture",
+    providerResponseId: "resp-fixture",
+    service: "openai",
+    model: "gpt-4o-mini",
+    tokensIn: 0,
+    tokensOut: 0,
+  } as const;
+
   async function insertCommand(input: {
     idempotencyKey: string;
     status: "pending" | "processing";
@@ -102,7 +117,7 @@ if (databaseTest.kind === "ready") {
       ) VALUES (
         'content_cost.record', ${input.status}, ${input.idempotencyKey},
         'content_generation_job', ${FIXTURE_PREFIX},
-        '{}'::jsonb, 'fp', ${input.attemptCount}, ${input.maxAttempts},
+        ${JSON.stringify(VALID_CONTENT_COST_PAYLOAD)}::jsonb, 'fp', ${input.attemptCount}, ${input.maxAttempts},
         ${input.availableAt ?? new Date()}, ${input.leaseToken ?? null}::uuid,
         ${input.leaseExpiresAt ?? null},
         'internal', 'record_content_cost'

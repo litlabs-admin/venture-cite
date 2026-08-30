@@ -104,12 +104,12 @@ export function createOutboxRepository(database: Database = db): OutboxRepositor
               dead_lettered_at = now(),
               lease_token = null, lease_expires_at = null,
               last_error_code = coalesce(last_error_code, 'attempts_exhausted')
-          where kind = any(${claimKinds}::text[])
+          where kind = any(${sql.param(claimKinds)}::text[])
             and status = 'processing' and lease_expires_at < now() and (attempt_count >= max_attempts or cancellation_requested_at is not null)
           returning id
         ), candidate as (
           select id from public.outbox_commands
-          where kind = any(${claimKinds}::text[])
+          where kind = any(${sql.param(claimKinds)}::text[])
             and ((status = 'pending' and cancellation_requested_at is null and available_at <= now() and attempt_count < max_attempts)
              or (status = 'processing' and cancellation_requested_at is null and lease_expires_at < now() and attempt_count < max_attempts)
             )
