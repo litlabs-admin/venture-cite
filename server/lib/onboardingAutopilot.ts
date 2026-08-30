@@ -54,6 +54,31 @@ async function setAutopilot(brandId: string, patch: Partial<Brand>): Promise<voi
 }
 
 /**
+ * Write the terminal 'completed' state, and THROW if the write does not land.
+ *
+ * Deliberately not setAutopilot(): that helper swallows its error, which is
+ * right for progress breadcrumbs and wrong here. This write is what stops the
+ * resume sweep re-entering a brand whose citation work is already paid for. A
+ * silently dropped completion leaves the brand in 'running_citations' with no
+ * active run, which is exactly the state that starts a second full run.
+ *
+ * Throwing surfaces the failure to runOnboardingAutopilot's catch, which marks
+ * the brand 'failed' - a bounded, attempt-capped path - instead of leaving it
+ * in the unbounded in-flight one.
+ */
+async function markAutopilotCompleted(brandId: string): Promise<void> {
+  // Clear the retry budget on success, so a brand that needed two attempts
+  // this time starts fresh if it is ever re-activated later.
+  await storage.updateBrand(brandId, {
+    autopilotStatus: "completed",
+    autopilotStep: 3,
+    autopilotCompletedAt: new Date(),
+    autopilotAttempts: 0,
+    autopilotError: null,
+  } as never);
+}
+
+/**
  * Drive one brand's activation forward, holding a per-brand lock.
  *
  * Every entry point funnels through here - the onboarding kickoff, the
@@ -360,6 +385,25 @@ async function runOnboardingAutopilotUnlocked(
       }
     }
 
+    // Citation work is done and paid for. Commit that fact BEFORE the
+    // supplementary phase below, not after.
+    //
+    // populateBrandDashboard is given its own 120s budget, so writing
+    // completion after it left a window up to two minutes wide in which the
+    // brand sat in 'running_citations' with no active citation_runs row -
+    // advanceCitationRun has already marked it terminal, and
+    // getActiveCitationRuns only selects 'pending'/'running'. A restart,
+    // deploy, or platform timeout inside that window sent the next resume
+    // down the `else` branch, which calls runBrandPrompts and starts a
+    // SECOND full paid citation run. The partial unique index does not stop
+    // it, because the earlier run is no longer active. In-flight states carry
+    // no attempt cap, so only the 6h stall demotion bounded the repeat.
+    //
+    // Ordering is safe: step 3 already "deliberately does not gate
+    // completion" (see below), so marking completed first changes no
+    // semantics - it only removes the window.
+    await markAutopilotCompleted(brandId);
+
     // Step 3: everything the citation run does not populate - site health,
     // mention scan, listicle scan, perception scoring. Without this the
     // dashboard's Mentions, Listicles and Perception panels render dashes on
@@ -386,17 +430,22 @@ async function runOnboardingAutopilotUnlocked(
     // The budget is a courtesy bound on one brand's activation, not a platform
     // deadline; anything it cuts short the weekly sweep finishes, because both
     // read the same ledger.
-    await populateBrandDashboard(brandId, { deadlineMs: Date.now() + 120_000 });
-
-    // Clear the retry budget on success, so a brand that needed two attempts
-    // this time starts fresh if it is ever re-activated later.
-    await setAutopilot(brandId, {
-      autopilotStatus: "completed",
-      autopilotStep: 3,
-      autopilotCompletedAt: new Date(),
-      autopilotAttempts: 0,
-      autopilotError: null,
-    } as never);
+    //
+    // Guarded so it cannot un-complete the brand. populateBrandDashboard
+    // documents itself as never throwing, and its sub-jobs are individually
+    // caught - but its first statement, storage.getBrandById, is not, so a
+    // database blip does throw out of it. Now that completion is written
+    // BEFORE this call, letting that reach the catch below would rewrite a
+    // finished brand to 'failed' and hand it to the attempt-capped path,
+    // which re-runs the citation work this phase exists not to gate.
+    try {
+      await populateBrandDashboard(brandId, { deadlineMs: Date.now() + 120_000 });
+    } catch (err) {
+      logger.warn(
+        { err, brandId, userId },
+        "onboardingAutopilot: supplementary dashboard phase failed - brand stays completed",
+      );
+    }
 
     logger.info({ brandId, userId }, "onboardingAutopilot: complete");
   } catch (err) {
