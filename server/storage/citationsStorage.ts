@@ -40,16 +40,6 @@ export const citationsStorage = {
 
   async createCitation(insertCitation: InsertCitation): Promise<Citation> {
     const result = await db.insert(schema.citations).values(insertCitation).returning();
-    const analyticsRows = await db.select().from(schema.analytics);
-    if (analyticsRows.length > 0) {
-      await db
-        .update(schema.analytics)
-        .set({
-          totalCitations: sql`${schema.analytics.totalCitations} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.analytics.id, analyticsRows[0].id));
-    }
     return result[0];
   },
 
@@ -58,17 +48,6 @@ export const citationsStorage = {
       .update(schema.articles)
       .set({ citationCount: sql`${schema.articles.citationCount} + 1` })
       .where(eq(schema.articles.id, id));
-
-    const analyticsRows = await db.select().from(schema.analytics);
-    if (analyticsRows.length > 0) {
-      await db
-        .update(schema.analytics)
-        .set({
-          totalCitations: sql`${schema.analytics.totalCitations} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.analytics.id, analyticsRows[0].id));
-    }
   },
 
   async createGeoRanking(insertRanking: InsertGeoRanking): Promise<GeoRanking> {

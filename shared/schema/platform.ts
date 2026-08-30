@@ -319,35 +319,6 @@ export const insertCompetitorFaviconSchema = createInsertSchema(competitorFavico
 export type CompetitorFavicon = typeof competitorFavicons.$inferSelect;
 export type InsertCompetitorFavicon = z.infer<typeof insertCompetitorFaviconSchema>;
 
-export const sourceHealth = pgTable(
-  "source_health",
-  {
-    brandId: varchar("brand_id")
-      .notNull()
-      .references(() => brands.id, { onDelete: "cascade" }),
-    source: text("source").notNull(), // 'reddit' | 'hackernews' | 'quora'
-    consecutiveFailures: integer("consecutive_failures").notNull().default(0),
-    lastFailureAt: timestamp("last_failure_at"),
-    lastFailureReason: text("last_failure_reason"),
-    pausedUntil: timestamp("paused_until"),
-    lastSuccessfulScanAt: timestamp("last_successful_scan_at"),
-  },
-  (t) => ({
-    pk: primaryKey({ columns: [t.brandId, t.source] }),
-  }),
-);
-export type SourceHealth = typeof sourceHealth.$inferSelect;
-export type InsertSourceHealth = typeof sourceHealth.$inferInsert;
-
-export const sentimentCache = pgTable("sentiment_cache", {
-  contentHash: text("content_hash").primaryKey(),
-  sentiment: text("sentiment").notNull(), // 'positive' | 'neutral' | 'negative'
-  sentimentScore: numeric("sentiment_score", { precision: 3, scale: 2 }).notNull(),
-  cachedAt: timestamp("cached_at").notNull().defaultNow(),
-});
-export type SentimentCache = typeof sentimentCache.$inferSelect;
-export type InsertSentimentCache = typeof sentimentCache.$inferInsert;
-
 export const tourEvents = pgTable("tour_events", {
   id: varchar("id").primaryKey(),
   userId: varchar("user_id")

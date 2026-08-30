@@ -16,11 +16,11 @@
     "claimPendingContentJob",
     "clearTourStateForBrand",
     "completeContentJobSlice",
+    "countAutomaticCitationRunsSince",
     "countCitedRankingsForArticle",
     "countSentimentCallsForBrandSince",
     "createAgentTask",
     "createAlertHistory",
-    "createAlertSetting",
     "createArticle",
     "createBetaInviteCode",
     "createBofuContent",
@@ -57,7 +57,6 @@
     "createSetHealthRun",
     "createUser",
     "createWikipediaMention",
-    "deleteAlertSetting",
     "deleteAllMentionsForBrand",
     "deleteArticle",
     "deleteBetaInviteCode",
@@ -100,8 +99,6 @@
     "getActiveScanJobsForUser",
     "getAgentTaskById",
     "getAlertHistory",
-    "getAlertSettingById",
-    "getAlertSettings",
     "getAllBetaInviteCodes",
     "getAnalytics",
     "getArticleById",
@@ -274,7 +271,6 @@
     "tryInsertWikipediaMention",
     "unsetVisibilityStep",
     "updateAgentTask",
-    "updateAlertSetting",
     "updateAnalytics",
     "updateArticle",
     "updateArticleIfVersion",
@@ -456,11 +452,11 @@
       "source": "server/storage/citationsStorage.ts"
     },
     "createCitation": {
-      "body": "{ const result = await db.insert(schema.citations).values(insertCitation).returning(); const analyticsRows = await db.select().from(schema.analytics); if (analyticsRows.length > 0) { await db .update(schema.analytics) .set({ totalCitations: sql`${schema.analytics.totalCitations} + 1`, updatedAt: new Date(), }) .where(eq(schema.analytics.id, analyticsRows[0].id)); } return result[0]; }",
+      "body": "{ const result = await db.insert(schema.citations).values(insertCitation).returning(); return result[0]; }",
       "source": "server/storage/citationsStorage.ts"
     },
     "incrementArticleCitations": {
-      "body": "{ await db .update(schema.articles) .set({ citationCount: sql`${schema.articles.citationCount} + 1` }) .where(eq(schema.articles.id, id)); const analyticsRows = await db.select().from(schema.analytics); if (analyticsRows.length > 0) { await db .update(schema.analytics) .set({ totalCitations: sql`${schema.analytics.totalCitations} + 1`, updatedAt: new Date(), }) .where(eq(schema.analytics.id, analyticsRows[0].id)); } }",
+      "body": "{ await db .update(schema.articles) .set({ citationCount: sql`${schema.articles.citationCount} + 1` }) .where(eq(schema.articles.id, id)); }",
       "source": "server/storage/citationsStorage.ts"
     },
     "createGeoRanking": {
@@ -528,7 +524,7 @@
       "source": "server/storage/citationsStorage.ts"
     },
     "createCitationRun": {
-      "body": "{ const [row] = await db.insert(schema.citationRuns).values(run).returning(); return row; }",
+      "body": "{ // Stamp last_advance_started_at at creation, same moment status is set // to 'running' - so a freshly created row is never mistaken for one // that has gone stale with no recorded progress. See migration 0123. const [row] = await db .insert(schema.citationRuns) .values({ ...run, lastAdvanceStartedAt: new Date() }) .returning(); return row; }",
       "source": "server/storage/citationsStorage.ts"
     },
     "updateCitationRun": {
@@ -544,15 +540,19 @@
       "source": "server/storage/citationsStorage.ts"
     },
     "recomputeCitationRunAggregate": {
-      "body": "{ const runRows = await db .select({ isCited: schema.geoRankings.isCited, aiPlatform: schema.geoRankings.aiPlatform, }) .from(schema.geoRankings) .where(eq(schema.geoRankings.runId, runId)); const totalChecks = runRows.length; const totalCited = runRows.filter((x) => x.isCited === 1).length; const citationRate = totalChecks > 0 ? Math.round((totalCited / totalChecks) * 100) : 0; const platformMap = new Map<string, { cited: number; checks: number }>(); for (const x of runRows) { const e = platformMap.get(x.aiPlatform) || { cited: 0, checks: 0 }; e.checks += 1; if (x.isCited === 1) e.cited += 1; platformMap.set(x.aiPlatform, e); } const platformBreakdown = Object.fromEntries( Array.from(platformMap.entries()).map(([p, s]) => [ p, { ...s, rate: s.checks > 0 ? Math.round((s.cited / s.checks) * 100) : 0 }, ]), ); await db .update(schema.citationRuns) .set({ totalChecks, totalCited, citationRate, platformBreakdown }) .where(eq(schema.citationRuns.id, runId)); return { totalChecks, totalCited, citationRate }; }",
+      "body": "{ const runRows = await db .select({ isCited: schema.geoRankings.isCited, aiPlatform: schema.geoRankings.aiPlatform, }) .from(schema.geoRankings) .where(eq(schema.geoRankings.runId, runId)); const totalChecks = runRows.length; const totalCited = runRows.filter((x) => x.isCited === 1).length; const citationRate = citationRatePct(totalCited, totalChecks); const platformMap = new Map<string, { cited: number; checks: number }>(); for (const x of runRows) { const e = platformMap.get(x.aiPlatform) || { cited: 0, checks: 0 }; e.checks += 1; if (x.isCited === 1) e.cited += 1; platformMap.set(x.aiPlatform, e); } const platformBreakdown = Object.fromEntries( Array.from(platformMap.entries()).map(([p, s]) => [ p, { ...s, rate: citationRatePct(s.cited, s.checks) }, ]), ); await db .update(schema.citationRuns) .set({ totalChecks, totalCited, citationRate, platformBreakdown }) .where(eq(schema.citationRuns.id, runId)); return { totalChecks, totalCited, citationRate }; }",
       "source": "server/storage/citationsStorage.ts"
     },
     "getActiveCitationRuns": {
-      "body": "{ const rows = await db .select({ id: schema.citationRuns.id, startedAt: schema.citationRuns.startedAt, progressPct: schema.citationRuns.progressPct, status: schema.citationRuns.status, }) .from(schema.citationRuns) .where( and( eq(schema.citationRuns.brandId, brandId), inArray(schema.citationRuns.status, [\"pending\", \"running\"]), ), ) .orderBy(desc(schema.citationRuns.startedAt)); return rows; }",
+      "body": "{ const rows = await db .select({ id: schema.citationRuns.id, startedAt: schema.citationRuns.startedAt, lastAdvanceStartedAt: schema.citationRuns.lastAdvanceStartedAt, progressPct: schema.citationRuns.progressPct, status: schema.citationRuns.status, }) .from(schema.citationRuns) .where( and( eq(schema.citationRuns.brandId, brandId), inArray(schema.citationRuns.status, [\"pending\", \"running\"]), ), ) .orderBy(desc(schema.citationRuns.startedAt)); return rows; }",
+      "source": "server/storage/citationsStorage.ts"
+    },
+    "countAutomaticCitationRunsSince": {
+      "body": "{ const [row] = await db .select({ n: sql<number>`count(*)::int` }) .from(schema.citationRuns) .where( and( eq(schema.citationRuns.brandId, brandId), inArray(schema.citationRuns.triggeredBy, [\"cron\", \"auto_onboarding\"]), gte(schema.citationRuns.startedAt, since), ), ); return row?.n ?? 0; }",
       "source": "server/storage/citationsStorage.ts"
     },
     "bumpCitationRunProgress": {
-      "body": "{ await db .update(schema.citationRuns) .set({ progressPct, totalChecks, totalCited, status: \"running\", }) .where(eq(schema.citationRuns.id, runId)); }",
+      "body": "{ // This fires repeatedly during a single slice (every PROGRESS_BUMP_EVERY // tasks or PROGRESS_BUMP_INTERVAL_MS, see server/citationChecker.ts) - // it is the mid-slice signal that staleness reaping keys off of. See // migration 0123. await db .update(schema.citationRuns) .set({ progressPct, totalChecks, totalCited, status: \"running\", lastAdvanceStartedAt: new Date(), }) .where(eq(schema.citationRuns.id, runId)); }",
       "source": "server/storage/citationsStorage.ts"
     },
     "getCitationRunLiveState": {
@@ -1027,6 +1027,14 @@
       "body": "{ const result = await db .delete(schema.betaInviteCodes) .where(eq(schema.betaInviteCodes.id, id)) .returning(); return result.length > 0; }",
       "source": "server/storage/identityStorage.ts"
     },
+    "getTourState": {
+      "body": "{ const [row] = await db .select({ onboardingState: schema.users.onboardingState }) .from(schema.users) .where(eq(schema.users.id, userId)) .limit(1); const state = (row?.onboardingState ?? {}) as Record<string, unknown>; const tours = (state.tours as Record<string, unknown> | undefined) ?? {}; return tours; }",
+      "source": "server/storage/identityStorage.ts"
+    },
+    "patchTourState": {
+      "body": "{ // Read-modify-write of the whole onboarding_state column, so it must // be atomic: a SELECT ... FOR UPDATE row lock serializes concurrent // tour patches AND blocks the sibling /api/onboarding/state writer // (any UPDATE of this row waits on the lock) for the duration of the // transaction. Without this, two concurrent writers each computed // from a stale snapshot and the second clobbered the first (lost // updates, including legacy onboarding flags). return await db.transaction(async (tx) => { const [current] = await tx .select({ onboardingState: schema.users.onboardingState }) .from(schema.users) .where(eq(schema.users.id, userId)) .limit(1) .for(\"update\"); const existing = (current?.onboardingState ?? {}) as Record<string, unknown>; const tours = (existing.tours ?? {}) as Record<string, unknown>; const next = applyTourStateOp(tours, op, args); const merged = { ...existing, tours: next }; const [updated] = await tx .update(schema.users) .set({ onboardingState: merged }) .where(eq(schema.users.id, userId)) .returning({ onboardingState: schema.users.onboardingState }); const newTours = ((updated?.onboardingState as Record<string, unknown> | undefined)?.tours ?? {}) as Record<string, unknown>; return newTours; }); }",
+      "source": "server/storage/identityStorage.ts"
+    },
     "createRun": {
       "body": "{ const [row] = await db.insert(schema.workflowRuns).values(data).returning(); return row; }",
       "source": "server/storage/jobsStorage.ts"
@@ -1111,14 +1119,6 @@
       "body": "{ const existing = await db.select().from(schema.analytics); if (existing.length > 0) { const result = await db .update(schema.analytics) .set({ ...analyticsUpdate, updatedAt: new Date() }) .where(eq(schema.analytics.id, existing[0].id)) .returning(); return result[0]; } const result = await db .insert(schema.analytics) .values({ ...analyticsUpdate, updatedAt: new Date(), }) .returning(); return result[0]; }",
       "source": "server/storage/platformStorage.ts"
     },
-    "getTourState": {
-      "body": "{ const [row] = await db .select({ onboardingState: schema.users.onboardingState }) .from(schema.users) .where(eq(schema.users.id, userId)) .limit(1); const state = (row?.onboardingState ?? {}) as Record<string, unknown>; const tours = (state.tours as Record<string, unknown> | undefined) ?? {}; return tours; }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "patchTourState": {
-      "body": "{ // Read-modify-write of the whole onboarding_state column, so it must // be atomic: a SELECT ... FOR UPDATE row lock serializes concurrent // tour patches AND blocks the sibling /api/onboarding/state writer // (any UPDATE of this row waits on the lock) for the duration of the // transaction. Without this, two concurrent writers each computed // from a stale snapshot and the second clobbered the first (lost // updates, including legacy onboarding flags). return await db.transaction(async (tx) => { const [current] = await tx .select({ onboardingState: schema.users.onboardingState }) .from(schema.users) .where(eq(schema.users.id, userId)) .limit(1) .for(\"update\"); const existing = (current?.onboardingState ?? {}) as Record<string, unknown>; const tours = (existing.tours ?? {}) as Record<string, unknown>; const next = applyTourStateOp(tours, op, args); const merged = { ...existing, tours: next }; const [updated] = await tx .update(schema.users) .set({ onboardingState: merged }) .where(eq(schema.users.id, userId)) .returning({ onboardingState: schema.users.onboardingState }); const newTours = ((updated?.onboardingState as Record<string, unknown> | undefined)?.tours ?? {}) as Record<string, unknown>; return newTours; }); }",
-      "source": "server/storage/platformStorage.ts"
-    },
     "recordTourEvents": {
       "body": "{ if (events.length === 0) return 0; await db .insert(schema.tourEvents) .values(events) .onConflictDoNothing({ target: schema.tourEvents.id }); return events.length; }",
       "source": "server/storage/platformStorage.ts"
@@ -1147,26 +1147,6 @@
       "body": "{ // The \"Record Snapshot\" button on the Trends tab calls this. Compute // share-of-answer from brand_prompts × geo_rankings - the tables the // active citation pipeline actually writes to. (The prompt_portfolio // table this used to prefer was dead - the active pipeline never wrote // to it - and was dropped; see migration 0082.) const brandPrompts = await this.getBrandPromptsByBrandId(brandId); if (brandPrompts.length > 0) { const rankings = await this.getGeoRankingsByBrandPromptIds(brandPrompts.map((p) => p.id)); const totalChecks = rankings.length; const citedChecks = rankings.filter((r) => r.isCited === 1).length; const soaValue = totalChecks > 0 ? (citedChecks / totalChecks) * 100 : 0; await this.createMetricsSnapshot({ brandId, metricType: \"share_of_answer\", metricValue: soaValue.toFixed(2), metricDetails: { promptCount: brandPrompts.length, totalChecks, citedChecks, }, } as any); } // citation_quality - average totalQualityScore across citations. // getCitationQualities has its own Phase-1 fallback (Wave D), so this // always returns something when there are cited rankings. const citations = await this.getCitationQualities(brandId); if (citations.length > 0) { const avgQuality = citations.reduce((sum, c) => sum + c.totalQualityScore, 0) / citations.length; await this.createMetricsSnapshot({ brandId, metricType: \"citation_quality\", metricValue: avgQuality.toFixed(2), metricDetails: { citationCount: citations.length }, } as any); } // hallucinations - always write a row (even 0 unresolved is useful for // trend tracking). const hallucinations = await this.getBrandHallucinations(brandId); const unresolvedCount = hallucinations.filter( (h: BrandHallucination) => h.isResolved === 0, ).length; await this.createMetricsSnapshot({ brandId, metricType: \"hallucinations\", metricValue: unresolvedCount.toString(), metricDetails: { total: hallucinations.length, unresolved: unresolvedCount }, } as any); }",
       "source": "server/storage/platformStorage.ts"
     },
-    "createAlertSetting": {
-      "body": "{ const result = await db.insert(schema.alertSettings).values(setting).returning(); return result[0]; }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "getAlertSettings": {
-      "body": "{ return await db .select() .from(schema.alertSettings) .where(eq(schema.alertSettings.brandId, brandId)); }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "getAlertSettingById": {
-      "body": "{ const result = await db .select() .from(schema.alertSettings) .where(eq(schema.alertSettings.id, id)); return result[0]; }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "updateAlertSetting": {
-      "body": "{ const result = await db .update(schema.alertSettings) .set(update) .where(eq(schema.alertSettings.id, id)) .returning(); return result[0]; }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "deleteAlertSetting": {
-      "body": "{ const result = await db .delete(schema.alertSettings) .where(eq(schema.alertSettings.id, id)) .returning(); return result.length > 0; }",
-      "source": "server/storage/platformStorage.ts"
-    },
     "createAlertHistory": {
       "body": "{ const result = await db.insert(schema.alertHistory).values(history).returning(); return result[0]; }",
       "source": "server/storage/platformStorage.ts"
@@ -1193,30 +1173,6 @@
     },
     "deleteCommunityPost": {
       "body": "{ const result = await db .delete(schema.communityPosts) .where(eq(schema.communityPosts.id, id)) .returning(); return result.length > 0; }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "getSourceHealth": {
-      "body": "{ const [row] = await db .select() .from(schema.sourceHealth) .where(and(eq(schema.sourceHealth.brandId, brandId), eq(schema.sourceHealth.source, source))) .limit(1); return row; }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "upsertSourceHealth": {
-      "body": "{ await db .insert(schema.sourceHealth) .values(input) .onConflictDoUpdate({ target: [schema.sourceHealth.brandId, schema.sourceHealth.source], set: { consecutiveFailures: input.consecutiveFailures ?? 0, lastFailureAt: input.lastFailureAt ?? null, lastFailureReason: input.lastFailureReason ?? null, pausedUntil: input.pausedUntil ?? null, lastSuccessfulScanAt: input.lastSuccessfulScanAt ?? null, }, }); }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "getCachedSentiment": {
-      "body": "{ const [row] = await db .select() .from(schema.sentimentCache) .where(eq(schema.sentimentCache.contentHash, contentHash)) .limit(1); return row; }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "upsertCachedSentiment": {
-      "body": "{ await db .insert(schema.sentimentCache) .values({ contentHash: input.contentHash, sentiment: input.sentiment, sentimentScore: input.sentimentScore, }) .onConflictDoUpdate({ target: schema.sentimentCache.contentHash, set: { sentiment: input.sentiment, sentimentScore: input.sentimentScore, cachedAt: new Date(), }, }); }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "pruneOldSentimentCache": {
-      "body": "{ const res = await db.execute(sql` DELETE FROM sentiment_cache WHERE cached_at < now() - (${beforeDays} || ' days')::interval RETURNING content_hash `); const r = res as unknown as { rows?: unknown[] } & unknown[]; return r.rows?.length ?? (Array.isArray(r) ? r.length : 0); }",
-      "source": "server/storage/platformStorage.ts"
-    },
-    "countSentimentCallsForBrandSince": {
-      "body": "{ const [row] = await db .select({ count: sql<number>`count(*)::int` }) .from(schema.brandMentions) .where( and( eq(schema.brandMentions.brandId, brandId), eq(schema.brandMentions.sentimentSource, \"llm\"), gte(schema.brandMentions.discoveredAt, since), ), ); return row?.count ?? 0; }",
       "source": "server/storage/platformStorage.ts"
     },
     "getSystemState": {
@@ -1577,6 +1533,30 @@
     },
     "listMentionsForBrand": {
       "body": "{ const limit = Math.min(opts.limit ?? 25, 100); const sort = opts.sort ?? \"newest\"; // Raw `SELECT *` returns snake_case column names; the rest of the app // (Drizzle types + frontend) expects camelCase. Map at the boundary. const mapRow = (r: Record<string, unknown>): BrandMention => ({ id: r.id as string, brandId: r.brand_id as string, platform: r.platform as string, sourceUrl: r.source_url as string, sourceTitle: (r.source_title as string | null) ?? null, mentionContext: (r.mention_context as string | null) ?? null, sentiment: (r.sentiment as string | null) ?? null, sentimentScore: (r.sentiment_score as string | null) ?? null, engagementScore: (r.engagement_score as number | null) ?? null, authorUsername: (r.author_username as string | null) ?? null, isVerified: r.is_verified as number, mentionedAt: r.mentioned_at ? new Date(r.mentioned_at as string) : null, discoveredAt: new Date(r.discovered_at as string), metadata: (r.metadata ?? null) as BrandMention[\"metadata\"], status: r.status as string, mentionLocation: (r.mention_location as string | null) ?? null, linkStatus: (r.link_status as string | null) ?? null, lastVerifiedAt: r.last_verified_at ? new Date(r.last_verified_at as string) : null, matchedVariation: (r.matched_variation as string | null) ?? null, matchedField: (r.matched_field as string | null) ?? null, source: (r.source as string | null) ?? null, scannerVersion: (r.scanner_version as number | null) ?? null, sentimentSource: (r.sentiment_source as string | null) ?? null, engagementNormalized: (r.engagement_normalized as number | null) ?? null, }); // Build filter conditions. // All filtering is applied inline via raw SQL templates in each sort branch // (ILIKE across OR'd columns isn't expressible in Drizzle's ORM helpers). let rows: BrandMention[]; if (sort === \"engagement\") { // Keyset pagination on (engagement_normalized DESC, id ASC). const cursorClause = opts.cursor != null ? sql`AND (engagement_normalized, id) < ( (SELECT engagement_normalized FROM brand_mentions WHERE id = ${opts.cursor.id}), ${opts.cursor.id} )` : sql``; const qFilter = opts.q ? sql`AND (source_title ILIKE ${\"%\" + opts.q + \"%\"} OR mention_context ILIKE ${\"%\" + opts.q + \"%\"})` : sql``; const res = await db.execute(sql` SELECT * FROM brand_mentions WHERE brand_id = ${brandId} ${opts.status ? sql`AND status = ${opts.status}` : sql``} ${opts.platform ? sql`AND platform = ${opts.platform}` : sql``} ${opts.sentiment ? sql`AND sentiment = ${opts.sentiment}` : sql``} ${opts.from ? sql`AND discovered_at >= ${opts.from}` : sql``} ${opts.to ? sql`AND discovered_at <= ${opts.to}` : sql``} ${qFilter} ${cursorClause} ORDER BY engagement_normalized DESC NULLS LAST, id ASC LIMIT ${limit + 1} `); const data = (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]); rows = (data as Record<string, unknown>[]).map(mapRow); } else if (sort === \"oldest\") { // Keyset on (discovered_at ASC, id ASC). const cursorClause = opts.cursor != null ? sql`AND (discovered_at, id) > (${opts.cursor.discoveredAt}, ${opts.cursor.id})` : sql``; const qFilter = opts.q ? sql`AND (source_title ILIKE ${\"%\" + opts.q + \"%\"} OR mention_context ILIKE ${\"%\" + opts.q + \"%\"})` : sql``; const res = await db.execute(sql` SELECT * FROM brand_mentions WHERE brand_id = ${brandId} ${opts.status ? sql`AND status = ${opts.status}` : sql``} ${opts.platform ? sql`AND platform = ${opts.platform}` : sql``} ${opts.sentiment ? sql`AND sentiment = ${opts.sentiment}` : sql``} ${opts.from ? sql`AND discovered_at >= ${opts.from}` : sql``} ${opts.to ? sql`AND discovered_at <= ${opts.to}` : sql``} ${qFilter} ${cursorClause} ORDER BY discovered_at ASC, id ASC LIMIT ${limit + 1} `); const data = (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]); rows = (data as Record<string, unknown>[]).map(mapRow); } else { // Default: newest first - keyset on (discovered_at DESC, id DESC). const cursorClause = opts.cursor != null ? sql`AND (discovered_at, id) < (${opts.cursor.discoveredAt}, ${opts.cursor.id})` : sql``; const qFilter = opts.q ? sql`AND (source_title ILIKE ${\"%\" + opts.q + \"%\"} OR mention_context ILIKE ${\"%\" + opts.q + \"%\"})` : sql``; const res = await db.execute(sql` SELECT * FROM brand_mentions WHERE brand_id = ${brandId} ${opts.status ? sql`AND status = ${opts.status}` : sql``} ${opts.platform ? sql`AND platform = ${opts.platform}` : sql``} ${opts.sentiment ? sql`AND sentiment = ${opts.sentiment}` : sql``} ${opts.from ? sql`AND discovered_at >= ${opts.from}` : sql``} ${opts.to ? sql`AND discovered_at <= ${opts.to}` : sql``} ${qFilter} ${cursorClause} ORDER BY discovered_at DESC, id DESC LIMIT ${limit + 1} `); const data = (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]); rows = (data as Record<string, unknown>[]).map(mapRow); } // Determine next cursor. let nextCursor: { discoveredAt: Date; id: string } | null = null; if (rows.length > limit) { rows = rows.slice(0, limit); const last = rows[rows.length - 1]; nextCursor = { discoveredAt: last.discoveredAt instanceof Date ? last.discoveredAt : new Date(last.discoveredAt as string), id: last.id, }; } return { rows, nextCursor }; }",
+      "source": "server/storage/signalsStorage.ts"
+    },
+    "getSourceHealth": {
+      "body": "{ const [row] = await db .select() .from(schema.sourceHealth) .where(and(eq(schema.sourceHealth.brandId, brandId), eq(schema.sourceHealth.source, source))) .limit(1); return row; }",
+      "source": "server/storage/signalsStorage.ts"
+    },
+    "upsertSourceHealth": {
+      "body": "{ await db .insert(schema.sourceHealth) .values(input) .onConflictDoUpdate({ target: [schema.sourceHealth.brandId, schema.sourceHealth.source], set: { consecutiveFailures: input.consecutiveFailures ?? 0, lastFailureAt: input.lastFailureAt ?? null, lastFailureReason: input.lastFailureReason ?? null, pausedUntil: input.pausedUntil ?? null, lastSuccessfulScanAt: input.lastSuccessfulScanAt ?? null, }, }); }",
+      "source": "server/storage/signalsStorage.ts"
+    },
+    "getCachedSentiment": {
+      "body": "{ const [row] = await db .select() .from(schema.sentimentCache) .where(eq(schema.sentimentCache.contentHash, contentHash)) .limit(1); return row; }",
+      "source": "server/storage/signalsStorage.ts"
+    },
+    "upsertCachedSentiment": {
+      "body": "{ await db .insert(schema.sentimentCache) .values({ contentHash: input.contentHash, sentiment: input.sentiment, sentimentScore: input.sentimentScore, }) .onConflictDoUpdate({ target: schema.sentimentCache.contentHash, set: { sentiment: input.sentiment, sentimentScore: input.sentimentScore, cachedAt: new Date(), }, }); }",
+      "source": "server/storage/signalsStorage.ts"
+    },
+    "pruneOldSentimentCache": {
+      "body": "{ const res = await db.execute(sql` DELETE FROM sentiment_cache WHERE cached_at < now() - (${beforeDays} || ' days')::interval RETURNING content_hash `); const r = res as unknown as { rows?: unknown[] } & unknown[]; return r.rows?.length ?? (Array.isArray(r) ? r.length : 0); }",
+      "source": "server/storage/signalsStorage.ts"
+    },
+    "countSentimentCallsForBrandSince": {
+      "body": "{ const [row] = await db .select({ count: sql<number>`count(*)::int` }) .from(schema.brandMentions) .where( and( eq(schema.brandMentions.brandId, brandId), eq(schema.brandMentions.sentimentSource, \"llm\"), gte(schema.brandMentions.discoveredAt, since), ), ); return row?.count ?? 0; }",
       "source": "server/storage/signalsStorage.ts"
     }
   },

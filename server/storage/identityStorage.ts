@@ -3,6 +3,8 @@ import { db } from "../db";
 import * as schema from "@shared/schema";
 import type { BetaInviteCode, InsertBetaInviteCode, InsertUser, User } from "@shared/schema";
 import type { IStorage } from "../storage";
+import { applyTourStateOp } from "../lib/tourStateOps";
+import type { KnownTourId, TourStateOp } from "../lib/tourRegistry";
 
 export const identityStorage = {
   async getUser(id: string): Promise<User | undefined> {
@@ -121,5 +123,62 @@ export const identityStorage = {
       .where(eq(schema.betaInviteCodes.id, id))
       .returning();
     return result.length > 0;
+  },
+
+  // Tour engine state. Named after tourEvents (platform domain) but reads
+  // and writes only users.onboardingState - identity, not platform. See
+  // .audit/B7/B7-05-platform-split-design.md §4.
+  async getTourState(userId: string): Promise<Record<string, unknown>> {
+    const [row] = await db
+      .select({ onboardingState: schema.users.onboardingState })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+    const state = (row?.onboardingState ?? {}) as Record<string, unknown>;
+    const tours = (state.tours as Record<string, unknown> | undefined) ?? {};
+    return tours;
+  },
+
+  async patchTourState(
+    userId: string,
+    op: TourStateOp,
+    args: {
+      tourId?: KnownTourId;
+      version?: number;
+      brandId?: string | null;
+      timestamp: string;
+    },
+  ): Promise<Record<string, unknown>> {
+    // Read-modify-write of the whole onboarding_state column, so it must
+    // be atomic: a SELECT ... FOR UPDATE row lock serializes concurrent
+    // tour patches AND blocks the sibling /api/onboarding/state writer
+    // (any UPDATE of this row waits on the lock) for the duration of the
+    // transaction. Without this, two concurrent writers each computed
+    // from a stale snapshot and the second clobbered the first (lost
+    // updates, including legacy onboarding flags).
+    return await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ onboardingState: schema.users.onboardingState })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1)
+        .for("update");
+
+      const existing = (current?.onboardingState ?? {}) as Record<string, unknown>;
+      const tours = (existing.tours ?? {}) as Record<string, unknown>;
+      const next = applyTourStateOp(tours, op, args);
+
+      const merged = { ...existing, tours: next };
+
+      const [updated] = await tx
+        .update(schema.users)
+        .set({ onboardingState: merged })
+        .where(eq(schema.users.id, userId))
+        .returning({ onboardingState: schema.users.onboardingState });
+
+      const newTours = ((updated?.onboardingState as Record<string, unknown> | undefined)?.tours ??
+        {}) as Record<string, unknown>;
+      return newTours;
+    });
   },
 } satisfies Partial<IStorage> & ThisType<IStorage>;

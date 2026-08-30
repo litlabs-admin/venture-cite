@@ -1,25 +1,18 @@
 import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "../db";
 import type { IStorage } from "../storage";
-import { applyTourStateOp } from "../lib/tourStateOps";
-import type { KnownTourId, TourStateOp } from "../lib/tourRegistry";
 import * as schema from "@shared/schema";
 import type {
   AlertHistory,
-  AlertSettings,
   Analytics,
   BrandHallucination,
   CommunityPost,
   InsertAlertHistory,
-  InsertAlertSettings,
   InsertAnalytics,
   InsertCommunityPost,
   InsertMetricsHistory,
-  InsertSourceHealth,
   InsertTourEvent,
   MetricsHistory,
-  SentimentCache,
-  SourceHealth,
 } from "@shared/schema";
 
 export const platformStorage = {
@@ -84,60 +77,6 @@ export const platformStorage = {
       })
       .returning();
     return result[0];
-  },
-
-  async getTourState(userId: string): Promise<Record<string, unknown>> {
-    const [row] = await db
-      .select({ onboardingState: schema.users.onboardingState })
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
-    const state = (row?.onboardingState ?? {}) as Record<string, unknown>;
-    const tours = (state.tours as Record<string, unknown> | undefined) ?? {};
-    return tours;
-  },
-
-  async patchTourState(
-    userId: string,
-    op: TourStateOp,
-    args: {
-      tourId?: KnownTourId;
-      version?: number;
-      brandId?: string | null;
-      timestamp: string;
-    },
-  ): Promise<Record<string, unknown>> {
-    // Read-modify-write of the whole onboarding_state column, so it must
-    // be atomic: a SELECT ... FOR UPDATE row lock serializes concurrent
-    // tour patches AND blocks the sibling /api/onboarding/state writer
-    // (any UPDATE of this row waits on the lock) for the duration of the
-    // transaction. Without this, two concurrent writers each computed
-    // from a stale snapshot and the second clobbered the first (lost
-    // updates, including legacy onboarding flags).
-    return await db.transaction(async (tx) => {
-      const [current] = await tx
-        .select({ onboardingState: schema.users.onboardingState })
-        .from(schema.users)
-        .where(eq(schema.users.id, userId))
-        .limit(1)
-        .for("update");
-
-      const existing = (current?.onboardingState ?? {}) as Record<string, unknown>;
-      const tours = (existing.tours ?? {}) as Record<string, unknown>;
-      const next = applyTourStateOp(tours, op, args);
-
-      const merged = { ...existing, tours: next };
-
-      const [updated] = await tx
-        .update(schema.users)
-        .set({ onboardingState: merged })
-        .where(eq(schema.users.id, userId))
-        .returning({ onboardingState: schema.users.onboardingState });
-
-      const newTours = ((updated?.onboardingState as Record<string, unknown> | undefined)?.tours ??
-        {}) as Record<string, unknown>;
-      return newTours;
-    });
   },
 
   async recordTourEvents(events: InsertTourEvent[]): Promise<number> {
@@ -269,46 +208,6 @@ export const platformStorage = {
     } as any);
   },
 
-  async createAlertSetting(setting: InsertAlertSettings): Promise<AlertSettings> {
-    const result = await db.insert(schema.alertSettings).values(setting).returning();
-    return result[0];
-  },
-
-  async getAlertSettings(brandId: string): Promise<AlertSettings[]> {
-    return await db
-      .select()
-      .from(schema.alertSettings)
-      .where(eq(schema.alertSettings.brandId, brandId));
-  },
-
-  async getAlertSettingById(id: string): Promise<AlertSettings | undefined> {
-    const result = await db
-      .select()
-      .from(schema.alertSettings)
-      .where(eq(schema.alertSettings.id, id));
-    return result[0];
-  },
-
-  async updateAlertSetting(
-    id: string,
-    update: Partial<InsertAlertSettings>,
-  ): Promise<AlertSettings | undefined> {
-    const result = await db
-      .update(schema.alertSettings)
-      .set(update)
-      .where(eq(schema.alertSettings.id, id))
-      .returning();
-    return result[0];
-  },
-
-  async deleteAlertSetting(id: string): Promise<boolean> {
-    const result = await db
-      .delete(schema.alertSettings)
-      .where(eq(schema.alertSettings.id, id))
-      .returning();
-    return result.length > 0;
-  },
-
   async createAlertHistory(history: InsertAlertHistory): Promise<AlertHistory> {
     const result = await db.insert(schema.alertHistory).values(history).returning();
     return result[0];
@@ -371,86 +270,6 @@ export const platformStorage = {
       .where(eq(schema.communityPosts.id, id))
       .returning();
     return result.length > 0;
-  },
-
-  async getSourceHealth(brandId: string, source: string): Promise<SourceHealth | undefined> {
-    const [row] = await db
-      .select()
-      .from(schema.sourceHealth)
-      .where(and(eq(schema.sourceHealth.brandId, brandId), eq(schema.sourceHealth.source, source)))
-      .limit(1);
-    return row;
-  },
-
-  async upsertSourceHealth(input: InsertSourceHealth): Promise<void> {
-    await db
-      .insert(schema.sourceHealth)
-      .values(input)
-      .onConflictDoUpdate({
-        target: [schema.sourceHealth.brandId, schema.sourceHealth.source],
-        set: {
-          consecutiveFailures: input.consecutiveFailures ?? 0,
-          lastFailureAt: input.lastFailureAt ?? null,
-          lastFailureReason: input.lastFailureReason ?? null,
-          pausedUntil: input.pausedUntil ?? null,
-          lastSuccessfulScanAt: input.lastSuccessfulScanAt ?? null,
-        },
-      });
-  },
-
-  async getCachedSentiment(contentHash: string): Promise<SentimentCache | undefined> {
-    const [row] = await db
-      .select()
-      .from(schema.sentimentCache)
-      .where(eq(schema.sentimentCache.contentHash, contentHash))
-      .limit(1);
-    return row;
-  },
-
-  async upsertCachedSentiment(input: {
-    contentHash: string;
-    sentiment: string;
-    sentimentScore: string;
-  }): Promise<void> {
-    await db
-      .insert(schema.sentimentCache)
-      .values({
-        contentHash: input.contentHash,
-        sentiment: input.sentiment,
-        sentimentScore: input.sentimentScore,
-      })
-      .onConflictDoUpdate({
-        target: schema.sentimentCache.contentHash,
-        set: {
-          sentiment: input.sentiment,
-          sentimentScore: input.sentimentScore,
-          cachedAt: new Date(),
-        },
-      });
-  },
-
-  async pruneOldSentimentCache(beforeDays: number): Promise<number> {
-    const res = await db.execute(sql`
-      DELETE FROM sentiment_cache
-      WHERE cached_at < now() - (${beforeDays} || ' days')::interval
-      RETURNING content_hash
-    `);
-    const r = res as unknown as { rows?: unknown[] } & unknown[];
-    return r.rows?.length ?? (Array.isArray(r) ? r.length : 0);
-  },
-
-  async countSentimentCallsForBrandSince(brandId: string, since: Date): Promise<number> {
-    const [row] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(schema.brandMentions)
-      .where(
-        and(
-          eq(schema.brandMentions.brandId, brandId),
-          eq(schema.brandMentions.sentimentSource, "llm"),
-          gte(schema.brandMentions.discoveredAt, since),
-        ),
-      );
-    return row?.count ?? 0;
   },
 
   async getSystemState(key: string) {

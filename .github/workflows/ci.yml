@@ -62,6 +62,16 @@ jobs:
       - name: Schema export surface
         run: npm run schema:surface:check
 
+      # `server/databaseStorage.ts` is being split into domain storage modules
+      # behind a composed `storage` object (B5). This walks the TypeScript AST
+      # to prove three things `tsc` cannot: `IStorage` still declares the same
+      # methods as the baseline, no method is implemented in two files (object
+      # spread would resolve that silently, last writer wins), and no method
+      # body changed during a move. Never wired into CI until now: `IStorage`
+      # drifted from the B5 baseline with nothing to catch it.
+      - name: Storage surface
+        run: npm run storage:surface:check
+
       - name: Lint
         run: npm run lint
 

@@ -59,8 +59,6 @@ import {
   type BrandMonthlyCostCap,
   type MetricsHistory,
   type InsertMetricsHistory,
-  type AlertSettings,
-  type InsertAlertSettings,
   type AlertHistory,
   type InsertAlertHistory,
   type AgentTask,
@@ -747,16 +745,6 @@ export interface IStorage {
   createMetricsSnapshot(snapshot: InsertMetricsHistory): Promise<MetricsHistory>;
   getMetricsHistory(brandId: string, metricType?: string, days?: number): Promise<MetricsHistory[]>;
   recordCurrentMetrics(brandId: string): Promise<void>;
-
-  // Alert Settings methods
-  createAlertSetting(setting: InsertAlertSettings): Promise<AlertSettings>;
-  getAlertSettings(brandId: string): Promise<AlertSettings[]>;
-  getAlertSettingById(id: string): Promise<AlertSettings | undefined>;
-  updateAlertSetting(
-    id: string,
-    update: Partial<InsertAlertSettings>,
-  ): Promise<AlertSettings | undefined>;
-  deleteAlertSetting(id: string): Promise<boolean>;
 
   // Alert History methods
   createAlertHistory(history: InsertAlertHistory): Promise<AlertHistory>;

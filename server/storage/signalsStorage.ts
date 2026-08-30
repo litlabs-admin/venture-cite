@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import {
@@ -16,6 +16,9 @@ import {
   type InsertTrackedContentUrl,
   type BrandHallucination,
   type InsertBrandHallucination,
+  type SourceHealth,
+  type InsertSourceHealth,
+  type SentimentCache,
 } from "@shared/schema";
 import type { IStorage } from "../storage";
 
@@ -800,5 +803,89 @@ export const signalsStorage = {
     }
 
     return { rows, nextCursor };
+  },
+
+  // Source health + sentiment cache: exclusively used by the mention-
+  // scanning pipeline (mentionScanner.ts, sourceHealth.ts, sentimentBatcher.ts,
+  // routes/mentions.ts). Moved from platform per
+  // .audit/B7/B7-05-platform-split-design.md §2a.
+  async getSourceHealth(brandId: string, source: string): Promise<SourceHealth | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.sourceHealth)
+      .where(and(eq(schema.sourceHealth.brandId, brandId), eq(schema.sourceHealth.source, source)))
+      .limit(1);
+    return row;
+  },
+
+  async upsertSourceHealth(input: InsertSourceHealth): Promise<void> {
+    await db
+      .insert(schema.sourceHealth)
+      .values(input)
+      .onConflictDoUpdate({
+        target: [schema.sourceHealth.brandId, schema.sourceHealth.source],
+        set: {
+          consecutiveFailures: input.consecutiveFailures ?? 0,
+          lastFailureAt: input.lastFailureAt ?? null,
+          lastFailureReason: input.lastFailureReason ?? null,
+          pausedUntil: input.pausedUntil ?? null,
+          lastSuccessfulScanAt: input.lastSuccessfulScanAt ?? null,
+        },
+      });
+  },
+
+  async getCachedSentiment(contentHash: string): Promise<SentimentCache | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.sentimentCache)
+      .where(eq(schema.sentimentCache.contentHash, contentHash))
+      .limit(1);
+    return row;
+  },
+
+  async upsertCachedSentiment(input: {
+    contentHash: string;
+    sentiment: string;
+    sentimentScore: string;
+  }): Promise<void> {
+    await db
+      .insert(schema.sentimentCache)
+      .values({
+        contentHash: input.contentHash,
+        sentiment: input.sentiment,
+        sentimentScore: input.sentimentScore,
+      })
+      .onConflictDoUpdate({
+        target: schema.sentimentCache.contentHash,
+        set: {
+          sentiment: input.sentiment,
+          sentimentScore: input.sentimentScore,
+          cachedAt: new Date(),
+        },
+      });
+  },
+
+  async pruneOldSentimentCache(beforeDays: number): Promise<number> {
+    const res = await db.execute(sql`
+      DELETE FROM sentiment_cache
+      WHERE cached_at < now() - (${beforeDays} || ' days')::interval
+      RETURNING content_hash
+    `);
+    const r = res as unknown as { rows?: unknown[] } & unknown[];
+    return r.rows?.length ?? (Array.isArray(r) ? r.length : 0);
+  },
+
+  async countSentimentCallsForBrandSince(brandId: string, since: Date): Promise<number> {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.brandMentions)
+      .where(
+        and(
+          eq(schema.brandMentions.brandId, brandId),
+          eq(schema.brandMentions.sentimentSource, "llm"),
+          gte(schema.brandMentions.discoveredAt, since),
+        ),
+      );
+    return row?.count ?? 0;
   },
 } satisfies Partial<IStorage> & ThisType<IStorage>;

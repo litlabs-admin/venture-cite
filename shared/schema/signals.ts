@@ -5,6 +5,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   varchar,
@@ -296,3 +297,42 @@ export const insertBrandHallucinationSchema = createInsertSchema(brandHallucinat
 });
 export type InsertBrandHallucination = z.infer<typeof insertBrandHallucinationSchema>;
 export type BrandHallucination = typeof brandHallucinations.$inferSelect;
+
+// Source health - tracks consecutive scan failures per (brand, source) so
+// the mention scanner can back off a source that keeps failing. Moved from
+// platform: exclusively used by the signals mention-scanning pipeline
+// (mentionScanner.ts, sourceHealth.ts). See
+// .audit/B7/B7-05-platform-split-design.md §2a.
+export const sourceHealth = pgTable(
+  "source_health",
+  {
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    source: text("source").notNull(), // 'reddit' | 'hackernews' | 'quora'
+    consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+    lastFailureAt: timestamp("last_failure_at"),
+    lastFailureReason: text("last_failure_reason"),
+    pausedUntil: timestamp("paused_until"),
+    lastSuccessfulScanAt: timestamp("last_successful_scan_at"),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.brandId, t.source] }),
+  }),
+);
+export type SourceHealth = typeof sourceHealth.$inferSelect;
+export type InsertSourceHealth = typeof sourceHealth.$inferInsert;
+
+// Sentiment cache - keyed by content hash so repeated mentions with
+// identical text skip a re-classification call. Moved from platform:
+// exclusively used by sentimentBatcher.ts (called from mentionScanner.ts
+// and routes/mentions.ts). See
+// .audit/B7/B7-05-platform-split-design.md §2a.
+export const sentimentCache = pgTable("sentiment_cache", {
+  contentHash: text("content_hash").primaryKey(),
+  sentiment: text("sentiment").notNull(), // 'positive' | 'neutral' | 'negative'
+  sentimentScore: numeric("sentiment_score", { precision: 3, scale: 2 }).notNull(),
+  cachedAt: timestamp("cached_at").notNull().defaultNow(),
+});
+export type SentimentCache = typeof sentimentCache.$inferSelect;
+export type InsertSentimentCache = typeof sentimentCache.$inferInsert;
