@@ -6,8 +6,7 @@ import { logger } from "./logger";
 import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
 import { relevanceForRank } from "./competitorRelevance";
 import type { Brand } from "@shared/schema";
-
-const RAW_DELIM = "||| RAW_RESPONSE |||";
+import { RAW_RESPONSE_DELIMITER as RAW_DELIM } from "./citationContextFormat";
 const MAX_CITATION_SCAN = 50; // how many recent cited responses to mine
 
 const discoveredCompetitorSchema = z.object({

@@ -43,6 +43,7 @@ import { startPerceptionProbeRun, advancePerceptionProbeRun } from "../lib/perce
 const PROBE_SLICE_MS = 25_000;
 import { detectPlatform } from "../lib/platformDetect";
 import { discoverSitemapUrls } from "../lib/factAgent/v2/sitemapDiscovery";
+import { splitCitationContext } from "../lib/citationContextFormat";
 import { safeFetchText } from "../lib/ssrf";
 import { withOriginLimit } from "../lib/originConcurrency";
 import { scanPagesForFindings } from "../lib/siteHealthContentScan";
@@ -56,21 +57,14 @@ import { listSiteHealthScanHistory } from "../lib/siteHealthHistory";
 // citation runner too.
 const CORE_PLATFORMS = AI_PLATFORMS_CORE;
 
-// Strip the citation-delimiter markers from a stored citationContext.
-// Rows are persisted as "{statusLine}\n\n||| RAW_RESPONSE |||\n{body}"
-// (or the older "--- RAW RESPONSE ---"). For dashboard display we only
-// want the body text - the status line is redundant with the Cited/Not
-// cited pill the UI already renders.
+// Strip the citation-delimiter markers from a stored citationContext (see
+// server/lib/citationContextFormat.ts for the format and both markers). For
+// dashboard display we only want the body text - the status line is
+// redundant with the Cited/Not cited pill the UI already renders.
 function extractResponseBody(ctx: string | null | undefined): string | null {
+  const { fullResponse } = splitCitationContext(ctx);
+  if (fullResponse) return fullResponse;
   if (!ctx) return null;
-  const markers = ["\n\n||| RAW_RESPONSE |||\n", "\n\n--- RAW RESPONSE ---\n"];
-  for (const m of markers) {
-    const idx = ctx.indexOf(m);
-    if (idx !== -1) {
-      const body = ctx.slice(idx + m.length).trim();
-      return body.length > 0 ? body : null;
-    }
-  }
   // No delimiter - treat whole string as body, unless it starts with the
   // obvious "Cited" / "Not cited" status lines, in which case skip it.
   const trimmed = ctx.trim();

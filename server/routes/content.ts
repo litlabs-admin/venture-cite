@@ -44,11 +44,12 @@ import {
 } from "../lib/routesShared";
 import { runArticleSlice } from "../contentGenerationWorker";
 import { waitUntil } from "@vercel/functions";
-import { acquireOrWait, secondsUntilAvailable } from "../lib/rateLimitBuckets";
+import { enforceFeatureCooldownOr429 } from "../lib/rateLimitBuckets";
+import { hasEnoughBrandProfile } from "../lib/brandProfileCompleteness";
 
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
-import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
+import { enqueueLlmJob, registerLlmJobHandler, classifyAiEnqueueError } from "../lib/llmJobs";
 import { createRequestActor } from "../lib/requestActor";
 import { liveOpenAIEnabled } from "../lib/localFlowSafety";
 import { contentRequestData } from "../data/contentRequestData";
@@ -844,10 +845,7 @@ export function setupContentRoutes(app: Express): void {
         // anchor on and the response will be generic noise (or empty).
         // Surface this before the OpenAI call so the user sees a clear
         // 400 instead of "Failed to discover keywords."
-        const keywordHasProfile =
-          (brand.industry && brand.industry.trim().length > 0) ||
-          (Array.isArray(brand.products) && brand.products.length > 0) ||
-          (brand.targetAudience && brand.targetAudience.trim().length > 0);
+        const keywordHasProfile = hasEnoughBrandProfile(brand, { includeAudience: true });
         if (!keywordHasProfile) {
           return res.status(400).json({
             success: false,
@@ -868,13 +866,10 @@ export function setupContentRoutes(app: Express): void {
           "keyword-research/discover: invoked",
         );
 
-        if (!(await acquireOrWait("discover-keywords", brandId, 0))) {
-          const secs = await secondsUntilAvailable("discover-keywords", brandId);
-          return res.status(429).json({
-            success: false,
-            error: "rate_limited",
-            message: `Keyword discovery is on a short cooldown for this brand. Try again in ~${secs}s.`,
-          });
+        if (
+          await enforceFeatureCooldownOr429(res, "discover-keywords", brandId, "Keyword discovery")
+        ) {
+          return;
         }
 
         const competitors = await storage.getCompetitors(brandId);
@@ -951,17 +946,8 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
           });
         } catch (aiErr: unknown) {
           const e = aiErr as { status?: number; name?: string };
-          if (e?.status === 429) {
-            return res.status(429).json({
-              success: false,
-              error: "AI is busy right now. Please wait a moment and try again.",
-            });
-          }
-          if (e?.status === 401) {
-            return res
-              .status(503)
-              .json({ success: false, error: "AI service is misconfigured. Contact support." });
-          }
+          const mapped = classifyAiEnqueueError(e);
+          if (mapped) return res.status(mapped.status).json(mapped.body);
           if (e?.name === "AbortError" || e?.name === "TimeoutError") {
             return res
               .status(504)

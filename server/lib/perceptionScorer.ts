@@ -10,6 +10,7 @@ import { MODELS } from "./modelConfig";
 import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
 import { safeParseJson } from "./safeParseJson";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
+import { RAW_RESPONSE_DELIMITER as RAW_DELIM } from "./citationContextFormat";
 
 // The scoring client is resolved LAZILY, on first scoring call - never at
 // import time. server/routes/dashboard.ts imports this module, so an eager
@@ -20,11 +21,6 @@ import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 // a missing key should disable scoring, not the dashboard. `OpenAI` survives
 // here only as the injected-client TYPE for tests; the real call goes through
 // getOpenrouterClient().
-
-// Same delimiter used by hallucinationDetector.ts / competitorDiscovery.ts -
-// geo_rankings.citation_context is stored as
-// "{statusLine}\n\n||| RAW_RESPONSE |||\n{rawModelAnswer}".
-const RAW_DELIM = "||| RAW_RESPONSE |||";
 
 const MIN_SNIPPET_CHARS = 80;
 const MAX_SNIPPET_CHARS = 1200;

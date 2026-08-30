@@ -17,6 +17,7 @@ import { extractCitedUrls } from "./lib/urlExtractor";
 import type { TrackedContentUrl } from "@shared/schema";
 import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
 import { isRunStaleSinceLastProgress } from "./lib/citationReconciliation";
+import { buildCitationContext } from "./lib/citationContextFormat";
 
 // Bound on automatic (cron / auto_onboarding) citation run CREATION, per
 // brand, per rolling window. Deliberately enforced here - where the row is
@@ -1003,10 +1004,10 @@ export async function runBrandPrompts(
       const statusLine = fetchError.startsWith("Check failed")
         ? fetchError
         : `Check failed: ${fetchError}`;
-      citationContext = `${statusLine}\n\n||| RAW_RESPONSE |||\n${fetchError}`;
+      citationContext = buildCitationContext(statusLine, fetchError);
     } else {
       const statusLine = isCited ? "Cited" : "Not cited";
-      citationContext = `${statusLine}\n\n||| RAW_RESPONSE |||\n${responseText}`;
+      citationContext = buildCitationContext(statusLine, responseText);
     }
 
     // 3. citingOutletUrl - prefer the analyzer's explicitly-attributed URL
@@ -1059,7 +1060,7 @@ export async function runBrandPrompts(
         }
         const compUrl = v?.citedUrls?.[0] ?? citingOutletUrl;
         const compContext = v?.context
-          ? `${v.context.slice(0, 400)}\n\n||| RAW_RESPONSE |||\n${responseText}`
+          ? buildCitationContext(v.context.slice(0, 400), responseText)
           : citationContext;
         // Use analyzer enrichment only when analyzer also said cited;
         // otherwise null/default so we don't fabricate rank/relevance.

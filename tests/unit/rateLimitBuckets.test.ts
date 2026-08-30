@@ -60,8 +60,30 @@ vi.mock("../../server/db", () => ({
   },
 }));
 
-const { tryAcquire, acquireOrWait, secondsUntilAvailable, _resetBuckets } =
-  await import("../../server/lib/rateLimitBuckets");
+const {
+  tryAcquire,
+  acquireOrWait,
+  secondsUntilAvailable,
+  enforceFeatureCooldownOr429,
+  _resetBuckets,
+} = await import("../../server/lib/rateLimitBuckets");
+
+// Minimal Express Response fake: captures the status code and JSON body
+// the way res.status(n).json(body) would, without pulling in express.
+function makeFakeRes() {
+  const calls: { status?: number; body?: unknown } = {};
+  const res = {
+    status(code: number) {
+      calls.status = code;
+      return res;
+    },
+    json(body: unknown) {
+      calls.body = body;
+      return res;
+    },
+  };
+  return { res: res as unknown as import("express").Response, calls };
+}
 
 describe("rateLimitBuckets", () => {
   beforeEach(async () => {
@@ -142,5 +164,52 @@ describe("rateLimitBuckets", () => {
     const future = new Date(Date.now() + 60 * 60 * 1000); // 1 hour future
     store.set(k("reddit", "future-scope"), { tokens: 0, last_refill_at: future });
     expect(await tryAcquire("reddit", "future-scope")).toBe(true);
+  });
+
+  // B7-06 consolidation: server/routes/content.ts (discover-keywords),
+  // server/routes/contentTypes.ts (discover-listicles, scan-wikipedia,
+  // generate-faqs) each had their own copy of "acquireOrWait, then on
+  // failure secondsUntilAvailable + a 429 JSON response". These tests pin
+  // the one shared response shape.
+  describe("enforceFeatureCooldownOr429", () => {
+    it("writes nothing and returns false when the bucket has capacity", async () => {
+      const { res, calls } = makeFakeRes();
+      const limited = await enforceFeatureCooldownOr429(
+        res,
+        "discover-keywords",
+        "brand-1",
+        "Keyword discovery",
+      );
+      expect(limited).toBe(false);
+      expect(calls.status).toBeUndefined();
+      expect(calls.body).toBeUndefined();
+    });
+
+    it("writes a 429 with the feature label and an ETA when the bucket is exhausted", async () => {
+      for (let i = 0; i < 10; i++) await tryAcquire("discover-keywords", "brand-2");
+      const { res, calls } = makeFakeRes();
+      const limited = await enforceFeatureCooldownOr429(
+        res,
+        "discover-keywords",
+        "brand-2",
+        "Keyword discovery",
+      );
+      expect(limited).toBe(true);
+      expect(calls.status).toBe(429);
+      expect(calls.body).toEqual({
+        success: false,
+        error: "rate_limited",
+        message: expect.stringMatching(
+          /^Keyword discovery is on a short cooldown for this brand\. Try again in ~\d+s\.$/,
+        ),
+      });
+    });
+
+    it("interpolates whatever feature label and provider key the caller passes", async () => {
+      for (let i = 0; i < 10; i++) await tryAcquire("scan-wikipedia", "brand-3");
+      const { res, calls } = makeFakeRes();
+      await enforceFeatureCooldownOr429(res, "scan-wikipedia", "brand-3", "Wikipedia scan");
+      expect((calls.body as { message: string }).message).toMatch(/^Wikipedia scan is on a /);
+    });
   });
 });

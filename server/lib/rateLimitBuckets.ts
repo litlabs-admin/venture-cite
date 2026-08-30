@@ -9,6 +9,7 @@
 // API stays the same; tryAcquire and secondsUntilAvailable became async.
 // Mention/listicle scanners and tests already await acquireOrWait.
 
+import type { Response } from "express";
 import { pool } from "../db";
 import { logger } from "./logger";
 
@@ -213,6 +214,35 @@ export async function secondsUntilAvailable(provider: string, scopeId: string): 
     logger.warn({ err, provider, scopeId }, "rateLimit: secondsUntilAvailable failed");
     return 0;
   }
+}
+
+/**
+ * Try-once cooldown check for the four manual-discovery routes
+ * (discover-keywords, discover-listicles, scan-wikipedia, generate-faqs -
+ * see the per-feature CONFIGS entries above). All four handlers used to
+ * copy this same four-line block (acquireOrWait with maxWaitMs=0, then
+ * secondsUntilAvailable, then an identical 429 JSON shape) with only the
+ * bucket key and the feature label changing - consolidated here 2026-08-30
+ * so the one response shape has one definition.
+ *
+ * Returns true and writes the 429 response when the bucket is exhausted -
+ * the caller must return immediately in that case. Returns false (writes
+ * nothing) when the request may proceed.
+ */
+export async function enforceFeatureCooldownOr429(
+  res: Response,
+  provider: string,
+  scopeId: string,
+  featureLabel: string,
+): Promise<boolean> {
+  if (await acquireOrWait(provider, scopeId, 0)) return false;
+  const secs = await secondsUntilAvailable(provider, scopeId);
+  res.status(429).json({
+    success: false,
+    error: "rate_limited",
+    message: `${featureLabel} is on a short cooldown for this brand. Try again in ~${secs}s.`,
+  });
+  return true;
 }
 
 // For tests: wipes every bucket. Note: hits the live DB, so test setups

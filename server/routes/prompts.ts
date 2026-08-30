@@ -32,6 +32,12 @@ import { buildPromptScoreHistory, resolvePoints } from "../lib/promptScoreHistor
 import { citationRatePct } from "@shared/visibilityMetrics";
 import { waitUntil } from "@vercel/functions";
 import {
+  RAW_RESPONSE_DELIMITER,
+  LEGACY_RAW_RESPONSE_DELIMITER,
+  buildCitationContext,
+  splitCitationContext,
+} from "../lib/citationContextFormat";
+import {
   TRACKED_PROMPTS_CAP,
   AUDIENCE_GENERATION_COOLDOWN_MS,
   SET_HEALTH_COOLDOWN_MS,
@@ -1380,16 +1386,16 @@ export function setupPromptsRoutes(app: Express): void {
             byPrompt.set(key, { prompt: key, platforms: [] });
           }
           const ctx = r.citationContext || "";
-          const delimIdx = ctx.indexOf("||| RAW_RESPONSE |||");
-          const oldDelimIdx = ctx.indexOf("--- RAW RESPONSE ---");
+          const delimIdx = ctx.indexOf(RAW_RESPONSE_DELIMITER);
+          const oldDelimIdx = ctx.indexOf(LEGACY_RAW_RESPONSE_DELIMITER);
           let snippet: string | null = null;
           let fullResponse: string | null = null;
           if (delimIdx !== -1) {
             snippet = ctx.substring(0, delimIdx).trim();
-            fullResponse = ctx.substring(delimIdx + 20).trim();
+            fullResponse = ctx.substring(delimIdx + RAW_RESPONSE_DELIMITER.length).trim();
           } else if (oldDelimIdx !== -1) {
             snippet = ctx.substring(0, oldDelimIdx).trim();
-            fullResponse = ctx.substring(oldDelimIdx + 20).trim();
+            fullResponse = ctx.substring(oldDelimIdx + LEGACY_RAW_RESPONSE_DELIMITER.length).trim();
           } else if (ctx) {
             snippet = ctx;
           }
@@ -1486,13 +1492,15 @@ export function setupPromptsRoutes(app: Express): void {
           const rankings = await storage.getGeoRankingsByBrandPromptIds(prompts.map((p) => p.id));
           for (const r of rankings) {
             const ctx = r.citationContext || "";
-            const delimIdx = ctx.indexOf("||| RAW_RESPONSE |||");
-            const oldDelimIdx = ctx.indexOf("--- RAW RESPONSE ---");
+            const delimIdx = ctx.indexOf(RAW_RESPONSE_DELIMITER);
+            const oldDelimIdx = ctx.indexOf(LEGACY_RAW_RESPONSE_DELIMITER);
             let responseText = "";
             if (delimIdx !== -1) {
-              responseText = ctx.substring(delimIdx + "||| RAW_RESPONSE |||".length).trim();
+              responseText = ctx.substring(delimIdx + RAW_RESPONSE_DELIMITER.length).trim();
             } else if (oldDelimIdx !== -1) {
-              responseText = ctx.substring(oldDelimIdx + "--- RAW RESPONSE ---".length).trim();
+              responseText = ctx
+                .substring(oldDelimIdx + LEGACY_RAW_RESPONSE_DELIMITER.length)
+                .trim();
             }
             if (!responseText) continue;
 
@@ -1514,7 +1522,7 @@ export function setupPromptsRoutes(app: Express): void {
                 counts.newlyCited += 1;
               }
               const newStatusLine = newIsCited === 1 ? "Cited" : "Not cited";
-              patch.citationContext = `${newStatusLine}\n\n||| RAW_RESPONSE |||\n${responseText}`;
+              patch.citationContext = buildCitationContext(newStatusLine, responseText);
               await storage.updateGeoRanking(r.id, patch as any);
               counts.rankings += 1;
               if (r.runId) affectedRunIds.add(r.runId);
@@ -1756,26 +1764,9 @@ export function setupPromptsRoutes(app: Express): void {
           for (const u of Array.from(urls)) sourceCounts[u] = (sourceCounts[u] ?? 0) + 1;
         }
 
-        // citationContext is stored as "{snippet}\n\n||| RAW_RESPONSE |||\n{full}"
-        // (current format) or "{snippet}\n\n--- RAW RESPONSE ---\n{full}" (older
-        // format written before 2026-04-16). Support both so existing rows
-        // render correctly without requiring a re-run.
-        const splitContext = (
-          ctx: string | null,
-        ): { snippet: string | null; fullResponse: string | null } => {
-          if (!ctx) return { snippet: null, fullResponse: null };
-          const markers = ["\n\n||| RAW_RESPONSE |||\n", "\n\n--- RAW RESPONSE ---\n"];
-          for (const marker of markers) {
-            const idx = ctx.indexOf(marker);
-            if (idx !== -1) {
-              return {
-                snippet: ctx.slice(0, idx).trim() || null,
-                fullResponse: ctx.slice(idx + marker.length).trim() || null,
-              };
-            }
-          }
-          return { snippet: ctx, fullResponse: null };
-        };
+        // Support both current and legacy citationContext formats so existing
+        // rows render correctly without requiring a re-run - see
+        // server/lib/citationContextFormat.ts.
 
         let totalCited = 0;
         for (const r of latest) {
@@ -1796,7 +1787,7 @@ export function setupPromptsRoutes(app: Express): void {
           if (r.brandPromptId) {
             const promptRow = promptMap.get(r.brandPromptId);
             if (promptRow) {
-              const { snippet, fullResponse } = splitContext(r.citationContext);
+              const { snippet, fullResponse } = splitCitationContext(r.citationContext);
               const rank = typeof r.rank === "number" && r.rank > 0 ? r.rank : null;
               promptRow.platforms.push({
                 platform: r.aiPlatform,

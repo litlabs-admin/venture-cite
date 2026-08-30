@@ -114,6 +114,42 @@ export interface EnqueueResult {
   status: "pending";
 }
 
+export interface AiEnqueueErrorResponse {
+  status: number;
+  body: { success: false; error: string };
+}
+
+/**
+ * Classifies an error thrown by enqueueLlmJob() into the user-facing HTTP
+ * response. The keyword-discovery and FAQ-generation routes
+ * (server/routes/content.ts, server/routes/contentTypes.ts) each catch
+ * immediately after calling enqueueLlmJob() and had their own copy of this
+ * 429/401 mapping - byte-identical for those two cases, so it lives here
+ * once. Returns null when no known classification applies; the caller
+ * should fall back to its own generic error response (and may check
+ * additional error shapes, like an AbortError/TimeoutError name, before
+ * falling back - see server/routes/content.ts).
+ */
+export function classifyAiEnqueueError(err: unknown): AiEnqueueErrorResponse | null {
+  const e = err as { status?: number } | undefined;
+  if (e?.status === 429) {
+    return {
+      status: 429,
+      body: {
+        success: false,
+        error: "AI is busy right now. Please wait a moment and try again.",
+      },
+    };
+  }
+  if (e?.status === 401) {
+    return {
+      status: 503,
+      body: { success: false, error: "AI service is misconfigured. Contact support." },
+    };
+  }
+  return null;
+}
+
 export async function enqueueLlmJob<P>(params: EnqueueParams<P>): Promise<EnqueueResult> {
   if (!HANDLERS.has(params.kind)) {
     throw new Error(

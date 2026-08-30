@@ -25,7 +25,8 @@ import {
   safeParseJson,
   asyncHandler,
 } from "../lib/routesShared";
-import { acquireOrWait, secondsUntilAvailable } from "../lib/rateLimitBuckets";
+import { enforceFeatureCooldownOr429 } from "../lib/rateLimitBuckets";
+import { hasEnoughBrandProfile } from "../lib/brandProfileCompleteness";
 import {
   loadBrandGenerationContext,
   renderFactsBlock,
@@ -33,7 +34,7 @@ import {
 } from "../lib/brandGenerationContext";
 import { computeAiSurfaceScore } from "../lib/faqScoring";
 import { normalizeUrl } from "../lib/trackedContentMatcher";
-import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
+import { enqueueLlmJob, registerLlmJobHandler, classifyAiEnqueueError } from "../lib/llmJobs";
 
 import { logger } from "../lib/logger";
 
@@ -331,9 +332,7 @@ export function setupContentTypesRoutes(app: Express): void {
             error: "Listicle discovery requires OPENROUTER_API_KEY. Contact support.",
           });
         }
-        const listicleHasProfile =
-          (brand.industry && brand.industry.trim().length > 0) ||
-          (Array.isArray(brand.products) && brand.products.length > 0);
+        const listicleHasProfile = hasEnoughBrandProfile(brand);
         if (!listicleHasProfile) {
           return res.status(400).json({
             success: false,
@@ -341,13 +340,15 @@ export function setupContentTypesRoutes(app: Express): void {
           });
         }
 
-        if (!(await acquireOrWait("discover-listicles", brand.id, 0))) {
-          const secs = await secondsUntilAvailable("discover-listicles", brand.id);
-          return res.status(429).json({
-            success: false,
-            error: "rate_limited",
-            message: `Listicle discovery is on a short cooldown for this brand. Try again in ~${secs}s.`,
-          });
+        if (
+          await enforceFeatureCooldownOr429(
+            res,
+            "discover-listicles",
+            brand.id,
+            "Listicle discovery",
+          )
+        ) {
+          return;
         }
 
         const { scanBrandListicles } = await import("../lib/listicleScanner");
@@ -463,11 +464,7 @@ export function setupContentTypesRoutes(app: Express): void {
             error: "Wikipedia scan requires OPENAI_API_KEY. Contact support.",
           });
         }
-        const wikiHasProfile =
-          brand.name &&
-          brand.name.trim().length > 0 &&
-          ((brand.industry && brand.industry.trim().length > 0) ||
-            (Array.isArray(brand.products) && brand.products.length > 0));
+        const wikiHasProfile = hasEnoughBrandProfile(brand, { requireName: true });
         if (!wikiHasProfile) {
           return res.status(400).json({
             success: false,
@@ -475,13 +472,8 @@ export function setupContentTypesRoutes(app: Express): void {
           });
         }
 
-        if (!(await acquireOrWait("scan-wikipedia", brand.id, 0))) {
-          const secs = await secondsUntilAvailable("scan-wikipedia", brand.id);
-          return res.status(429).json({
-            success: false,
-            error: "rate_limited",
-            message: `Wikipedia scan is on a short cooldown for this brand. Try again in ~${secs}s.`,
-          });
+        if (await enforceFeatureCooldownOr429(res, "scan-wikipedia", brand.id, "Wikipedia scan")) {
+          return;
         }
 
         const { scanBrandWikipedia } = await import("../lib/wikipediaScanner");
@@ -1017,13 +1009,8 @@ Return ONLY valid JSON. Do not include an aiSurfaceScore field - it is computed 
         if (!ctx) return res.status(404).json({ success: false, error: "Brand not found" });
         const { brand, facts } = ctx;
 
-        if (!(await acquireOrWait("generate-faqs", brand.id, 0))) {
-          const secs = await secondsUntilAvailable("generate-faqs", brand.id);
-          return res.status(429).json({
-            success: false,
-            error: "rate_limited",
-            message: `FAQ generation is on a short cooldown for this brand. Try again in ~${secs}s.`,
-          });
+        if (await enforceFeatureCooldownOr429(res, "generate-faqs", brand.id, "FAQ generation")) {
+          return;
         }
 
         const factsBlock = renderFactsBlock(facts);
@@ -1087,17 +1074,8 @@ Return ONLY the JSON object (no prose, no markdown fences). Do NOT include any a
           });
         } catch (aiErr: unknown) {
           const e = aiErr as { status?: number; name?: string };
-          if (e?.status === 429) {
-            return res.status(429).json({
-              success: false,
-              error: "AI is busy right now. Please wait a moment and try again.",
-            });
-          }
-          if (e?.status === 401) {
-            return res
-              .status(503)
-              .json({ success: false, error: "AI service is misconfigured. Contact support." });
-          }
+          const mapped = classifyAiEnqueueError(e);
+          if (mapped) return res.status(mapped.status).json(mapped.body);
           return res
             .status(502)
             .json({ success: false, error: "AI service error. Please try again shortly." });

@@ -8,6 +8,7 @@ import { parseLLMJson, LLMParseError } from "./llmParse";
 import { logger } from "./logger";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import type { GeoRanking, BrandFactSheet } from "@shared/schema";
+import { RAW_RESPONSE_DELIMITER as RAW_DELIM } from "./citationContextFormat";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -19,7 +20,6 @@ attachAiLogger(openai);
 
 const MIN_FACT_SHEET_ROWS = 3;
 const MAX_RESPONSE_CHARS = 8_000;
-const RAW_DELIM = "||| RAW_RESPONSE |||";
 const JUDGE_CONCURRENCY = 5;
 const MAX_FACTS_IN_PROMPT = 40;
 
