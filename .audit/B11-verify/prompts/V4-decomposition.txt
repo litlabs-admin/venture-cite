@@ -1,0 +1,98 @@
+# V4 — Storage and schema decomposition integrity audit
+
+Two large decompositions happened on this branch:
+  1. `shared/schema.ts` was split into ~12 domain modules under shared/schema/.
+  2. The storage layer was split into ~11 domain modules, recomposed into one
+     `IStorage` object.
+
+Both are the kind of refactor that fails silently at runtime: a method that
+stopped being composed in, a table export that vanished from the barrel, a
+`this` binding that broke. TypeScript can pass while production throws
+"is not a function". Find every such hole.
+
+## Hard constraints
+- READ ONLY. Do not edit any file except your output artifact.
+- Do not run any git write operation: no committing, no pushing, no resetting,
+  no stashing, no branch switching, no discarding of working-tree changes.
+- Do NOT start Docker containers or a database. Do not run the test suite.
+- Verify from code. Treat Markdown and comments as unverified hints.
+
+## Getting the before state
+    git show origin/main:shared/schema.ts
+    git show origin/main:server/storage.ts
+Those are read commands and are allowed.
+
+## Part A — schema barrel completeness
+1. Enumerate every named export of `origin/main:shared/schema.ts`: every table,
+   every relation, every zod schema, every inferred type, every enum, every
+   constant.
+2. Enumerate every named export reachable from the current `shared/schema.ts`
+   barrel (follow the re-exports into shared/schema/*.ts).
+3. Diff the two sets. Report every export that DISAPPEARED and every one that
+   was RENAMED. For each, grep the whole repo for its old name and say whether
+   anything still imports it.
+4. Report any export that is now exported TWICE from different modules — a
+   duplicate re-export can resolve to the wrong object.
+5. For every table object, confirm the column set, the column types, the
+   defaults, the notNull flags, the primary key, and the indexes survived the
+   move unchanged. A silently dropped `.notNull()` or a changed default is a
+   blocker. Do this by diffing each table definition against origin/main.
+6. Confirm there is no import cycle among shared/schema/*.ts. Trace the imports.
+   A cycle produces `undefined` at module init and fails only at runtime.
+
+## Part B — storage composition completeness
+1. Enumerate every method on `origin/main:server/storage.ts`'s exported storage
+   object / IStorage interface.
+2. Enumerate every method the current composition actually produces at runtime.
+   Read the composition site: how are the domain objects merged? Object spread,
+   Object.assign, class mixin? Whatever it is, work out which keys survive.
+3. Diff the two sets. Report every method that is MISSING from the composition,
+   every method that is DEFINED in a domain module but never merged in, and
+   every method DECLARED on IStorage with no implementation.
+4. COLLISIONS. If two domain modules define the same method name, the later
+   spread wins silently. Find every duplicate key across the domain modules and
+   say which implementation wins and whether that is the right one.
+5. `this` BINDING. The composition reportedly relies on
+   `satisfies Partial<IStorage> & ThisType<IStorage>` with object spread. For
+   every domain method that calls `this.someOtherMethod()`, confirm the method
+   it calls is present on the final composed object. A cross-domain `this` call
+   to a method that did not make it into the composition throws at runtime and
+   type checking will not catch it if the types say otherwise. Enumerate every
+   cross-domain `this.` call and verify each target.
+6. Confirm no domain module holds mutable module-level state that used to be
+   per-instance, or vice versa.
+7. Check the CI gate that reportedly locks the export surface count. Find it,
+   read it, and say whether it actually would catch a dropped method or only
+   counts. A count gate passes when one method is removed and another added.
+
+## Part C — the foreign key declarations
+Commit `8d87c3c` added four `.references()` calls in shared/schema/platform.ts.
+Verify each against the migration that created the real constraint (grep
+migrations/ for the constraint). Confirm the referenced table, the referenced
+column, and the onDelete action match. A declared `cascade` where the database
+has `set null` (or the reverse) is a blocker because generated DDL would then
+be wrong.
+
+Also state whether `identity.ts` (which platform.ts now imports for `users`)
+introduces an import cycle.
+
+## Output
+Write to `.audit/B11-verify/V4-decomposition.md`.
+
+Mandatory sections:
+`## Schema exports: lost, renamed, duplicated` — a table, or the sentence
+  "None. All N exports from origin/main are reachable from the current barrel."
+  with N stated.
+`## Storage methods: missing, orphaned, colliding` — same treatment, with the
+  method count before and after stated explicitly.
+`## Cross-domain this-calls verified` — a table of caller -> callee -> present?
+`## Findings` — numbered:
+  ID | severity (blocker/high/medium/low) | file:line
+  What is missing or wrong:
+  Runtime symptom (the exact error a user would hit):
+  Confidence: high/medium/low
+
+End with `## Verdict`: DECOMPOSITION COMPLETE / GAPS FOUND, with counts.
+
+If you cannot enumerate something exhaustively, say so plainly. A stated gap in
+coverage is useful. A silent one is a lie.

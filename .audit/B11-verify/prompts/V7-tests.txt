@@ -1,0 +1,102 @@
+# V7 — Test suite integrity audit
+
+The branch reports "300 files / 2,182 tests passed, 0 failures". A green suite is
+only evidence if the tests can actually fail. Earlier in this program, two tests
+were found that passed no matter what the implementation did, and a set of
+"source-text tests" (tests that read a file with readFileSync and assert the code
+LOOKS a certain way) were deleted rather than fixed.
+
+Your job: establish how much of that green is real, especially over the code this
+branch changed.
+
+## Hard constraints
+- READ ONLY. Do not edit any file except your output artifact.
+- Do not run any git write operation: no committing, no pushing, no resetting,
+  no stashing, no branch switching, no discarding of working-tree changes.
+- Do NOT start Docker containers or a database. Do NOT run the test suite — the
+  owner runs one suite at a time and a concurrent run would corrupt their result.
+  This is a static audit of test CODE.
+- Verify from code. Treat Markdown and comments as unverified hints.
+
+## Getting the before state
+    git show origin/main:<path>
+    git diff --name-status origin/main...HEAD -- tests/
+Those are read commands and are allowed.
+
+## Part A — deleted and weakened tests
+1. List every test file DELETED on this branch and every test case removed from
+   a surviving file. For each, state what behaviour it used to assert and
+   identify the replacement test that now covers it. Any behaviour that lost
+   coverage with no replacement is a finding.
+2. The source-text tests were removed from what is now server/routes/billing.ts
+   and server/routes/cron.ts coverage. Confirm the behaviours they gestured at
+   (whatever the asserted source text was meant to guarantee) are now asserted
+   behaviourally somewhere, or report the gap.
+
+## Part B — tests that cannot fail
+Scan the whole tests/ tree for tests that pass regardless of the implementation:
+- A test body with no `expect` at all. Enumerate every one.
+- `expect(true).toBe(true)`, `expect(x).toBeDefined()` on something that is
+  always defined, `expect(fn).not.toThrow()` where fn cannot throw.
+- A mock so complete that the assertion only checks the mock. Specifically: an
+  assertion whose expected value is derived from the same mock that produced the
+  actual value.
+- `try { ... } catch { }` swallowing an assertion failure.
+- An async test that does not await the thing it asserts on, so the assertion
+  runs before the work.
+- `expect(...)` with no matcher called.
+- Snapshot tests whose snapshot is empty or trivially small.
+- Tests skipped or focused: `.skip`, `.todo`, `.only`, `xit`, `xdescribe`,
+  commented-out test blocks. Enumerate every one with file:line and say whether
+  it is intentional.
+- Conditional skips, especially anything gated on an environment variable such
+  as TEST_DATABASE_URL. For each, state exactly what stops being tested when the
+  variable is unset, and whether the suite reports that as skipped or as passed.
+  This matters: the project's own guidance says integration tests skip silently
+  without TEST_DATABASE_URL, so a green run may not have exercised them at all.
+
+## Part C — coverage of what this branch actually changed
+For each of these high-risk changes, name the test that would FAIL if the change
+were reverted or broken. If no such test exists, that is the finding:
+  a) server/lib/onboardingAutopilot.ts — the fall-through fix. Which test fails
+     if you restore the fall-through and let it start a second concurrent run?
+  b) server/routes/geoSignals.ts — the OwnershipError 404. Which test fails if
+     it returns 500 again?
+  c) client/src/lib/queryClient.ts — the QueryCache global error handler. Which
+     test fails if QueryCache is removed?
+  d) The route-to-service extraction — is there any test that asserts an
+     endpoint's status code and response shape end to end, or do the tests only
+     call the service functions directly and never exercise the HTTP layer?
+     Quantify: how many of the changed endpoints have an HTTP-level test?
+  e) The storage composition — is there a test that would fail if one domain
+     module were dropped from the composition?
+  f) shared/schema — is there a test that would fail if a table lost a
+     `.notNull()`?
+  g) The four new foreign key declarations — any test?
+
+## Part D — mutation spot-check (static reasoning only, do not run anything)
+Pick the five assertions you consider most load-bearing across the changed code.
+For each, describe a one-line change to the IMPLEMENTATION that would break the
+behaviour, and reason from the test source about whether the test would catch it.
+State your conclusion per assertion: CATCHES / DOES NOT CATCH / CANNOT TELL.
+
+## Output
+Write to `.audit/B11-verify/V7-tests.md`.
+
+Mandatory sections:
+`## Deleted coverage` — table: `what was asserted | replaced by | gap?`
+`## Tests that cannot fail` — table: `file:line | why it cannot fail`, or
+  "None found" with a statement of how many test files you actually read.
+`## Skipped, conditional, and gated tests` — table with the environment
+  condition and what goes untested.
+`## Coverage of this branch's changes` — the a-through-g table above.
+`## Mutation spot-check` — five rows.
+`## Findings` — numbered:
+  ID | severity (blocker/high/medium/low) | file:line
+  What is not actually tested:
+  What could ship broken as a result:
+  Confidence: high/medium/low
+
+End with `## Verdict`: one sentence on how much confidence the green suite
+earns, and state explicitly how many of the ~300 test files you examined versus
+how many you sampled. Do not imply exhaustive coverage you did not achieve.

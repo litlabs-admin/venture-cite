@@ -1,0 +1,113 @@
+# V6 — Runtime and startup crash surface audit
+
+The question: if this branch were deployed to production right now, with the
+database untouched, would the process start, stay up, and keep every scheduled
+job running?
+
+This audit is about the code paths a test suite does not exercise: module
+initialisation, the production server entry point, the scheduler, cron handlers,
+background jobs, and environment configuration.
+
+## Hard constraints
+- READ ONLY. Do not edit any file except your output artifact.
+- Do not run any git write operation: no committing, no pushing, no resetting,
+  no stashing, no branch switching, no discarding of working-tree changes.
+- Do NOT start Docker containers or a database. Do not start the server. Do not
+  run the test suite.
+- Verify from code. Treat Markdown and comments as unverified hints. In
+  particular, do not trust CLAUDE.md or AGENTS.md descriptions of how production
+  boots — check the actual files.
+
+## Getting the before state
+    git show origin/main:<path>
+That is a read command and is allowed.
+
+Enumerate what changed outside routes and storage:
+    git diff --name-only origin/main...HEAD -- server/ src/ client/src/lib/ package.json
+
+## Areas to audit
+
+### 1. Production boot path
+Establish, from code, how production actually starts. The repo claims Nitro plus
+an Express bridge at src/server/expressBridge.ts, with server/index.ts being
+development only and throwing under NODE_ENV=production. Verify that claim.
+Then trace the full production import graph from the entry point and confirm:
+- Every module the bridge pulls in exists and exports what the importer expects.
+- No module that is development-only gets imported on the production path.
+- No top-level code in a newly created module performs I/O, reads an env var
+  that may be unset, or throws during import. A throw at import time is a boot
+  failure, not a request failure.
+- The ~42 new files under server/services/ and the ~23 new module files under
+  shared/schema/ and the storage domains: check each for top-level side effects.
+
+### 2. Scheduler and cron
+A new file server/lib/schedulerJobRegistry.ts exports SCHEDULER_JOB_NAMES, used
+at 11 call sites in server/scheduler.ts. Verify:
+- The registry contains exactly the job names the scheduler registers, no more
+  and no fewer. A renamed job name means a job silently stops running, or a
+  crash-guard key no longer matches stored state.
+- Compare every job name string against origin/main. Any changed string is a
+  finding: state what persisted state (database rows, lock keys, lease names)
+  keys off that string and what happens on the first run after deploy when the
+  new name does not match the old rows.
+- Every cron route handler in server/routes/cron.ts: confirm each still runs the
+  same work in the same order, and that the extraction to services did not drop
+  a job.
+- The job lease / crash guard mechanism: does a deploy mid-run leave a stale
+  lease that blocks the job forever?
+
+### 3. The autopilot change
+server/lib/onboardingAutopilot.ts was restructured from fall-through to
+if/else, gained AUTOPILOT_STALL_HOURS, and gained a demotion UPDATE before the
+resume scan. Read the whole file. Verify:
+- The if/else genuinely cannot start a second citation run while one is active.
+  Walk every path.
+- The stall demotion cannot demote a run that is legitimately in progress and
+  merely slow.
+- The demotion UPDATE is correctly scoped and cannot touch other tenants' rows.
+- Whether the partial unique index citation_runs_one_active_per_brand over
+  ('pending','running') is consistent with the new state transitions — could the
+  new code attempt an insert that violates it and surface as a 500?
+
+### 4. Client change with production blast radius
+client/src/lib/queryClient.ts gained a QueryCache with a global onError, where
+before only a MutationCache existed. Verify:
+- The global query error handler cannot produce a toast storm: what happens when
+  a dashboard mounts twelve queries and the user's session has expired? Count
+  the error callbacks that fire.
+- It does not swallow errors that a component-level error boundary previously
+  handled.
+- Retry and refetch behaviour is unchanged.
+
+### 5. Environment and configuration
+- Any NEW environment variable read anywhere on this branch. For each: is it
+  documented, does it have a safe default, and what happens in production if it
+  is unset? An undefined env var that reads as the string "undefined" is a
+  finding.
+- Any changed default, timeout, budget, limit, or interval. Compare against
+  origin/main and state the production effect of each change.
+- package.json: any dependency added, removed, or version-changed, and any
+  script whose behaviour changed. Check the build and start scripts especially.
+
+### 6. Type checking is not evidence
+Note anywhere the code would pass `tsc` but fail at runtime: a cast that hides a
+missing property, a non-null assertion on something that can be null, a
+`satisfies` that does not actually constrain, dynamic property access.
+
+## Output
+Write to `.audit/B11-verify/V6-runtime.md`.
+
+Mandatory sections:
+`## Production boot: verified import graph` — what you traced and what you found.
+`## Scheduler job names: before vs after` — a table, one row per job.
+`## New or changed environment variables` — a table, or "None."
+`## Dependency and script changes` — a table, or "None."
+`## Findings` — numbered:
+  ID | severity (blocker/high/medium/low) | file:line
+  What happens:
+  Why it breaks in production but not in tests:
+  Concrete sequence:
+  Confidence: high/medium/low
+
+End with `## Verdict`: WOULD BOOT AND RUN / WOULD BOOT WITH DEGRADED JOBS /
+WOULD NOT BOOT, with the reasoning in three sentences or fewer.

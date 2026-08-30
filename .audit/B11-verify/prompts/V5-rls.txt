@@ -1,0 +1,92 @@
+# V5 — Row level security correctness audit
+
+Migration 0124 adds RLS policies to nine tenant-scoped tables, described as
+"defence in depth". A wrong RLS policy fails in one of two ways, and both are
+serious:
+  - TOO TIGHT: legitimate application queries silently return zero rows, or
+    inserts fail, and production breaks.
+  - TOO LOOSE: one tenant reads another tenant's data.
+
+Decide which, if either, this migration does.
+
+## Hard constraints
+- READ ONLY. Do not edit any file except your output artifact.
+- Do not run any git write operation: no committing, no pushing, no resetting,
+  no stashing, no branch switching, no discarding of working-tree changes.
+- Do NOT start Docker containers or a database. Do NOT connect to any database.
+  Where a claim needs a live database, mark it UNSETTLED-NEEDS-DB.
+- Verify from code. Treat Markdown and comments as unverified hints.
+
+## Scope
+- migrations/0124_rls_defence_in_depth.sql — read every line.
+- Every earlier RLS migration, so you know the existing policy landscape. Find
+  them: grep migrations/*.sql for "POLICY", "ROW LEVEL SECURITY", "current_setting".
+  Pay attention to 0113 (initplan rewrite), 0118, 0120 (revoked grants).
+- How the application connects: find the Postgres pool setup in server/. Which
+  database ROLE does the application authenticate as? Is that role the table
+  owner, a superuser, or does it have BYPASSRLS? This determines whether the new
+  policies have ANY effect on application queries at all. Settle it first — the
+  answer changes the severity of everything else.
+- How any per-request setting is established. Grep for `set_config`,
+  `current_setting`, `venturecite.` and find where those GUCs are set, whether
+  it is per transaction or per session, and what happens on a pooled connection
+  that is reused by a different tenant's request.
+
+## Questions to answer with file:line evidence
+1. ROLE. Which role runs application queries? Is it the table owner? A table
+   owner bypasses RLS unless FORCE ROW LEVEL SECURITY is set. Does 0124 issue
+   `ALTER TABLE ... FORCE ROW LEVEL SECURITY`? If not, state plainly whether
+   these policies do anything at all for the application path, and adjust your
+   verdict accordingly. Do not assume — find the role in code.
+2. COVERAGE. For each of the nine tables, list the policies created and which
+   commands they cover (SELECT/INSERT/UPDATE/DELETE/ALL). A table with
+   RLS ENABLED but no policy for a command denies that command entirely. Find
+   every such hole and name the application query it would break.
+3. PREDICATE CORRECTNESS. For each policy, quote the USING and WITH CHECK
+   expressions. Verify the tenant column actually exists on that table and is
+   the right one — some tables scope by user_id, some by brand_id which then
+   joins to brands.user_id. A policy that scopes a brand_id table by a
+   non-existent user_id column will error at apply time. A policy that joins
+   through brands must be checked for whether that subquery is itself subject to
+   RLS (it is, and that can produce an unexpected empty result).
+4. INSERT SAFETY. A policy with USING but no WITH CHECK does not constrain
+   INSERT. List every table where a tenant could insert a row attributed to
+   another tenant.
+5. PERFORMANCE. Earlier migration 0113 wrapped `current_setting(...)` in
+   `(select ...)` so Postgres evaluates it once per query (InitPlan) rather than
+   once per row. Does 0124 follow that pattern everywhere? Every bare
+   `current_setting` in a policy predicate is a per-row function call and a
+   performance finding on a large table. Also: does each policy predicate hit an
+   index, or does it force a sequential scan? Check which indexes exist on each
+   tenant column by grepping migrations/.
+6. SERVICE AND WORKER PATHS. Background jobs, cron, and the outbox worker do not
+   run in a user request and may have no GUC set. For each of the nine tables,
+   find every background write path in server/ and state whether the new policy
+   would block it. A cron job that silently stops writing is a production
+   outage that no test would catch. This is the most likely way 0124 breaks
+   production — spend your effort here.
+7. IDEMPOTENCY AND REAPPLY. Does 0124 guard every CREATE POLICY so a rerun does
+   not fail?
+8. INTERACTION WITH 0120. Migration 0120 revoked Data API grants. Confirm 0124
+   does not re-expose anything through PostgREST/the Supabase Data API.
+9. MIRROR PARITY with supabase/migrations/20260421000132_0124_rls_defence_in_depth.sql.
+
+## Output
+Write to `.audit/B11-verify/V5-rls.md`.
+
+Mandatory sections:
+`## Effective role and whether RLS applies at all` — answer this first, in
+  plain language, with the file:line where the role is configured.
+`## Per-table policy matrix` — table with columns
+  `table | RLS enabled | FORCE? | SELECT | INSERT | UPDATE | DELETE | tenant column | index? | initplan-wrapped?`
+`## Background write paths that the policy could block` — table with
+  `job/file:line | table written | GUC set? | blocked?`
+`## Findings` — numbered:
+  ID | severity (blocker/high/medium/low) | file:line
+  What the policy does:
+  Why it is wrong:
+  Concrete query or job that breaks, or concrete cross-tenant read that succeeds:
+  Confidence: high/medium/low
+
+End with `## Verdict`: SAFE TO APPLY / SAFE WITH CONDITIONS / NOT SAFE, plus
+`## Unsettled without a database`.

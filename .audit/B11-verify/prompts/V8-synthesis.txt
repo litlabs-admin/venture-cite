@@ -1,0 +1,109 @@
+# V8 — Synthesis and production deployment sequence
+
+Seven independent audits have completed. Your job is to reconcile them into one
+decision document: can this branch go to production, in what order, and what
+must be true before each step.
+
+You are the last reviewer. Do not simply merge the seven files. Where two
+reports disagree, work out which is right by reading the code yourself and say
+so. Where a report asserts something the orchestrator already settled against
+the live database, the orchestrator's finding wins — it is empirical.
+
+## Hard constraints
+- READ ONLY. Do not edit any file except your output artifact.
+- Do not run any git write operation: no committing, no pushing, no resetting,
+  no stashing, no branch switching, no discarding of working-tree changes.
+- Do NOT start Docker containers or a database. Do NOT connect to any database.
+- Do not run the test suite. Another process is using it.
+
+## Inputs — read all eight in full
+- .audit/B11-verify/V0-orchestrator.md  ← EMPIRICAL, verified against the live
+  production database. This one outranks the others on any factual conflict.
+- .audit/B11-verify/V1-migrations.md
+- .audit/B11-verify/V2-routes.md
+- .audit/B11-verify/V3-data-loss.md
+- .audit/B11-verify/V4-decomposition.md
+- .audit/B11-verify/V5-rls.md
+- .audit/B11-verify/V6-runtime.md
+- .audit/B11-verify/V7-tests.md
+
+## Known conflicts you must resolve explicitly
+These are already identified. For each, state the resolution and the evidence:
+
+1. V1 returned NOT SAFE, blocking on a possible `numeric(12,6)` overflow in
+   0122. V0 measured production: 21,394 rows, max value 10, zero rows at risk.
+   V3-004 raises the same concern with low confidence. Resolve.
+2. V5 named `job_leases` RLS-with-no-policy as an outage risk and marked the
+   application role UNSETTLED. V0 measured it: the pool role is `postgres`,
+   which has `rolbypassrls = true`, and only `postgres` and `service_role` hold
+   grants on that table. Resolve.
+3. V4 rated five missing storage methods `high`. V0 showed they had no caller on
+   `origin/main` either — dead code. Resolve, and say whether V4-02 (the CI
+   surface gate cannot detect a loss) still stands.
+4. V6-01 claims the branch "replaces" `0122_signup_grants_beta.sql`. V0 showed
+   the branch is 2 commits BEHIND main, which added that file after the branch
+   point, and that its commit `09077cc` contains no application code. Resolve,
+   and fold it into the merge sequencing.
+5. V2 found 3 endpoints with changed behaviour. Two (geo-signals 404, re-detect
+   durable cooldown) are deliberate fixes with their own commits. Determine
+   whether F1 (`POST /api/articles/:id/generate`, body parsed before the status
+   check, 400 instead of 409) is deliberate or an accident of the extraction.
+   Read `client/src/` and find out whether any caller can actually send an
+   invalid body for an article in a non-draft status. Say whether it needs
+   fixing before release or can be recorded and left.
+
+## The one finding to weigh most carefully
+V6-02: after `advanceCitationRun()` marks a run terminal but before
+`setAutopilot(... 'completed')` writes, a process restart leaves the brand in
+`running_citations` with no active run, so the next resume calls
+`runBrandPrompts()` and starts a fresh PAID citation run. The window includes a
+`populateBrandDashboard(..., deadlineMs: 120_000)` call, so it is up to two
+minutes wide, not a microsecond race.
+
+The orchestrator established that the in-flight path has no attempt cap by
+deliberate design and is bounded only by the 6-hour stall demotion, which runs
+before the scan in the same sweep.
+
+Answer precisely:
+- How many repeat paid runs can occur in the worst case, given how often
+  `resumeInFlightAutopilots` actually fires? Find every caller and every
+  schedule. Show the arithmetic.
+- What is the cheapest correct fix? Consider: writing `autopilot_step = 3` or a
+  terminal marker immediately when the slice returns `done` and before
+  `populateBrandDashboard`; making the completion write part of the same
+  transaction; or having the `else` branch check for a recently-terminal run for
+  this autopilot cycle before starting a new one. Recommend ONE, with the
+  reasoning, and say what it would break.
+- Is this a release blocker, or a follow-up? Defend the answer.
+
+## Deliverable
+Write to `.audit/B11-verify/V8-synthesis.md`.
+
+Mandatory sections:
+
+`## Decision` — one of: SHIP / SHIP AFTER LISTED FIXES / DO NOT SHIP. One
+paragraph of justification. No hedging.
+
+`## Consolidated findings` — a single deduplicated table, ordered by real
+severity after reconciliation, with columns:
+`ID | severity | area | one-line statement | status (CONFIRMED / REFUTED / DELIBERATE) | source report(s)`
+Every finding from all eight reports must appear exactly once. If you refute
+one, say REFUTED and give the evidence. Do not quietly drop findings.
+
+`## Production deployment sequence` — a numbered runbook. For each step: the
+exact command, the precondition that must hold before running it, the
+observable that proves it worked, and the rollback if it does not. Cover in the
+right order: merging main into the branch, regenerating the Supabase mirror,
+CI, applying 0122/0123/0124, deploying application code, and the post-deploy
+checks. State explicitly which steps are irreversible.
+
+`## What could still delete or corrupt production data` — the honest list, with
+the conditions that would have to hold. If the answer is "nothing, absent an
+operator running a manual command", say that plainly and name the commands.
+
+`## Residual risk accepted` — what ships unfixed and why that is acceptable.
+
+`## Evidence gaps` — what nobody verified, and what it would take to close each.
+
+Be decisive. The reader is the repository owner and wants a yes or no with
+conditions, not a survey of opinions.

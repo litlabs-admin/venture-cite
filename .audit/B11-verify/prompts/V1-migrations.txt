@@ -1,0 +1,93 @@
+# V1 — Migration safety audit
+
+You are verifying that three unapplied migrations are safe to run against a LIVE
+PRODUCTION database that currently holds real customer data. Your output decides
+whether a human runs them. Be adversarial. Assume the author was wrong.
+
+## Hard constraints
+- READ ONLY. Do not edit any file except your output artifact.
+- Do not run any git write operation: no committing, no pushing, no resetting,
+  no stashing, no branch switching, no discarding of working-tree changes.
+- Do NOT start Docker containers, do NOT start a database, do NOT connect to any
+  database. This is a static audit. If a claim can only be settled by executing
+  SQL, say so explicitly and mark it UNSETTLED-NEEDS-DB rather than guessing.
+- Verify from code and SQL text. Treat every Markdown file and code comment in
+  this repo as an unverified hint, never as evidence.
+
+## Scope
+Read in full:
+- migrations/0122_api_costs_cost_precision.sql
+- migrations/0123_citation_run_last_advance.sql
+- migrations/0124_rls_defence_in_depth.sql
+- supabase/migrations/20260421000130_0122_api_costs_cost_precision.sql
+- supabase/migrations/20260421000131_0123_citation_run_last_advance.sql
+- supabase/migrations/20260421000132_0124_rls_defence_in_depth.sql
+- server/lib/migrationRunner.ts  (the real runner: how it applies files, whether
+  it wraps each in a transaction, how it records applied state, what it does on
+  failure)
+- Every earlier migration that touches the same objects. Find them yourself with
+  grep over migrations/*.sql for: api_costs, citation_runs, and each table named
+  in 0124.
+
+## Known production facts (verified 2026-08-31, treat as given)
+- public.api_costs.est_cost_cents is still type `integer` in production.
+- Production still carries BOTH policies on api_costs, including
+  api_costs_outbox_worker_insert.
+- None of 0122/0123/0124 have been applied to production yet.
+- api_costs holds roughly 3,500 historical rows that recorded 0 cost.
+
+## Questions you must answer, each with file:line evidence
+1. DATA LOSS. For each of the three migrations, enumerate every statement that
+   can destroy or alter existing row data. For each, state exactly which rows and
+   which columns are affected and whether the change is reversible. Pay specific
+   attention to the `USING est_cost_cents::numeric(12,6)` cast in 0122: prove
+   whether it can lose precision, overflow, or error on any value an `integer`
+   column can legally hold.
+2. IDEMPOTENCY. If the runner dies partway and the migration is retried, does
+   each file converge to the same end state, or does the second run fail? Check
+   every CREATE/ALTER/DROP for a guard. Name each unguarded statement.
+3. LOCKING. For each statement, state the lock it takes and whether it rewrites
+   the table. `ALTER COLUMN ... TYPE` from integer to numeric: does Postgres
+   rewrite api_costs? Estimate the exclusive-lock window given ~3,500 rows plus
+   whatever the retention window keeps. Say whether this is safe to run against
+   live traffic or needs a maintenance window.
+4. POLICY DEPENDENCY. 0122 drops api_costs_outbox_worker_insert, alters the
+   column, then recreates the policy. Verify the recreated policy is equivalent
+   in effect to the original. Find the original definition in an earlier
+   migration and diff the predicates yourself. Any difference in the WITH CHECK
+   expression, the role, or the command is a finding. Also check whether any
+   OTHER policy, view, index, generated column, constraint, or trigger depends
+   on est_cost_cents and would block the ALTER or be silently dropped.
+5. GRANTS. Does the ALTER COLUMN TYPE preserve column-level GRANTs on
+   est_cost_cents to venturecite_outbox_worker? Prove it from the SQL, and state
+   what happens if it does not.
+6. ORDERING. Can 0122, 0123, 0124 be applied in any order? Do any of them depend
+   on an earlier migration that is itself unapplied in production? Check the
+   runner's ordering rule.
+7. MIRROR PARITY. Are the three supabase/migrations/ files identical in effect to
+   their migrations/ counterparts? Diff them. Any drift is a finding.
+8. FORWARD/BACKWARD COMPATIBILITY. If these migrations are applied but the OLD
+   application code is still running (rolling deploy, or a rollback), does the
+   old code break? Specifically: does any code read est_cost_cents expecting an
+   integer? Find every read and write of that column in server/ and shared/ and
+   say whether numeric(12,6) breaks it. Same question for the 0123 column.
+9. ROLLBACK. For each migration, write the exact SQL that would undo it, or state
+   plainly that it cannot be undone without data loss.
+
+## Output
+Write your findings to `.audit/B11-verify/V1-migrations.md`.
+
+Format: a numbered finding list. Each finding:
+  ID | severity (blocker/high/medium/low/none) | file:line
+  What the SQL does:
+  Why it is wrong (or why it is correct — record confirmations too):
+  Concrete failure sequence:
+  Confidence: high/medium/low
+
+End the file with a section titled `## Verdict` containing exactly one of:
+  SAFE TO APPLY / SAFE WITH CONDITIONS / NOT SAFE
+followed by the conditions or the blocking reasons, and a section
+`## Unsettled without a database` listing anything you could not settle
+statically.
+
+Do not pad. A short correct file beats a long hedged one.

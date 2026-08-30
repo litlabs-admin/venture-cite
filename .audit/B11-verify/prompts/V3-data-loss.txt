@@ -1,0 +1,108 @@
+# V3 — Production data destruction sweep
+
+Single question: can anything on this branch delete, overwrite, or corrupt
+production data that the code on `origin/main` would not have deleted?
+
+This is the highest-stakes audit in the set. Err toward reporting.
+
+## Hard constraints
+- READ ONLY. Do not edit any file except your output artifact.
+- Do not run any git write operation: no committing, no pushing, no resetting,
+  no stashing, no branch switching, no discarding of working-tree changes.
+- Do NOT start Docker containers or a database. Do NOT connect to any database.
+- Verify from code. Treat Markdown and comments as unverified hints.
+
+## Method
+The diff is large (579 files) because whole files moved. Do not read it linearly.
+Instead:
+
+1. Enumerate every destructive operation that EXISTS on the branch. Search the
+   working tree (not the diff) under server/, shared/, src/, scripts/,
+   migrations/ for:
+     DELETE FROM, delete(, .delete(, TRUNCATE, DROP TABLE, DROP COLUMN,
+     DROP SCHEMA, ON DELETE CASCADE, drop database, UPDATE ... SET (mass update
+     with no tenant predicate)
+   Build the complete list first. Include test files and scripts — a script that
+   can be pointed at production counts.
+
+2. For each one, find its counterpart on origin/main:
+       git show origin/main:<path>
+   That is a read command and is allowed.
+   Then answer: did the predicate change? Did the retention window change? Did
+   the table change? Did it gain or lose a tenant/user scoping clause?
+   A retention window that shortened (say 90 days to 30) destroys data that used
+   to survive. That is a blocker.
+
+3. Report anything that is NEW on this branch, anything whose predicate WIDENED,
+   and anything whose window SHORTENED. Explicitly confirm the ones that are
+   byte-identical moves — a confirmation list is as valuable as a finding list,
+   because it is what lets a human trust the rest.
+
+## Specific things to settle
+a) RETENTION JOBS. The branch contains DELETE statements with interval
+   predicates (geo_signal_runs 90 days, schema_audits 30 days, api_costs 180
+   days, fact_scrape_events 90 days, chatbot_messages 30 days, chatbot_threads,
+   scan_jobs, sentiment_cache, tour_events, brand_fact_scrape_pages,
+   brand_fact_scrape_runs, fact_scrape_logs, llm_concurrency_slots). Find all of
+   them. For EACH, compare the interval and the predicate against origin/main.
+   Report any change.
+
+b) NEW FOREIGN KEYS WITH CASCADE. Commit `8d87c3c` added four `.references()`
+   declarations in shared/schema/platform.ts, two with `onDelete: "cascade"`
+   (api_costs.user_id, notification_preferences.user_id) and two with
+   `set null`. Settle definitively: does adding a `.references()` to a Drizzle
+   schema file cause any DELETE behaviour at runtime, or is it purely
+   declarative metadata used for DDL generation? Trace how the schema object is
+   consumed. If the constraint already exists in the database (it does), does
+   declaring it in Drizzle change anything an application query does? Answer with
+   evidence, not reasoning by analogy.
+
+c) db:push REACHABILITY. `drizzle-kit push` generates and applies DDL by diffing
+   the Drizzle schema against a live database, and it can DROP columns and tables
+   it does not recognise. Prove whether `db:push` can be reached in any
+   production or CI path. Check package.json scripts, every workflow file under
+   .github/, every Dockerfile, every deploy script, every npm lifecycle hook
+   (prestart/postinstall/prepare), and drizzle.config.ts for what database URL it
+   would target. If a developer ran it by accident against the production URL,
+   enumerate exactly which tables and columns drizzle-kit would drop, given that
+   migrations/ is the source of truth and the Drizzle schema may not describe
+   everything the database holds. This is the single most important question in
+   this brief.
+
+d) TEST AND FIXTURE CLEANUP. Some test files delete rows, for example a
+   `delete from public.users where id = any(...)` in an integration test. For
+   every such helper, prove it cannot run against production: what database URL
+   does it use, what happens if TEST_DATABASE_URL is unset or points somewhere
+   real, and is there a guard that refuses a non-test database? If there is no
+   guard, that is a finding regardless of current configuration.
+
+e) SEED AND RESET SCRIPTS. Find every script under scripts/ that can reset,
+   truncate, or reseed. State what protects each from being run against
+   production.
+
+f) MASS UPDATES. The autopilot fix added a demotion UPDATE before the resume
+   scan. Find it, quote it, and state exactly which rows it touches and whether
+   it can touch rows belonging to a tenant other than the one being processed.
+
+g) MIGRATION 0122's `USING` cast rewrites every row of api_costs. Confirm
+   whether any value currently stored can fail the cast or come out different.
+
+## Output
+Write to `.audit/B11-verify/V3-data-loss.md`.
+
+Two mandatory sections:
+
+`## Destructive operations inventory` — a table with columns
+`file:line | operation | table | predicate | vs origin/main (UNCHANGED / CHANGED / NEW) | can it reach production?`
+This table must be COMPLETE. If you had to stop early, say so at the top.
+
+`## Findings` — numbered, each:
+  ID | severity (blocker/high/medium/low) | file:line
+  What it deletes:
+  Why it is a risk:
+  Concrete sequence that destroys production data:
+  Confidence: high/medium/low
+
+End with `## Verdict`: one of
+  NO PRODUCTION DATA AT RISK / DATA AT RISK UNDER STATED CONDITIONS / DATA WILL BE LOST
+and the reasoning in three sentences or fewer.

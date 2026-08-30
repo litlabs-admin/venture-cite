@@ -1,0 +1,87 @@
+# V2 — Route to service extraction: behaviour parity audit
+
+A large refactor moved business logic out of 13 Express route files into ~42
+modules under server/services/. The claim is that this was behaviour preserving.
+Your job is to disprove that claim. Any behaviour difference that reaches an HTTP
+client is a finding.
+
+## Hard constraints
+- READ ONLY. Do not edit any file except your output artifact.
+- Do not run any git write operation: no committing, no pushing, no resetting,
+  no stashing, no branch switching, no discarding of working-tree changes.
+- Do NOT start Docker containers or a database. Do not run the test suite.
+- Verify from code. Treat Markdown and comments as unverified hints.
+
+## How to get the before and after
+The refactor lives on the current branch. The pre-refactor code is on
+`origin/main`. Read the old version of a file with:
+
+    git show origin/main:server/routes/<name>.ts
+
+That is a read command and is allowed. Use it freely.
+
+The route files in scope (current versions under server/routes/):
+  analytics.ts, billing.ts, brands.ts, chatbot.ts, competitors.ts, content.ts,
+  cron.ts, dashboard.ts, geoSignals.ts, prompts.ts, tours.ts
+Plus every other file under server/routes/ that differs from origin/main.
+Enumerate them yourself:
+
+    git diff --name-only origin/main...HEAD -- server/routes/ server/services/
+
+## What to compare, endpoint by endpoint
+For EVERY route handler that changed, build a before/after comparison of:
+
+1. METHOD AND PATH. Identical string, including trailing slashes and param names.
+   A renamed param breaks callers.
+2. MIDDLEWARE CHAIN. Same auth guard, same rate limiter, same body parser, same
+   validation, in the same order. A dropped or reordered guard is a blocker.
+   Specifically check every handler still enforces authentication and tenant
+   ownership exactly as before.
+3. STATUS CODES. Every code the old handler could return, the new one must still
+   return under the same condition. Watch for: 200 vs 201, 400 vs 422,
+   403 vs 404 (this codebase deliberately answers 404 for a cross-tenant miss —
+   confirm that is preserved and not accidentally widened), 404 vs 500.
+4. RESPONSE BODY SHAPE. Same top-level keys, same nesting, same field names,
+   same types. A field renamed from `count` to `total`, or a bare array becoming
+   `{ items: [] }`, breaks the client. Check the client code under client/src/
+   for what it actually reads, and flag any shape the client would now misread.
+5. ERROR SHAPE. Same `{ success, error }` or whatever the convention is. Check
+   thrown errors are still caught at the same boundary and not leaking a 500.
+6. SIDE EFFECTS AND ORDER. Same database writes, same external calls, in the
+   same order, under the same conditions. A write that moved before a validation
+   check is a finding. A write that now happens outside its former transaction
+   is a blocker.
+7. EARLY RETURNS. The old handlers used patterns that write the response
+   directly (for example a helper that takes `res` and returns a sentinel). If
+   such a helper was replaced by a throwing service call, prove the throw is
+   caught and mapped to the same status. Conversely, prove no service module
+   imports Express or touches `req`/`res`.
+8. DEAD OR ORPHANED CODE. Any service function that no route calls, and any
+   route branch that is now unreachable.
+
+## Also check
+- Does every new service module avoid importing Express, `req`, or `res`?
+  Grep for it. Report every violation.
+- Did any endpoint disappear entirely, or get registered on a different router
+  or mount path? Compare the router registration in server/routes/index.ts (or
+  wherever routes are mounted) before and after.
+- Are there duplicate route registrations, where the same method+path is now
+  registered twice? The first registration wins silently.
+
+## Output
+Write to `.audit/B11-verify/V2-routes.md`.
+
+Start with a table: one row per endpoint that changed, columns
+`method | path | verdict (SAME / DIFFERS) | note`. Every DIFFERS row must have a
+numbered finding below.
+
+Each finding:
+  ID | severity (blocker/high/medium/low) | file:line before -> file:line after
+  Old behaviour:
+  New behaviour:
+  Concrete request that gets a different response than before:
+  Confidence: high/medium/low
+
+End with `## Verdict`: BEHAVIOUR PRESERVED / BEHAVIOUR CHANGED, and a count of
+endpoints checked. If you could not check some, list them under
+`## Not checked` rather than implying coverage you do not have.
