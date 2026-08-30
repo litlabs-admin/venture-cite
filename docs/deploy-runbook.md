@@ -84,6 +84,20 @@ Set the explicit migration confirmation in the secure release shell.
 
 Run `npm run db:migrate:release` once.
 
+Apply migration 0122 before deploying application code that writes fractional cents.
+
+`estimateCostCents` returns a fractional value, and Postgres silently rounds a numeric into an `integer` column on insert. It raises no error. Deploying the code first therefore leaves the sub-cent fix inert and keeps recording 0 for cheap calls, which is the defect 0122 exists to end. The reverse order is safe, because the old code writes whole numbers that the widened column stores unchanged.
+
+Before applying 0122 to any database, confirm no stored value exceeds the new type.
+
+```sql
+select count(*) filter (where est_cost_cents >= 1000000) as would_overflow,
+       min(est_cost_cents), max(est_cost_cents), count(*)
+from public.api_costs;
+```
+
+A non-zero `would_overflow` means the `USING` cast will fail and abort the release. Production measured 0 on 2026-08-31, with 21,394 rows and a maximum of 10.
+
 Run `npm run db:configure-request-roles` in dry-run mode.
 
 Apply the role memberships only after the dry run passes.
