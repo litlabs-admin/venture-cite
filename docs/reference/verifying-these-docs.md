@@ -1,0 +1,80 @@
+# Verifying these documents
+
+This documentation set describes code, and code changes. Run these commands
+to check a specific claim against the repository you have checked out,
+rather than trusting the prose.
+
+## The schema surface
+
+`npm run schema:surface:check` runs
+`tsx scripts/schemaExportSurface.ts --check .audit/B4/schema-exports-before.txt`.
+It walks the TypeScript AST of `shared/schema.ts` and its 13 domain modules
+and confirms the exported surface — every table, type, and Zod schema —
+matches the committed baseline. CI runs this on every push. It proves the
+[schema domain split](./schema-domains.md) has not silently dropped or
+duplicated an export; it does not by itself prove a table moved to the
+correct domain.
+
+## The storage surface
+
+`npx tsx scripts/storageSurface.ts --check .audit/B5/storage-surface-before.json`
+compares the current `IStorage` interface and every implementing method
+against the committed baseline: same method count, no method implemented in
+two files, and no method body changed (whitespace-insensitive). This command
+is not wired into an npm script or into CI; run it by hand after touching
+`server/storage.ts` or any file under `server/storage/`.
+
+`node scripts/verifyStorageSplit.mjs <domain> [--skip-tests]` runs the
+surface check above, plus three checks specific to one storage domain:
+every method `.audit/B5/allocation.json` assigns to that domain actually
+moved there, no method of that domain is left behind in
+`server/databaseStorage.ts`, and `scripts/storageSurface.ts` itself is
+unmodified from the committed version (`git diff --stat HEAD --
+scripts/storageSurface.ts` must be empty). Domain names are the 11 listed in
+[Storage layer](./storage-layer.md).
+
+## The generated migration mirror
+
+`npm run supabase:migrations:check` runs
+`node scripts/syncSupabaseMigrations.mjs --check` and fails if
+`supabase/migrations/` is not a byte-identical, timestamp-renamed mirror of
+`migrations/`. CI runs this on every push. If it fails, run
+`npm run supabase:migrations:sync` to regenerate the mirror, and commit the
+result — never hand-edit a file under `supabase/migrations/`.
+
+## The schema split's own gate script
+
+`node scripts/verifySchemaSplit.mjs [--skip-tests]` runs every gate described
+in [Schema domains](./schema-domains.md): export surface, sorted generated
+SQL comparison against `HEAD`, typecheck, lint, format, and the full test
+suite.
+
+## Tests
+
+```sh
+npm run check         # tsc, plus scripts/verify-tour-targets.ts
+npm run lint
+npm run format:check
+npm test              # vitest run — unit and component tests
+npm run test:integration
+```
+
+`npm test` and `npm run test:integration` both depend on
+`TEST_DATABASE_URL`. `tests/helpers/destructiveDatabaseTest.ts` returns
+`{ kind: "skip" }` for every integration test when that variable is unset,
+and Vitest reports a skipped test as neither a pass nor a failure. A green
+`npm test` run does not by itself prove the integration suite executed —
+check the test output for the number of tests actually run, not only the
+final pass/fail summary. See [Running the integration suite
+locally](../how-to/run-the-integration-suite.md) for how to set
+`TEST_DATABASE_URL` safely.
+
+## What this page does not cover
+
+This page lists the automated checks that exist today. It does not describe
+a mechanism that runs these checks automatically against documentation
+prose (for example, extracting a claimed npm script name from a Markdown
+file and confirming it exists in `package.json`). No such mechanism exists
+in this repository as of this writing; treat every command and path in this
+documentation set as accurate at the commit that introduced it, and re-run
+the commands above to confirm it still is.
