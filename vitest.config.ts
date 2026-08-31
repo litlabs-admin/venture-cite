@@ -20,6 +20,19 @@ export default defineConfig({
     // *.spec.ts, which is Playwright's naming convention here, so they must
     // be excluded explicitly. Run them with `npm run test:e2e`.
     exclude: ["node_modules", "dist", "build", "coverage", "tests/e2e/**"],
+    // client/src/lib/supabase.ts throws at import time when these are unset,
+    // and client/src/lib/queryClient.ts pulls it in through authStore, so every
+    // component test that touches the query client dies during collection
+    // rather than in an assertion. The suite was passing locally only because a
+    // developer's .env happened to supply them; on a fresh CI checkout 12 files
+    // failed to load. Supplying them here makes the suite self-contained.
+    //
+    // Deliberately not real values. Every test mocks the Supabase client, and a
+    // placeholder that cannot resolve is the safer failure if one ever does not.
+    env: {
+      VITE_SUPABASE_URL: "https://test.supabase.co",
+      VITE_SUPABASE_ANON_KEY: "test-anon-key",
+    },
     setupFiles: ["./tests/setup.ts"],
     // Runs once per run, before any file loads. Repairs the migration-0112
     // role grants that an interrupted integration run can leave stripped -
