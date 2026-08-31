@@ -186,7 +186,26 @@ function isProvablyUserScoped(argument: ts.Expression): boolean {
   return userScoped;
 }
 
-function scanStorageWrites(): StorageFinding[] {
+// Parsing every file under client/src and src with the TypeScript compiler
+// is the expensive part of this suite: ~370 files, ~1.3s per full pass on an
+// otherwise idle machine (measured with `vitest run --reporter=verbose`).
+// The two tests below each used to trigger their own pass - one from
+// scanStorageWrites(), one more from the second test's own declaration scan,
+// plus scanStorageWrites() again - three passes for one file's worth of
+// source. Under a busy 338-file suite that's ~4-5s of parsing in a single
+// test file alone, enough to trip vitest's 5000ms per-test default. Parsing
+// once and sharing the result between both tests removes the duplication
+// instead of just raising the timeout on top of it.
+let cachedScan: {
+  sourceFilesByPath: ts.SourceFile[];
+  declarations: ReturnType<typeof collectConstantDeclarations>;
+} | null = null;
+
+function parseSourceTree(): {
+  sourceFilesByPath: ts.SourceFile[];
+  declarations: ReturnType<typeof collectConstantDeclarations>;
+} {
+  if (cachedScan) return cachedScan;
   const files = SOURCE_ROOTS.flatMap((root) => sourceFiles(resolve(root))).map((file) => ({
     file,
     source: readFileSync(file, "utf8"),
@@ -195,6 +214,12 @@ function scanStorageWrites(): StorageFinding[] {
     ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKindFor(file)),
   );
   const declarations = collectConstantDeclarations(sourceFilesByPath);
+  cachedScan = { sourceFilesByPath, declarations };
+  return cachedScan;
+}
+
+function scanStorageWrites(): StorageFinding[] {
+  const { sourceFilesByPath, declarations } = parseSourceTree();
   const findings: StorageFinding[] = [];
 
   for (const sourceFile of sourceFilesByPath) {
@@ -259,16 +284,7 @@ describe("client storage key completeness", () => {
   });
 
   it("accounts for every storage write in client source", () => {
-    const files = SOURCE_ROOTS.flatMap((root) => sourceFiles(resolve(root))).map((file) =>
-      ts.createSourceFile(
-        file,
-        readFileSync(file, "utf8"),
-        ts.ScriptTarget.Latest,
-        true,
-        scriptKindFor(file),
-      ),
-    );
-    const declarations = collectConstantDeclarations(files);
+    const { declarations } = parseSourceTree();
     const legacyKeys = new Set(resolveStringList("LEGACY_UNPREFIXED_KEYS", declarations));
     const retainedKeys = new Set(resolveStringList("RETAINED_DEVICE_STORAGE_KEYS", declarations));
     const findings = scanStorageWrites();

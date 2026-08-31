@@ -52,6 +52,17 @@ vi.mock("../../server/lib/sentryReport", () => ({
   captureAndFlush: stubs.captureAndFlush,
 }));
 
+// confirmOnboardingBrand() dynamically imports "@shared/schema" on its first
+// call (see server/services/onboardingActivation.ts) rather than at module
+// load. That import is cheap once cached, but transforming it cold under
+// vitest's SSR module runner measured ~1.9s in isolation, and whichever test
+// happens to run first eats that cost against vitest's 5000ms default. Under
+// a busy 338-file suite that grows enough to trip the timeout. Importing it
+// here, at module top level, moves the cold cost into the file's "import"
+// phase (unbounded by testTimeout) instead of leaving it to land on
+// whichever `it` runs first.
+await import("@shared/schema");
+
 const {
   confirmOnboardingBrand,
   retryOnboardingAutopilot,

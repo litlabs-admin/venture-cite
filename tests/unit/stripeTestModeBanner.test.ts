@@ -42,6 +42,15 @@ const setupProductsStubs = vi.hoisted(() => ({
   info: vi.fn(),
 }));
 
+// server/stripeClient.ts's only dependency is the "stripe" package, which is
+// large enough that transforming it cold under vitest's SSR module runner
+// measured 3-5s in isolation (vs 2-7ms once cached). The tests below call
+// vi.resetModules() before each import to pick up a changed env var, so
+// whichever one runs first pays that cold cost against the 5000ms default
+// test timeout. Importing it once here, before any test's timer starts,
+// moves that cost into the file's "import" phase instead.
+await import("../../server/stripeClient");
+
 describe("isStripeTestMode - detection", () => {
   const ORIGINAL_KEY = process.env.STRIPE_SECRET_KEY;
 
@@ -122,11 +131,18 @@ describe("GET /api/stripe/products - rides the test-mode flag on the catalogue t
     }
   }
 
+  // This is the first test to import server/routes/billing.ts, which pulls
+  // in ../storage (the full DatabaseStorage graph) and ../services/billing.
+  // That cold import measured 3-4s in isolation, in vitest's "tests" phase
+  // rather than "import" - it happens inside the test body because the
+  // module must be re-imported per test via vi.resetModules() to pick up
+  // fresh mocks. That is real, bounded work, not a hang, so it gets a wider
+  // timeout instead of a global one.
   it("reports testMode: true on Stripe test keys", async () => {
     stubs.isStripeTestMode.mockReturnValue(true);
     const { body } = await fetchProducts();
     expect(body.testMode).toBe(true);
-  });
+  }, 20_000);
 
   it("reports testMode: false on live keys", async () => {
     stubs.isStripeTestMode.mockReturnValue(false);

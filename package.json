@@ -41,7 +41,7 @@
     "schema:surface": "tsx scripts/schemaExportSurface.ts",
     "schema:surface:check": "tsx scripts/schemaExportSurface.ts --check .audit/B4/schema-exports-before.txt",
     "storage:surface": "tsx scripts/storageSurface.ts",
-    "storage:surface:check": "tsx scripts/storageSurface.ts --check .audit/B5/storage-surface-before.json",
+    "storage:surface:check": "tsx scripts/storageSurface.ts --check",
     "test:e2e": "playwright test",
     "test:e2e:local": "playwright test --project=local-flows",
     "test:e2e:ui": "playwright test --ui",
