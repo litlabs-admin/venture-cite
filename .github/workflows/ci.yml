@@ -19,6 +19,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history. The Supabase mirror check below regenerates its
+          # baseline from `git show 45d3d8f7…:shared/schema.ts`, and the default
+          # fetch-depth of 1 does not carry that commit's tree, so the step died
+          # with "path 'shared/schema.ts' exists on disk, but not in
+          # 45d3d8f7…". It passed locally only because a normal clone has the
+          # history.
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
