@@ -117,6 +117,11 @@ const envSchemaBase = z.object({
   RESEND_FROM_ADDRESS: z.string().optional(),
   EMAIL_DELIVERY_ENABLED: z.enum(["true", "false"]).optional(),
 
+  // Recipient for operational health-check alerts (server/lib/opsAlertEmail.ts -
+  // provider spend, stuck outbox, overdue jobs, stalled citation runs). When
+  // unset, the health check still runs and still logs; it just sends no email.
+  OPS_ALERT_EMAIL: z.string().email().optional(),
+
   // Stripe API version pin. Falls back to a hardcoded
   // version in stripeClient.ts. Set in deploy env if you want to
   // pin to a different version than the SDK ships with.

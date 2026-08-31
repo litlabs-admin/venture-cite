@@ -28,6 +28,7 @@ import { logger } from "./logger";
 import { captureAndFlush } from "./sentryReport";
 import { storage } from "../storage";
 import { isRunStaleSinceLastProgress } from "./citationReconciliation";
+import { sendOpsAlertEmails } from "./opsAlertEmail";
 
 export type OpsAlertKind =
   | "provider_spend_over_threshold"
@@ -307,6 +308,14 @@ export async function runOpsHealthCheck(
       tags: { source: "opsHealthCheck", kind: alert.kind },
       extra: { measured: alert.measured, threshold: alert.threshold, lookAt: alert.lookAt },
     });
+  }
+
+  // Email path is best-effort and self-contained (its own cooldown, its
+  // own try/catch) - a failure inside it must never surface here.
+  try {
+    await sendOpsAlertEmails(alerts);
+  } catch (err) {
+    logger.error({ err }, "opsHealthCheck: sendOpsAlertEmails threw unexpectedly");
   }
 
   return { ranAt: new Date().toISOString(), alerts };
