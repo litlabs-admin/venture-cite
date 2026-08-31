@@ -21,9 +21,11 @@
 import { describe, expect, it } from "vitest";
 import { measureRouteHttpCoverage } from "../../scripts/routeHttpCoverage.mjs";
 
-// Measured on 2026-08-31: 31 of 240 registrations. The gap is real and
-// recorded, not an assertion that the remaining 209 are safe.
-const BASELINE_COVERED = 31;
+// Measured on 2026-08-31: 153 of 240 registrations, up from 31 after
+// prompts, contentTypes, dashboard, articles and intelligence gained
+// end-to-end tests. The remaining 87 are a real, recorded gap - this is not an
+// assertion that they are safe.
+const BASELINE_COVERED = 153;
 
 describe("HTTP-level route coverage", () => {
   const { registrations, covered, uncovered } = measureRouteHttpCoverage();
