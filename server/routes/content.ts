@@ -138,6 +138,29 @@ export function setupContentRoutes(app: Express): void {
         }
         const parsed = contentGenerationRequestSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
+          // Only when the body is ALSO invalid does the article's status get
+          // consulted here. B6a-01 removed the unconditional pre-check for a
+          // good reason - it read the article outside the enqueue transaction,
+          // so it could only ever be stale relative to the atomic check in
+          // private.request_enqueue_content_generation, never more correct -
+          // and that reasoning is untouched: a well-formed request still goes
+          // straight to the atomic check, which remains the only gate.
+          //
+          // What B6a-01 did not account for is this branch. With the
+          // pre-check gone, an article already 'generating' plus an invalid
+          // body answered 400 "keywords are required", which is misleading:
+          // the keywords are not the reason it cannot generate. That is
+          // reachable from the UI, because client/src/pages/content.tsx always
+          // posts keywords.join(", "), an empty string when no keyword is set.
+          // A stale read can only cost a retry here; the request was going to
+          // fail either way.
+          if (article.status !== "draft" && article.status !== "failed") {
+            return res.status(409).json({
+              success: false,
+              error: `Cannot generate - article is in status '${article.status}'.`,
+              code: "invalid_status",
+            });
+          }
           const firstIssue = parsed.error.issues[0];
           if (firstIssue?.path[0] === "keywords") {
             return res.status(400).json({ success: false, error: "keywords are required" });
