@@ -51,6 +51,10 @@ export async function assertWithinBudget(
 
   const used = await tokensUsedLast24h(userId);
   if (used >= cap) {
+    logger.warn(
+      { userId, tier, used, cap },
+      "llmBudget: daily token cap exceeded, blocking request",
+    );
     throw new BudgetExceededError(tier, cap, used);
   }
   if (used >= cap * 0.8) {

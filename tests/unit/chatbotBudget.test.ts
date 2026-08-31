@@ -1,11 +1,10 @@
 // Coverage for the chatbot budget helper (Phase 5 - A1).
 //
-// 2026-05-27: `CHATBOT_DAILY_TOKEN_CAP` is now `-1` for every tier so the
-// production runtime early-returns from `assertChatbotBudget` before any
-// DB read. The throw-path tests below temporarily override the caps to
-// positive values so they still verify the underlying budget LOGIC is
-// correct - if caps are ever re-enabled, regressions in the cap math
-// stay caught.
+// 2026-08-31: `CHATBOT_DAILY_TOKEN_CAP` carries real per-tier limits again
+// (see server/lib/llmPricing.ts for the cost arithmetic). `-1` is still
+// supported as an explicit "unlimited" escape hatch - assertChatbotBudget
+// early-returns before any DB read when a tier's cap is `-1`, which the
+// first test below still covers by overriding the free-tier cap.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
@@ -34,10 +33,16 @@ describe("chatbotBudget", () => {
   });
 
   it("assertChatbotBudget early-returns when cap is -1 (disabled)", async () => {
-    // Production state: caps disabled across all tiers. The helper should
-    // not touch the DB and should not throw.
-    await expect(assertChatbotBudget("user-1", "free")).resolves.toBeUndefined();
-    expect(stubs.dbExecute).not.toHaveBeenCalled();
+    // -1 is still a supported "unlimited" override for a tier. When set,
+    // the helper must not touch the DB and must not throw.
+    const originalCap = CHATBOT_DAILY_TOKEN_CAP.free;
+    (CHATBOT_DAILY_TOKEN_CAP as Record<string, number>).free = -1;
+    try {
+      await expect(assertChatbotBudget("user-1", "free")).resolves.toBeUndefined();
+      expect(stubs.dbExecute).not.toHaveBeenCalled();
+    } finally {
+      (CHATBOT_DAILY_TOKEN_CAP as Record<string, number>).free = originalCap;
+    }
   });
 
   describe("with caps temporarily enabled", () => {

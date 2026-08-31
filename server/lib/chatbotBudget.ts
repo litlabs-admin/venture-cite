@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
+import { logger } from "./logger";
 import {
   CHATBOT_DAILY_TOKEN_CAP,
   CHATBOT_MESSAGES_PER_HOUR,
@@ -40,9 +41,17 @@ export async function assertChatbotBudget(userId: string, tier: Tier): Promise<v
   const [tokens, msgs] = await Promise.all([tokensUsedToday(userId), messagesLastHour(userId)]);
 
   if (tokens >= tokenCap) {
+    logger.warn(
+      { userId, tier, tokens, tokenCap },
+      "chatbotBudget: daily token cap exceeded, blocking request",
+    );
     throw new BudgetExceededError(tier, tokenCap, tokens);
   }
   if (msgs >= msgCap) {
+    logger.warn(
+      { userId, tier, msgs, msgCap },
+      "chatbotBudget: hourly message cap exceeded, blocking request",
+    );
     throw new BudgetExceededError(tier, msgCap, msgs);
   }
 }
