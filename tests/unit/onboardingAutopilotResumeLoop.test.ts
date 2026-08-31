@@ -73,8 +73,12 @@ vi.mock("../../server/lib/factAgent/v2/vercelBudget", () => ({
   LLM_CALL_TIMEOUT_MS: 30_000,
 }));
 
-const { runOnboardingAutopilot, resumeInFlightAutopilots, AUTOPILOT_STALL_HOURS } =
-  await import("../../server/lib/onboardingAutopilot");
+const {
+  runOnboardingAutopilot,
+  resumeInFlightAutopilots,
+  AUTOPILOT_STALL_HOURS,
+  resolveAutopilotProgressTimestamp,
+} = await import("../../server/lib/onboardingAutopilot");
 
 function statusesWritten(): string[] {
   return storageStubs.updateBrand.mock.calls
@@ -206,11 +210,14 @@ describe("Defect 2: resumeInFlightAutopilots bounds in-flight retries with a sta
     );
     expect(firstCallText).not.toContain("'idle'");
 
-    // Only rows older than AUTOPILOT_STALL_HOURS (6h) qualify.
+    // Only rows whose most recent progress (citation_runs.last_advance_started_at,
+    // falling back to started_at, falling back to autopilot_started_at for a
+    // brand with no run) is older than AUTOPILOT_STALL_HOURS (6h) qualify.
     expect(firstCallText).toContain("autopilot_started_at IS NOT NULL");
-    expect(firstCallText).toContain(
-      `autopilot_started_at < now() - interval '${AUTOPILOT_STALL_HOURS} hours'`,
-    );
+    expect(firstCallText).toContain("FROM citation_runs cr");
+    expect(firstCallText).toContain("cr.brand_id = brands.id");
+    expect(firstCallText).toContain("COALESCE(cr.last_advance_started_at, cr.started_at)");
+    expect(firstCallText).toContain(`< now() - interval '${AUTOPILOT_STALL_HOURS} hours'`);
 
     // The demotion is logged so it's visible in production, not silent.
     const { logger } = await import("../../server/lib/logger");
@@ -240,5 +247,62 @@ describe("Defect 2: resumeInFlightAutopilots bounds in-flight retries with a sta
     );
     // The scan still runs even when nothing was demoted.
     expect(dbStubs.execute).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("Defect 3: stall demotion measures progress, not total run age", () => {
+  const HOUR_MS = 60 * 60 * 1000;
+  const now = new Date("2026-08-31T12:00:00.000Z");
+  const oldAutopilotStart = new Date(now.getTime() - 30 * HOUR_MS); // 30h old run
+
+  it("resolves to the run's last_advance_started_at when present, even though autopilot_started_at is very old", () => {
+    const recentAdvance = new Date(now.getTime() - 1 * HOUR_MS); // 1h ago - fresh
+    const resolved = resolveAutopilotProgressTimestamp(
+      { lastAdvanceStartedAt: recentAdvance, startedAt: oldAutopilotStart },
+      oldAutopilotStart,
+    );
+    expect(resolved.getTime()).toBe(recentAdvance.getTime());
+    // A brand resolved to 1h ago is NOT past the 6h stall threshold, even
+    // though its autopilot_started_at (30h ago) is.
+    expect(now.getTime() - resolved.getTime()).toBeLessThan(AUTOPILOT_STALL_HOURS * HOUR_MS);
+  });
+
+  it("falls back to the run's started_at when last_advance_started_at is NULL (pre-migration-0123 row)", () => {
+    const runStartedAt = new Date(now.getTime() - 8 * HOUR_MS); // 8h ago - stale
+    const resolved = resolveAutopilotProgressTimestamp(
+      { lastAdvanceStartedAt: null, startedAt: runStartedAt },
+      oldAutopilotStart,
+    );
+    expect(resolved.getTime()).toBe(runStartedAt.getTime());
+    // 8h since the run's own started_at IS past the 6h stall threshold.
+    expect(now.getTime() - resolved.getTime()).toBeGreaterThanOrEqual(
+      AUTOPILOT_STALL_HOURS * HOUR_MS,
+    );
+  });
+
+  it("falls back to autopilot_started_at when the brand has no citation run at all", () => {
+    const resolved = resolveAutopilotProgressTimestamp(null, oldAutopilotStart);
+    expect(resolved.getTime()).toBe(oldAutopilotStart.getTime());
+    // 30h since autopilot_started_at IS past the 6h stall threshold, so a
+    // brand stuck before its first citation run (e.g. 'scraping_facts')
+    // still gets demoted.
+    expect(now.getTime() - resolved.getTime()).toBeGreaterThanOrEqual(
+      AUTOPILOT_STALL_HOURS * HOUR_MS,
+    );
+  });
+
+  it("the demotion SQL keys off citation_runs' progress column, not autopilot_started_at alone", async () => {
+    dbStubs.execute.mockResolvedValue({ rows: [] });
+
+    await resumeInFlightAutopilots(Date.now() + 60_000);
+
+    const firstCallText = flattenSql(dbStubs.execute.mock.calls[0][0]);
+    // A brand actively advancing citation slices must not be judged solely
+    // on autopilot_started_at - the predicate must consult citation_runs.
+    expect(firstCallText).toContain("citation_runs");
+    expect(firstCallText).toContain("last_advance_started_at");
+    // autopilot_started_at survives only as the final fallback, inside a
+    // COALESCE, not as the sole comparison operand.
+    expect(firstCallText).toMatch(/COALESCE\([\s\S]*autopilot_started_at\s*\)/);
   });
 });

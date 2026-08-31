@@ -45,6 +45,33 @@ export const AUTOPILOT_RETRY_BACKOFF_MINUTES = 60;
  *  to the bounded retry path below, instead of being retried without limit. */
 export const AUTOPILOT_STALL_HOURS = 6;
 
+/**
+ * Mirrors the COALESCE chain the resume sweep's SQL uses to pick the
+ * timestamp a brand's staleness is judged against - documented here as a
+ * pure function so the fallback order is independently unit-testable, the
+ * same way server/lib/citationReconciliation.ts's isRunStaleSinceLastProgress
+ * documents the citation_runs table's own version of this same chain.
+ *
+ * Order: the brand's most recent citation run's last_advance_started_at
+ * (stamped on every real slice advance - server/storage/citationsStorage.ts's
+ * bumpCitationRunProgress) - or that run's started_at if it predates
+ * migration 0123 - or autopilot_started_at if the brand has no citation run
+ * yet at all (still in 'scraping_facts' or 'generating_prompts').
+ */
+export function resolveAutopilotProgressTimestamp(
+  latestCitationRun: {
+    lastAdvanceStartedAt: Date | string | null;
+    startedAt: Date | string;
+  } | null,
+  autopilotStartedAt: Date | string,
+): Date {
+  if (latestCitationRun) {
+    const progressAt = latestCitationRun.lastAdvanceStartedAt ?? latestCitationRun.startedAt;
+    return new Date(progressAt);
+  }
+  return new Date(autopilotStartedAt);
+}
+
 async function setAutopilot(brandId: string, patch: Partial<Brand>): Promise<void> {
   try {
     await storage.updateBrand(brandId, patch as any);
@@ -470,6 +497,30 @@ export async function resumeInFlightAutopilots(deadlineMs?: number): Promise<voi
     // finish stops being retried without limit and becomes visible instead.
     // The scan below then picks it up on the bounded 'failed' path, with the
     // attempt cap and the backoff, rather than the unbounded in-flight path.
+    // Measured against PROGRESS, not total run age. autopilot_started_at is
+    // when the whole run began; a brand advancing normally through
+    // 'running_citations' can legitimately run past AUTOPILOT_STALL_HOURS in
+    // total (see AUTOPILOT_STALL_HOURS's own doc comment - a slice-based
+    // citation run is not required to finish quickly), and demoting it there
+    // writes a user-visible autopilot_error and hands it to the attempt-capped
+    // retry path while it was doing nothing wrong.
+    //
+    // Keys off the brand's most recent citation_runs row instead, mirroring
+    // exactly the COALESCE chain server/lib/citationReconciliation.ts and
+    // server/citationChecker.ts already use to judge staleness for that same
+    // table: last_advance_started_at (migration 0123, stamped on every actual
+    // slice advance - server/storage/citationsStorage.ts's
+    // bumpCitationRunProgress) first, falling back to the run's started_at
+    // for a row predating that column or reaped before its first progress
+    // stamp. A brand with no citation run at all yet - still in
+    // 'scraping_facts' or 'generating_prompts' - has nothing to COALESCE to,
+    // so the outer COALESCE falls back once more to autopilot_started_at,
+    // reproducing the original total-run-age judgment for exactly the phases
+    // where "run age" and "progress age" are the same thing.
+    //
+    // This sweep is a system-wide maintenance pass and intentionally has no
+    // per-tenant/brand_id filter beyond deleted_at - the subquery is
+    // correlated per row, not scoped to one tenant.
     const stalled = await db.execute<{ id: string }>(sql`
       UPDATE brands
       SET autopilot_status = 'failed',
@@ -477,7 +528,16 @@ export async function resumeInFlightAutopilots(deadlineMs?: number): Promise<voi
       WHERE deleted_at IS NULL
         AND autopilot_status IN ('pending', 'scraping_facts', 'generating_prompts', 'running_citations')
         AND autopilot_started_at IS NOT NULL
-        AND autopilot_started_at < now() - ${sql.raw(`interval '${AUTOPILOT_STALL_HOURS} hours'`)}
+        AND COALESCE(
+              (
+                SELECT COALESCE(cr.last_advance_started_at, cr.started_at)
+                FROM citation_runs cr
+                WHERE cr.brand_id = brands.id
+                ORDER BY cr.started_at DESC
+                LIMIT 1
+              ),
+              autopilot_started_at
+            ) < now() - ${sql.raw(`interval '${AUTOPILOT_STALL_HOURS} hours'`)}
       RETURNING id
     `);
     const stalledRows = (stalled as { rows?: Array<{ id: string }> }).rows ?? [];
