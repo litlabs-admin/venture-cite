@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { z } from "zod";
 import type { APIRequestContext, Page } from "@playwright/test";
+import { localE2EOwnerDatabaseUrl } from "./local-database-access";
 
 const localConfigSchema = z.object({
   appUrl: z.string().url(),
@@ -63,12 +64,14 @@ export function localE2EConfig(): LocalE2EConfig | null {
     };
     if (Object.values(values).some((value) => !value)) return null;
     const parsed = localConfigSchema.parse(values);
-    if (
-      !isLoopbackUrl(parsed.appUrl) ||
-      !isLoopbackUrl(parsed.supabaseUrl) ||
-      !isLoopbackUrl(parsed.databaseUrl)
-    )
-      return null;
+    if (!isLoopbackUrl(parsed.appUrl) || !isLoopbackUrl(parsed.supabaseUrl)) return null;
+    // Pin the database the same way tests/e2e/support/local-database-access.ts
+    // does for the rest of the local E2E suite: loopback host, fixed local
+    // Supabase port, fixed database name. This fixture deletes public.users
+    // rows and issues Supabase Auth admin deletes, whose FK cascades remove
+    // child rows too, so accepting any loopback database name (as this check
+    // used to) would also accept a loopback tunnel into a production mirror.
+    localE2EOwnerDatabaseUrl(parsed.databaseUrl);
     return parsed;
   } catch {
     return null;

@@ -40,7 +40,7 @@ function isTestDatabaseUrl(url: string): boolean {
   );
 }
 
-function isLoopbackHost(url: string): boolean {
+export function isLoopbackHost(url: string): boolean {
   return normalizedHost(new URL(url).hostname) === "loopback";
 }
 

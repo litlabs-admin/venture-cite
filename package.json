@@ -18,7 +18,7 @@
     "start": "cross-env NODE_ENV=production node --env-file-if-exists=.env dist/server/index.mjs",
     "check": "tsc && npm run verify:tours",
     "verify:tours": "tsx scripts/verify-tour-targets.ts",
-    "db:push": "drizzle-kit push",
+    "db:push": "tsx scripts/guardDrizzlePush.ts",
     "db:audit:metadata": "tsx scripts/auditDatabaseMetadata.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:migrate:release": "cross-env NODE_ENV=production tsx scripts/migrate.ts --release",

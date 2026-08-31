@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Full history. The Supabase mirror check below regenerates its
           # baseline from `git show 45d3d8f7…:shared/schema.ts`, and the default
@@ -29,7 +29,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -101,10 +101,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -119,8 +119,12 @@ jobs:
 
       # `supabase start` reuses an existing volume and skips migrations when one
       # is present. A CI runner is always fresh, but this check is cheap and it
-      # turns a silent partial schema into a clear failure. It caught exactly that
-      # locally on 2026-08-28, where 5 of 130 migrations were missing.
+      # turns a silent gap in the migration ledger into a clear failure. It caught
+      # exactly that locally on 2026-08-28, where 5 of 130 migrations were missing.
+      # It also runs a few cheap structural checks (role/RLS/grant existence) for
+      # the most recent migrations, which catch drift a complete ledger can miss
+      # (2026-08-31: ledger complete, role grants absent) — those checks cover
+      # only the objects they name, not the whole schema.
       - name: Assert every migration applied
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55322/postgres
