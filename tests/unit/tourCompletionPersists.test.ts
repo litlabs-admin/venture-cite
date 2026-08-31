@@ -80,12 +80,31 @@ function droppedStepIds(): string[] {
     .map(([e]) => e.stepId);
 }
 
+// Frames this file has queued but not yet run. A frame that is still pending
+// when a test ends fires after vitest has torn down happy-dom, and Shepherd
+// then reaches for a window that no longer exists:
+//
+//   ReferenceError: window is not defined
+//     at node_modules/shepherd.js/dist/js/shepherd.mjs
+//     at Timeout._onTimeout tests/unit/tourCompletionPersists.test.ts:88
+//
+// Vitest reports that as an unhandled error and fails the run even though every
+// test passed - which is exactly what it did in CI, at 306 files and 2208 tests
+// green. It does not reproduce locally because the timing differs; the leak is
+// real either way, so the timers are tracked and cleared rather than left to
+// chance.
+const pendingFrames = new Set<ReturnType<typeof setTimeout>>();
+
 beforeEach(() => {
   document.body.innerHTML = "";
   vi.clearAllMocks();
   // Shepherd starts the tour inside rAF; happy-dom has it, but keep it prompt.
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-    setTimeout(() => cb(0), 50);
+    const id = setTimeout(() => {
+      pendingFrames.delete(id);
+      cb(0);
+    }, 50);
+    pendingFrames.add(id);
     return 0;
   });
 });
@@ -93,6 +112,8 @@ beforeEach(() => {
 afterEach(() => {
   for (const running of runningTours) running.cancel("test_cleanup");
   runningTours.clear();
+  for (const id of pendingFrames) clearTimeout(id);
+  pendingFrames.clear();
 });
 
 // Two steps; the SECOND one's anchor is deliberately never added to the DOM,
