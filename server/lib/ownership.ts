@@ -106,69 +106,119 @@ async function confirmEntityReadThroughRls(
   if (!confirmed) throw new OwnershipError(404, notFoundLabel);
 }
 
+// requireEntityThroughBrandWithRlsConfirmation runs both enforcement layers
+// for a table covered by migration 0124's venturecite_entity_request
+// policies: loadEntityThroughBrand's application-level join, then
+// confirmEntityReadThroughRls's independent re-read under RLS. Only call this
+// for one of the nine tables 0124 actually granted; every other require*
+// helper in this file stays on loadEntityThroughBrand alone.
+async function requireEntityThroughBrandWithRlsConfirmation(
+  table: any,
+  id: string,
+  userId: string,
+  notFoundLabel: string,
+): Promise<any> {
+  const row = await loadEntityThroughBrand(table, id, userId, notFoundLabel);
+  await confirmEntityReadThroughRls(table, id, userId, notFoundLabel);
+  return row;
+}
+
 export async function requireCompetitor(
   id: string,
   userId: string,
 ): Promise<typeof schema.competitors.$inferSelect> {
-  const row = await loadEntityThroughBrand(schema.competitors, id, userId, "Competitor not found");
-  await confirmEntityReadThroughRls(schema.competitors, id, userId, "Competitor not found");
-  return row;
+  return requireEntityThroughBrandWithRlsConfirmation(
+    schema.competitors,
+    id,
+    userId,
+    "Competitor not found",
+  );
 }
 
 export async function requireFaq(
   id: string,
   userId: string,
 ): Promise<typeof schema.faqItems.$inferSelect> {
-  return loadEntityThroughBrand(schema.faqItems, id, userId, "FAQ not found");
+  return requireEntityThroughBrandWithRlsConfirmation(schema.faqItems, id, userId, "FAQ not found");
 }
 
 export async function requireListicle(
   id: string,
   userId: string,
 ): Promise<typeof schema.listicles.$inferSelect> {
-  return loadEntityThroughBrand(schema.listicles, id, userId, "Listicle not found");
+  return requireEntityThroughBrandWithRlsConfirmation(
+    schema.listicles,
+    id,
+    userId,
+    "Listicle not found",
+  );
 }
 
 export async function requireBofuContent(
   id: string,
   userId: string,
 ): Promise<typeof schema.bofuContent.$inferSelect> {
-  return loadEntityThroughBrand(schema.bofuContent, id, userId, "BOFU content not found");
+  return requireEntityThroughBrandWithRlsConfirmation(
+    schema.bofuContent,
+    id,
+    userId,
+    "BOFU content not found",
+  );
 }
 
 export async function requireHallucination(
   id: string,
   userId: string,
 ): Promise<typeof schema.brandHallucinations.$inferSelect> {
-  return loadEntityThroughBrand(schema.brandHallucinations, id, userId, "Hallucination not found");
+  return requireEntityThroughBrandWithRlsConfirmation(
+    schema.brandHallucinations,
+    id,
+    userId,
+    "Hallucination not found",
+  );
 }
 
 export async function requireBrandFact(
   id: string,
   userId: string,
 ): Promise<typeof schema.brandFactSheet.$inferSelect> {
-  return loadEntityThroughBrand(schema.brandFactSheet, id, userId, "Brand fact not found");
+  return requireEntityThroughBrandWithRlsConfirmation(
+    schema.brandFactSheet,
+    id,
+    userId,
+    "Brand fact not found",
+  );
 }
 
 export async function requireBrandMention(
   id: string,
   userId: string,
 ): Promise<typeof schema.brandMentions.$inferSelect> {
-  return loadEntityThroughBrand(schema.brandMentions, id, userId, "Brand mention not found");
+  return requireEntityThroughBrandWithRlsConfirmation(
+    schema.brandMentions,
+    id,
+    userId,
+    "Brand mention not found",
+  );
 }
 
 export async function requireCommunityPost(
   id: string,
   userId: string,
 ): Promise<typeof schema.communityPosts.$inferSelect> {
-  return loadEntityThroughBrand(schema.communityPosts, id, userId, "Community post not found");
+  return requireEntityThroughBrandWithRlsConfirmation(
+    schema.communityPosts,
+    id,
+    userId,
+    "Community post not found",
+  );
 }
 
 export async function requireCitationQuality(
   id: string,
   userId: string,
 ): Promise<typeof schema.citationQuality.$inferSelect> {
-  return loadEntityThroughBrand(
+  return requireEntityThroughBrandWithRlsConfirmation(
     schema.citationQuality,
     id,
     userId,
