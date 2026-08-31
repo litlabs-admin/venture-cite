@@ -2,6 +2,8 @@ import type { Request } from "express";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import * as schema from "@shared/schema";
+import { createRequestActor } from "./requestActor";
+import { setRestrictedRequestContext } from "../data/restrictedRequestTransaction";
 
 // Thrown by the require* helpers when an entity can't be found OR when the
 // caller doesn't own it. Handlers catch this and convert to 401/404.
@@ -70,11 +72,47 @@ export async function requireArticle(
   return loadEntityThroughBrand(schema.articles, id, userId, "Article not found");
 }
 
+// confirmEntityReadThroughRls re-reads the row through
+// venturecite_entity_request (migration 0124's policies, made assumable by
+// 0125) inside its own transaction, with the tenant GUC set the way the
+// policy predicate expects. It is a second, independent enforcement layer on
+// top of loadEntityThroughBrand's application-level join, not a replacement
+// for it: the application connection (postgres) has rolbypassrls = true, so
+// this is the only read among the two that RLS actually applies to. A miss
+// here - whether because the row truly isn't the caller's, or because
+// something upstream disagrees with the policy - fails closed as the same
+// 404 loadEntityThroughBrand would give, rather than trusting the ownership
+// check alone.
+async function confirmEntityReadThroughRls(
+  table: any,
+  id: string,
+  userId: string,
+  notFoundLabel: string,
+): Promise<void> {
+  const actor = createRequestActor(userId);
+  const confirmed = await db.transaction(async (transaction) => {
+    await setRestrictedRequestContext({
+      actor,
+      role: "venturecite_entity_request",
+      transaction,
+    });
+    const [row] = await transaction
+      .select({ id: table.id })
+      .from(table)
+      .where(eq(table.id, id))
+      .limit(1);
+    return row;
+  });
+  if (!confirmed) throw new OwnershipError(404, notFoundLabel);
+}
+
 export async function requireCompetitor(
   id: string,
   userId: string,
 ): Promise<typeof schema.competitors.$inferSelect> {
-  return loadEntityThroughBrand(schema.competitors, id, userId, "Competitor not found");
+  const row = await loadEntityThroughBrand(schema.competitors, id, userId, "Competitor not found");
+  await confirmEntityReadThroughRls(schema.competitors, id, userId, "Competitor not found");
+  return row;
 }
 
 export async function requireFaq(
