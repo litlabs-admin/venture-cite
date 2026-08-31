@@ -110,7 +110,7 @@ order.forEach((domain, index) => {
     "",
     "## Acceptance",
     "",
-    "    npx tsx scripts/storageSurface.ts --check .audit/B5/storage-surface-before.json",
+    "    npx tsx scripts/storageSurface.ts --check",
     "    npm run check",
     "    npm run lint",
     "    npm run format:check",

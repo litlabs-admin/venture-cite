@@ -51,7 +51,7 @@ domain instead of the entire interface. Existing call sites that already import
 ## Verify
 
 ```sh
-npx tsx scripts/storageSurface.ts --check .audit/B5/storage-surface-before.json
+npx tsx scripts/storageSurface.ts --check
 ```
 
 This fails if your change accidentally duplicates a method name across two
