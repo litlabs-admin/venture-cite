@@ -323,8 +323,23 @@ if (implAdded.length)
     `${implAdded.length} implementations appeared: ${implAdded.slice(0, 10).join(", ")}`,
   );
 
+// Only a method that MOVED and changed body is a problem. The predicate used
+// to compare bodies alone while the message blamed a move, which was fine
+// while the decomposition was in flight against a pre-decomposition baseline -
+// nothing had moved yet on `main`, so any body difference was a move.
+//
+// That stopped being true once B5 landed on `main`. Comparing against an
+// advancing baseline, a plain in-place bugfix to any storage method differs
+// from `main` and failed the gate, blaming "a move that should not alter
+// behaviour" when no file moved. That is a false positive with a misleading
+// message, and it would have blocked ordinary work.
+//
+// Scoping it to moved methods restores the invariant the rule was written for -
+// a pure relocation must not change behaviour - and makes the message true.
+// Editing a method in place is a normal change and no longer trips it.
 const changed = beforeNames
   .filter((m) => afterNames.includes(m))
+  .filter((m) => before.implementations[m].source !== surface.implementations[m].source)
   .filter((m) => before.implementations[m].body !== surface.implementations[m].body);
 if (changed.length) {
   problems.push(
