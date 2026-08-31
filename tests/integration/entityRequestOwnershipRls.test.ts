@@ -221,9 +221,18 @@ if (databaseTest.kind === "ready") {
     // this error.
     it("fails loudly, not silently, when the entity role attempts a write it was never granted", async () => {
       const competitorId = randomUUID();
-      await db
-        .insert(schema.competitors)
-        .values({ id: competitorId, brandId: brandAId, name: "Acme", domain: "acme.test" });
+      // Distinct name and domain per run. competitors carries a unique index on
+      // (brand_id, lower(name), lower(coalesce(domain, ''))), and the seed the
+      // table-driven cases above insert for brand A is already ("Acme",
+      // "acme.test") - reusing it here failed with 23505 before the role was
+      // ever asked to write, so the test never reached what it was checking.
+      const uniqueSuffix = competitorId.slice(0, 8);
+      await db.insert(schema.competitors).values({
+        id: competitorId,
+        brandId: brandAId,
+        name: `WriteDenial ${uniqueSuffix}`,
+        domain: `write-denial-${uniqueSuffix}.test`,
+      });
 
       await expect(
         db.transaction(async (transaction) => {
@@ -241,7 +250,7 @@ if (databaseTest.kind === "ready") {
         .select({ name: schema.competitors.name })
         .from(schema.competitors)
         .where(eq(schema.competitors.id, competitorId));
-      expect(unchanged).toEqual([{ name: "Acme" }]);
+      expect(unchanged).toEqual([{ name: `WriteDenial ${uniqueSuffix}` }]);
     });
   });
 } else {
