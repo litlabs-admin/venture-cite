@@ -21,11 +21,15 @@
 import { describe, expect, it } from "vitest";
 import { measureRouteHttpCoverage } from "../../scripts/routeHttpCoverage.mjs";
 
-// Measured on 2026-08-31: 153 of 240 registrations, up from 31 after
-// prompts, contentTypes, dashboard, articles and intelligence gained
-// end-to-end tests. The remaining 87 are a real, recorded gap - this is not an
-// assertion that they are safe.
-const BASELINE_COVERED = 153;
+// Measured on 2026-08-31: 239 of 240 registrations, up from 31 at the start of
+// the pass. The one gap is GET /api/brand-fact-sheet/runs/:runId/stream, an SSE
+// endpoint that never resolves its response and so does not fit the
+// request/response shape these tests use; its ownership branch is identical to
+// the covered GET /runs/:runId.
+//
+// "Covered" still means only that some test calls that method and path. It is a
+// floor, not a quality score.
+const BASELINE_COVERED = 239;
 
 describe("HTTP-level route coverage", () => {
   const { registrations, covered, uncovered } = measureRouteHttpCoverage();
