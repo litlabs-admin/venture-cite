@@ -12,6 +12,18 @@
 // and path. It does not mean the endpoint is well tested. It is a floor, not a
 // score.
 //
+// It also UNDERCOUNTS, and in a way worth knowing before chasing a gap. The
+// scan matches a literal `.get("/api/…")` in a file that mentions supertest, so
+// a test driving a route another way is invisible to it. That is not
+// hypothetical: GET /api/brand-fact-sheet/runs/:runId/stream read as uncovered
+// for a while, and tests/unit/factSheetSseStream.test.ts had been exercising it
+// against a raw http.Server the whole time - necessarily so, because an SSE
+// endpoint that never ends its response cannot be driven by supertest's
+// resolve-on-end contract.
+//
+// So a route reported uncovered is a prompt to go and look, not proof that
+// nothing tests it.
+//
 // Run: node scripts/routeHttpCoverage.mjs [--json]
 
 import fs from "node:fs";

@@ -21,15 +21,20 @@
 import { describe, expect, it } from "vitest";
 import { measureRouteHttpCoverage } from "../../scripts/routeHttpCoverage.mjs";
 
-// Measured on 2026-08-31: 239 of 240 registrations, up from 31 at the start of
-// the pass. The one gap is GET /api/brand-fact-sheet/runs/:runId/stream, an SSE
-// endpoint that never resolves its response and so does not fit the
-// request/response shape these tests use; its ownership branch is identical to
-// the covered GET /runs/:runId.
+// Measured on 2026-09-01: 240 of 240 registrations, up from 31 at the start of
+// the pass.
 //
-// "Covered" still means only that some test calls that method and path. It is a
-// floor, not a quality score.
-const BASELINE_COVERED = 239;
+// The last one to close, GET /api/brand-fact-sheet/runs/:runId/stream, is worth
+// remembering: it read as uncovered while tests/unit/factSheetSseStream.test.ts
+// had been driving it against a raw http.Server all along. The scanner only
+// sees a literal `.get("/api/…")` in a supertest file, and an SSE endpoint that
+// never ends its response cannot be driven that way. The number went up because
+// the resolvable branches - the pre-flush 404 and a terminal run - gained
+// supertest tests, not because the endpoint went from untested to tested.
+//
+// So this is a floor twice over: "covered" means only that some test calls that
+// method and path, and the scan can miss tests that drive a route another way.
+const BASELINE_COVERED = 240;
 
 describe("HTTP-level route coverage", () => {
   const { registrations, covered, uncovered } = measureRouteHttpCoverage();
@@ -50,10 +55,16 @@ describe("HTTP-level route coverage", () => {
     expect(pairs).toContain("POST /api/geo-signals/optimize-chunks");
   });
 
-  it("reports the outstanding gap rather than hiding it", () => {
-    // Not an assertion about quality - just proof the gap is measured. The
-    // number is large on purpose; see the file header.
-    expect(uncovered.length).toBeGreaterThan(0);
+  it("accounts for every registration, covered or not", () => {
+    // This used to assert `uncovered.length > 0` - written when 209 were
+    // uncovered and a gap was a safe thing to assume. It became false at
+    // 240/240 and failed, which is the right way round: an invariant that
+    // encodes "there is still work left" expires the moment the work is done.
+    //
+    // What is worth pinning is the accounting, not the shortfall: every
+    // registration is classified exactly once, so a scan that quietly dropped
+    // routes cannot read as full coverage.
     expect(covered.length + uncovered.length).toBe(registrations.length);
+    expect(covered.length).toBe(registrations.length - uncovered.length);
   });
 });

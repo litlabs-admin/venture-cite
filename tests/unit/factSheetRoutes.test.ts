@@ -5,12 +5,17 @@
 // via-entity to gate ownership - a cross-tenant id must answer the identical
 // 404 a nonexistent id would, and the downstream service must never run.
 //
-// The GET /runs/:runId/stream SSE endpoint is intentionally not covered here:
-// it never resolves the response (it loops with setTimeout until the run
-// reaches a terminal status or the client disconnects), so it isn't a
-// request/response contract that fits the supertest .send()/expect() shape
-// used by the rest of this suite. Its pre-flush ownership/404 branch is
-// identical in structure to GET /runs/:runId, which is covered below.
+// The GET /runs/:runId/stream SSE endpoint's steady-state polling loop (page/
+// fact/source-update events across multiple ticks, abort handling, the slice
+// budget) is covered separately in tests/unit/factSheetSseStream.test.ts using
+// a raw http client, because that behavior never resolves the response for a
+// non-terminal run and doesn't fit supertest's .send()/expect() shape.
+//
+// The pre-flush ownership/404 branch and the terminal-run happy path DO
+// resolve a response (the handler calls res.end() once it writes "done"), so
+// those are covered here with supertest like every other route in this file -
+// which is also what makes scripts/routeHttpCoverage.mjs count this route as
+// having an HTTP-level test.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
@@ -200,6 +205,56 @@ describe("GET /api/brand-fact-sheet/runs/:runId", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true, run, pages: [{ id: "page-1" }] });
+  });
+});
+
+describe("GET /api/brand-fact-sheet/runs/:runId/stream", () => {
+  it("answers 404 for a run that does not exist, before any streaming begins", async () => {
+    runsService.getFactSheetRunById.mockResolvedValue(undefined);
+
+    const response = await request(makeApp()).get("/api/brand-fact-sheet/runs/missing-run/stream");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ success: false, error: "Run not found" });
+    expect(response.headers["content-type"]).toMatch(/json/);
+    expect(streamService.getNewFactSheetPages).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 for a run whose brand the caller does not own, before any streaming begins", async () => {
+    runsService.getFactSheetRunById.mockResolvedValue({ id: "run-1", brandId: "brand-other" });
+    ownership.requireBrand.mockRejectedValue(new TestOwnershipError("Brand not found", 403));
+
+    const response = await request(makeApp()).get("/api/brand-fact-sheet/runs/run-1/stream");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ success: false, error: "Run not found" });
+    expect(response.headers["content-type"]).toMatch(/json/);
+    expect(streamService.getNewFactSheetPages).not.toHaveBeenCalled();
+  });
+
+  it("streams SSE headers and a done frame for a run that is already terminal", async () => {
+    const run = {
+      id: "run-1",
+      brandId: "brand-1",
+      status: "completed",
+      pagesFetched: 2,
+      factsExtracted: 5,
+      llmCostCents: 3,
+    };
+    runsService.getFactSheetRunById.mockResolvedValue(run);
+    ownership.requireBrand.mockResolvedValue({ id: "brand-1", userId: user.id });
+    streamService.getNewFactSheetPages.mockResolvedValue({ events: [], lastPageId: "" });
+    streamService.getNewFactSheetFacts.mockResolvedValue({ events: [], lastFactId: "" });
+    streamService.getFactSheetSourceUpdateEvents.mockResolvedValue([]);
+
+    const response = await request(makeApp()).get("/api/brand-fact-sheet/runs/run-1/stream");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toMatch(/text\/event-stream/);
+    expect(response.headers["cache-control"]).toMatch(/no-cache/);
+    expect(response.text).toContain("data:");
+    expect(response.text).toContain('"status":"completed"');
+    expect(response.text).toContain("event: done");
   });
 });
 
