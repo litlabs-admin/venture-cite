@@ -22,6 +22,7 @@ export const SCHEDULER_JOB_NAMES = {
   detectFactScrapeFailure: "detect-fact-scrape-failure",
   weeklyCatchupKickoff: "weekly-catchup-kickoff",
   weeklyReport: "weekly-report",
+  opsHealthCheck: "ops-health-check",
 } as const;
 
 export type SchedulerJobName = (typeof SCHEDULER_JOB_NAMES)[keyof typeof SCHEDULER_JOB_NAMES];

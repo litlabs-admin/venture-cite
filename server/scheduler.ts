@@ -20,6 +20,7 @@ import { startRun } from "./lib/workflowEngine";
 import { tryEmitWeeklyDigestForUser } from "./lib/weeklyDigestEmitter";
 import { runTourEventsCleanupJob } from "./lib/tourCleanup";
 import { SCHEDULER_JOB_NAMES } from "./lib/schedulerJobRegistry";
+import { runOpsHealthCheck } from "./lib/opsHealthCheck";
 
 import { captureAndFlush } from "./lib/sentryReport";
 const WEEKLY_CRON = process.env.WEEKLY_REPORT_CRON || "0 8 * * 0";
@@ -817,6 +818,20 @@ export function initScheduler(): void {
       }),
     );
     logger.info({ cron: CONTENT_COST_OUTBOX_CRON }, "content cost outbox drain scheduled");
+  }
+
+  // Operational health check: provider spend, outbox staleness, overdue
+  // scheduled jobs, stuck citation runs. Every 15 minutes - frequent enough
+  // to catch a runaway spend spike or a broken outbox drain within the hour,
+  // cheap enough (a handful of indexed reads) not to matter at that cadence.
+  // Read-only, and never throws - see server/lib/opsHealthCheck.ts.
+  const OPS_HEALTH_CHECK_CRON = process.env.OPS_HEALTH_CHECK_CRON || "*/15 * * * *";
+  if (cron.validate(OPS_HEALTH_CHECK_CRON)) {
+    cron.schedule(
+      OPS_HEALTH_CHECK_CRON,
+      cronCrashGuard(SCHEDULER_JOB_NAMES.opsHealthCheck, () => runOpsHealthCheck()),
+    );
+    logger.info({ cron: OPS_HEALTH_CHECK_CRON }, "ops health check scheduled");
   }
 
   // Daily account purge for users whose 30-day deletion grace has elapsed.

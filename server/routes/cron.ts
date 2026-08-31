@@ -52,6 +52,7 @@ import { storage } from "../storage";
 import { setupStripeProducts } from "../setupProducts";
 import { asyncHandler } from "../lib/asyncHandler";
 import { runContentCostOutboxDrain } from "../outbox/contentCostOutboxDrain";
+import { runOpsHealthCheck } from "../lib/opsHealthCheck";
 import { isCronAuthorized } from "../services/cronAuth";
 import {
   drainPendingContentJobs,
@@ -117,6 +118,7 @@ export function setupCronRoutes(app: Express): void {
       // retention prune that is skipped every day never runs at all.
       await orch.run("tour-events-cleanup", () => runTourEventsCleanupJob());
       await orch.run("detect-fact-scrape-failure", () => detectFactScrapeFailureRate());
+      await orch.run("ops-health-check", () => runOpsHealthCheck());
 
       // v2 backstop: completes any run abandoned by the client. Runs once a day
       // here (Hobby cron limit); when on Pro we'll also have a dedicated

@@ -97,6 +97,10 @@ export const STEP_CAPS_MS = {
   // Otherwise tour_events grows without bound and the failure alert stops.
   "tour-events-cleanup": 5_000,
   "detect-fact-scrape-failure": 5_000,
+  // Ops health check: a handful of cheap, indexed reads (api_costs,
+  // outbox_commands, system_state, citation_runs). Same order of magnitude
+  // as the other cheap housekeeping steps above.
+  "ops-health-check": 5_000,
 } as const;
 
 export type StepName = keyof typeof STEP_CAPS_MS;
