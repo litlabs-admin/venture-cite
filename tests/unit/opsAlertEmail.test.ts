@@ -87,13 +87,20 @@ describe("sendOpsAlertEmails", () => {
     await sendOpsAlertEmails([alert], deps);
     expect(deps.send).toHaveBeenCalledTimes(1);
 
-    // Two hours later: past the 1h condition cooldown, still inside the 6h one.
-    deps.now = () => Date.now() + 2 * 60 * 60 * 1000;
+    // Advance the fixture clock, not the wall clock. baseDeps pins now() to the
+    // fixed NOW above; reaching for Date.now() here measured the gap between
+    // real time and that constant instead of the interval under test, which is
+    // an arbitrary number and passed or failed on when the suite happened to
+    // run.
+    const HOUR = 60 * 60 * 1000;
+
+    // Two hours on: past the 1h condition cooldown, still inside the 6h one.
+    deps.now = () => NOW + 2 * HOUR;
     await sendOpsAlertEmails([alert], deps);
     expect(deps.send).toHaveBeenCalledTimes(1);
 
-    // Seven hours later: past it.
-    deps.now = () => Date.now() + 7 * 60 * 60 * 1000;
+    // Seven hours on: past it.
+    deps.now = () => NOW + 7 * HOUR;
     await sendOpsAlertEmails([alert], deps);
     expect(deps.send).toHaveBeenCalledTimes(2);
   });
