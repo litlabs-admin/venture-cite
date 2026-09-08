@@ -159,6 +159,7 @@ supabase/.branches/
 # Subagent-driven-development scratch: ledgers, briefs, review packages,
 # diffs and JSON schemas for in-flight plans.
 .superpowers/
+.worktrees/
 
 # Config backups taken before the 2026-08-27 Codex repair.
 *.bak-20260827
