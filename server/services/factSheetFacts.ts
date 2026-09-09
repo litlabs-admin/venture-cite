@@ -17,8 +17,9 @@ export async function getFactSheetFactById(factId: string) {
 export async function acceptFactSheetFact(
   fact: { id: string; brandId: string },
   dismissOtherSide: boolean,
+  acceptedBy: string,
 ) {
-  const updated = await storage.acceptFact(fact.id, { dismissOtherSide });
+  const updated = await storage.acceptFact(fact.id, { dismissOtherSide, acceptedBy });
   logger.info(
     {
       brandId: fact.brandId,
@@ -58,8 +59,9 @@ export async function bulkAcceptFactSheetConflicts(params: {
   side: "user" | "scraped";
   domain?: string;
   runId?: string;
+  acceptedBy: string;
 }): Promise<number> {
-  const { brandId, side, domain, runId } = params;
+  const { brandId, side, domain, runId, acceptedBy } = params;
   const conflicts = await storage.getBrandFactSheetConflicts(brandId);
   let affected = 0;
   for (const pair of conflicts) {
@@ -68,7 +70,7 @@ export async function bulkAcceptFactSheetConflicts(params: {
     if (runId && (pair.scrapedFact as any).runId !== runId) continue;
     const keep = side === "user" ? pair.userFact : pair.scrapedFact;
     const drop = side === "user" ? pair.scrapedFact : pair.userFact;
-    await storage.acceptFact(keep.id, { dismissOtherSide: false });
+    await storage.acceptFact(keep.id, { dismissOtherSide: false, acceptedBy });
     await storage.dismissFact(drop.id);
     affected += 1;
   }

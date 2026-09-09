@@ -727,7 +727,7 @@ export interface IStorage {
    *  Returns the updated fact. */
   acceptFact(
     factId: string,
-    options: { dismissOtherSide: boolean },
+    options: { dismissOtherSide: boolean; acceptedBy: string },
   ): Promise<BrandFactSheet | null>;
   /** Stamp dismissed_at on a fact. */
   dismissFact(factId: string): Promise<BrandFactSheet | null>;

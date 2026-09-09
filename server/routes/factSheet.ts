@@ -399,7 +399,7 @@ export function setupFactSheetRoutes(app: Express): void {
         }
         await requireBrand(fact.brandId, user.id);
 
-        const updated = await acceptFactSheetFact(fact, parsed.data.dismissOtherSide);
+        const updated = await acceptFactSheetFact(fact, parsed.data.dismissOtherSide, user.id);
         return res.status(200).json({ success: true, fact: updated });
       } catch (error) {
         if (error instanceof OwnershipError) {
@@ -462,7 +462,13 @@ export function setupFactSheetRoutes(app: Express): void {
         const { brandId, side, domain, runId } = parsed.data;
         await requireBrand(brandId, user.id);
 
-        const affected = await bulkAcceptFactSheetConflicts({ brandId, side, domain, runId });
+        const affected = await bulkAcceptFactSheetConflicts({
+          brandId,
+          side,
+          domain,
+          runId,
+          acceptedBy: user.id,
+        });
         return res.status(200).json({ success: true, affected });
       } catch (error) {
         if (error instanceof OwnershipError) {

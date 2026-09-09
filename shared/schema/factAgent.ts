@@ -191,6 +191,10 @@ export const brandFactSheet = pgTable(
     // Spec 2 §4.6: diff resolution state
     dismissedAt: timestamp("dismissed_at"),
     acceptedAt: timestamp("accepted_at"),
+    // Who accepted the fact. An extracted value becomes authoritative only
+    // when a person adopts it, so the record has to name that person - an
+    // accepted_at with no actor cannot answer "who said this was right?".
+    acceptedBy: varchar("accepted_by"),
     // Spec 2 §4.1: FK to the run that produced this row (null for source='user'/'manual')
     runId: varchar("run_id").references(() => brandFactScrapeRuns.id, { onDelete: "set null" }),
     lastVerified: timestamp("last_verified").notNull().defaultNow(),
