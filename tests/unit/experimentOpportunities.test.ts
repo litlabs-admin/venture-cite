@@ -78,4 +78,79 @@ describe("visibility experiment work opportunities", () => {
       ],
     });
   });
+
+  it("emits exactly the fields that experiment evidence requires", async () => {
+    const { source } = sourceForContent([publishedContent()]);
+
+    const opportunities = await source.collect({ actor: ACTOR, brandId: BRAND_ID });
+
+    expect(opportunities[0]?.evidence).toEqual([
+      {
+        kind: "experiment",
+        label: "Published page sits between two completed citation runs.",
+        experimentId: "bofu:content-1",
+        hypothesis: "Publishing this page will improve the brand's visibility.",
+        baselineMeasurementId: "run-before",
+        changedAt: "2026-09-08T12:00:00.000Z",
+        laterMeasurementId: "run-after",
+        conclusion: "Compare the successful citation runs before and after publication.",
+      },
+    ]);
+  });
+
+  it.each([
+    ["content id", { id: "" }],
+    ["baseline run id", { baselineRunId: "" }],
+    ["later run id", { laterRunId: "" }],
+  ] as const)("does not create a task when the %s is empty", async (_name, overrides) => {
+    const { source } = sourceForContent([publishedContent(overrides)]);
+
+    const opportunities = await source.collect({ actor: ACTOR, brandId: BRAND_ID });
+
+    expect(opportunities).toEqual([]);
+  });
+
+  it("does not create a task when both runs have the same id", async () => {
+    const { source } = sourceForContent([
+      publishedContent({ laterRunId: "run-before", laterRunAt: "2026-09-09T10:00:00.000Z" }),
+    ]);
+
+    const opportunities = await source.collect({ actor: ACTOR, brandId: BRAND_ID });
+
+    expect(opportunities).toEqual([]);
+  });
+
+  it.each([
+    ["publication time", { publishedAt: "not-a-date" }],
+    ["baseline run time", { baselineRunAt: "not-a-date" }],
+    ["later run time", { laterRunAt: "not-a-date" }],
+    ["baseline run after publication", { baselineRunAt: "2026-09-08T13:00:00.000Z" }],
+    ["later run before publication", { laterRunAt: "2026-09-08T11:00:00.000Z" }],
+  ] as const)("does not create a task with an invalid time bound: %s", async (_name, overrides) => {
+    const { source } = sourceForContent([publishedContent(overrides)]);
+
+    const opportunities = await source.collect({ actor: ACTOR, brandId: BRAND_ID });
+
+    expect(opportunities).toEqual([]);
+  });
+
+  it("does not create a task for content from another brand", async () => {
+    const { source } = sourceForContent([
+      publishedContent({ brandId: "brand-experiment-b" as BrandId }),
+    ]);
+
+    const opportunities = await source.collect({ actor: ACTOR, brandId: BRAND_ID });
+
+    expect(opportunities).toEqual([]);
+  });
+
+  it("keeps the task key stable across repeated reads", async () => {
+    const { source } = sourceForContent([publishedContent()]);
+
+    const first = await source.collect({ actor: ACTOR, brandId: BRAND_ID });
+    const second = await source.collect({ actor: ACTOR, brandId: BRAND_ID });
+
+    expect(first.map((item) => item.taskKey)).toEqual(["experiment:bofu:content-1"]);
+    expect(second.map((item) => item.taskKey)).toEqual(first.map((item) => item.taskKey));
+  });
 });
