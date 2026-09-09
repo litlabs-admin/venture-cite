@@ -22,13 +22,13 @@ import {
 type V2NavEntry = {
   label: string;
   icon: LucideIcon;
-  href?: "/v2/today";
+  href?: "/v2/today" | "/v2/my-work";
 };
 
 const ITEMS: V2NavEntry[] = [
   { label: "Today", icon: Sun, href: "/v2/today" },
   { label: "Visibility", icon: TrendingUp },
-  { label: "My work", icon: ListChecks },
+  { label: "My work", icon: ListChecks, href: "/v2/my-work" },
   { label: "Brand facts", icon: BookOpen },
   { label: "Learn", icon: GraduationCap },
 ];
