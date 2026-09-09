@@ -16,12 +16,16 @@ import { ObservedVisibility } from "./ObservedVisibility";
 // set lands on a different one. Every branch renders the same two-column
 // frame so the screen never jumps as data arrives.
 
+// 322px is the artboard's rail. Below `lg` it stacks under the content column
+// with a top hairline instead of a left one - progress is the reason the work
+// is ranked, so a narrow viewport reflows it rather than dropping it.
 const COLUMN = "min-w-0 flex-1 px-8 py-6";
-const RAIL = "hidden w-[322px] shrink-0 border-l border-vc-default px-6 py-6 xl:block";
+const RAIL =
+  "w-full shrink-0 border-t border-vc-default px-8 py-6 lg:w-[322px] lg:border-t-0 lg:border-l lg:px-6";
 
 function Frame({ main, rail }: { main: React.ReactNode; rail: React.ReactNode }) {
   return (
-    <div className="flex min-h-full items-stretch">
+    <div className="flex min-h-full flex-col items-stretch lg:flex-row">
       <div className={COLUMN}>{main}</div>
       <aside className={RAIL} aria-label="Your progress">
         {rail}
