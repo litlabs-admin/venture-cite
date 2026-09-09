@@ -105,11 +105,14 @@ function summary(overrides: Partial<WorkSummaryView> = {}): WorkSummaryView {
   };
 }
 
+// The shape /api/v2/visibility/mention-rate returns: `measured` is answers
+// actually collected, `failed` the provider calls that never returned one.
+// A week is plotted on `measured`, never on measured + failed.
 const WEEKS = [
-  { weekStart: "2026-07-13", cited: 6, total: 20, citationRate: 30 },
-  { weekStart: "2026-07-20", cited: 7, total: 20, citationRate: 35 },
-  { weekStart: "2026-08-24", cited: 16, total: 40, citationRate: 40 },
-  { weekStart: "2026-09-07", cited: 18, total: 40, citationRate: 45 },
+  { weekStart: "2026-07-13", cited: 6, measured: 20, failed: 0, mentionRate: 30 },
+  { weekStart: "2026-07-20", cited: 7, measured: 20, failed: 1, mentionRate: 35 },
+  { weekStart: "2026-08-24", cited: 16, measured: 40, failed: 0, mentionRate: 40 },
+  { weekStart: "2026-09-07", cited: 18, measured: 40, failed: 2, mentionRate: 45 },
 ];
 
 type Responses = {
@@ -126,7 +129,7 @@ function stubFetch(responses: Responses) {
     if (responses.pending) return new Promise<Response>(() => {});
     const failing =
       (responses.fail === "summary" && url.includes("/work/")) ||
-      (responses.fail === "trend" && url.includes("citation-trend"));
+      (responses.fail === "trend" && url.includes("/visibility/mention-rate"));
     if (failing) {
       return new Response(JSON.stringify({ success: false, error: "boom" }), { status: 500 });
     }

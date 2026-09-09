@@ -85,7 +85,7 @@ export function ObservedVisibility({ weeks }: { weeks: VisibilityWeek[] }) {
 
       {latest ? (
         <p className="mt-1.5 text-body text-vc-secondary" data-testid="v2-visibility-sentence">
-          Brand mentioned in {latest.cited} of {latest.measured} answers collected ·{" "}
+          Brand mentioned in {latest.cited} of {latest.measured} successful test answers ·{" "}
           <span className="font-semibold text-vc-accent">{latest.mentionRate}%</span>
         </p>
       ) : (
@@ -114,7 +114,11 @@ export function ObservedVisibility({ weeks }: { weeks: VisibilityWeek[] }) {
 
       {latest && (
         <p className="mt-3 text-caption text-vc-tertiary">
-          Latest sample: {latest.measured} answers collected
+          {/* The board names both halves of the sample. A failed attempt is an
+              absent observation, not a mention that did not happen, so it is
+              reported beside the denominator rather than folded into it. */}
+          Latest sample: {latest.measured} successful answers
+          {latest.failed > 0 ? ` · ${latest.failed} failed attempts` : ""}
         </p>
       )}
     </section>
