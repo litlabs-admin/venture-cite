@@ -17,6 +17,7 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { brands } from "./brands";
+import { users } from "./identity";
 
 // ============================================================================
 // Spec 2: Brand Fact Sheet redesign - scrape runs + pages + cost caps
@@ -191,6 +192,7 @@ export const brandFactSheet = pgTable(
     // Spec 2 §4.6: diff resolution state
     dismissedAt: timestamp("dismissed_at"),
     acceptedAt: timestamp("accepted_at"),
+    acceptedBy: varchar("accepted_by").references(() => users.id, { onDelete: "set null" }),
     // Spec 2 §4.1: FK to the run that produced this row (null for source='user'/'manual')
     runId: varchar("run_id").references(() => brandFactScrapeRuns.id, { onDelete: "set null" }),
     lastVerified: timestamp("last_verified").notNull().defaultNow(),
@@ -213,6 +215,7 @@ export const brandFactSheet = pgTable(
   (table) => [
     index("brand_fact_sheet_brand_id_idx").on(table.brandId),
     index("brand_fact_sheet_run_id_idx").on(table.runId),
+    index("brand_fact_sheet_accepted_by_idx").on(table.acceptedBy),
   ],
 );
 
