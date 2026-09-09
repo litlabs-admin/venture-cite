@@ -307,12 +307,14 @@ export const factAgentStorage = {
 
   async acceptFact(
     factId: string,
-    options: { dismissOtherSide: boolean },
+    options: { dismissOtherSide: boolean; acceptedBy: string },
   ): Promise<BrandFactSheet | null> {
-    // Stamp accepted_at on this fact.
+    // Stamp accepted_at and the accepting user on this fact. `acceptedBy` is
+    // required rather than optional so a new call site cannot record an
+    // acceptance with no author simply by omitting it.
     const [target] = await db
       .update(schema.brandFactSheet)
-      .set({ acceptedAt: new Date() })
+      .set({ acceptedAt: new Date(), acceptedBy: options.acceptedBy })
       .where(eq(schema.brandFactSheet.id, factId))
       .returning();
     if (!target) return null;

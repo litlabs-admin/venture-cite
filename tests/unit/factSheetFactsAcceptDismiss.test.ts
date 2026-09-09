@@ -78,7 +78,10 @@ describe("POST /api/brand-fact-sheet/facts/:factId/accept and /dismiss", () => {
     const res = await request(makeApp()).post("/api/brand-fact-sheet/facts/fact-1/accept").send({});
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(storageMock.acceptFact).toHaveBeenCalledWith("fact-1", { dismissOtherSide: false });
+    expect(storageMock.acceptFact).toHaveBeenCalledWith("fact-1", {
+      dismissOtherSide: false,
+      acceptedBy: "user-1",
+    });
   });
 
   it("accept: with dismissOtherSide=true forwards flag", async () => {
@@ -91,7 +94,10 @@ describe("POST /api/brand-fact-sheet/facts/:factId/accept and /dismiss", () => {
       .post("/api/brand-fact-sheet/facts/fact-2/accept")
       .send({ dismissOtherSide: true });
     expect(res.status).toBe(200);
-    expect(storageMock.acceptFact).toHaveBeenCalledWith("fact-2", { dismissOtherSide: true });
+    expect(storageMock.acceptFact).toHaveBeenCalledWith("fact-2", {
+      dismissOtherSide: true,
+      acceptedBy: "user-1",
+    });
   });
 
   it("dismiss: success", async () => {
@@ -142,8 +148,14 @@ describe("POST /api/brand-fact-sheet/facts/:factId/accept and /dismiss", () => {
       .send({ brandId: "brand-1", side: "user" });
     expect(res.status).toBe(200);
     expect(res.body.affected).toBe(2);
-    expect(storageMock.acceptFact).toHaveBeenCalledWith("u1", { dismissOtherSide: false });
-    expect(storageMock.acceptFact).toHaveBeenCalledWith("u2", { dismissOtherSide: false });
+    expect(storageMock.acceptFact).toHaveBeenCalledWith("u1", {
+      dismissOtherSide: false,
+      acceptedBy: "user-1",
+    });
+    expect(storageMock.acceptFact).toHaveBeenCalledWith("u2", {
+      dismissOtherSide: false,
+      acceptedBy: "user-1",
+    });
     expect(storageMock.dismissFact).toHaveBeenCalledWith("s1");
     expect(storageMock.dismissFact).toHaveBeenCalledWith("s2");
   });
@@ -163,7 +175,10 @@ describe("POST /api/brand-fact-sheet/facts/:factId/accept and /dismiss", () => {
       .send({ brandId: "brand-1", side: "scraped", domain: "positioning" });
     expect(res.status).toBe(200);
     expect(res.body.affected).toBe(1);
-    expect(storageMock.acceptFact).toHaveBeenCalledWith("s1", { dismissOtherSide: false });
+    expect(storageMock.acceptFact).toHaveBeenCalledWith("s1", {
+      dismissOtherSide: false,
+      acceptedBy: "user-1",
+    });
     expect(storageMock.dismissFact).toHaveBeenCalledWith("u1");
     expect(storageMock.acceptFact).not.toHaveBeenCalledWith("s2", expect.anything());
   });

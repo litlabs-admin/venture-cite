@@ -42,8 +42,12 @@ describe("acceptFactSheetFact", () => {
     const result = await acceptFactSheetFact(
       { id: "fact-1", brandId: "brand-1", domain: "positioning" } as any,
       true,
+      "user-7",
     );
-    expect(storageMock.acceptFact).toHaveBeenCalledWith("fact-1", { dismissOtherSide: true });
+    expect(storageMock.acceptFact).toHaveBeenCalledWith("fact-1", {
+      dismissOtherSide: true,
+      acceptedBy: "user-7",
+    });
     expect(result).toEqual({ id: "fact-1", acceptedAt: "now" });
   });
 });
@@ -76,10 +80,20 @@ describe("bulkAcceptFactSheetConflicts", () => {
   });
 
   it("resolves every conflict keeping the user side when no filters given", async () => {
-    const affected = await bulkAcceptFactSheetConflicts({ brandId: "brand-1", side: "user" });
+    const affected = await bulkAcceptFactSheetConflicts({
+      brandId: "brand-1",
+      side: "user",
+      acceptedBy: "user-7",
+    });
     expect(affected).toBe(2);
-    expect(storageMock.acceptFact).toHaveBeenCalledWith("u1", { dismissOtherSide: false });
-    expect(storageMock.acceptFact).toHaveBeenCalledWith("u2", { dismissOtherSide: false });
+    expect(storageMock.acceptFact).toHaveBeenCalledWith("u1", {
+      dismissOtherSide: false,
+      acceptedBy: "user-7",
+    });
+    expect(storageMock.acceptFact).toHaveBeenCalledWith("u2", {
+      dismissOtherSide: false,
+      acceptedBy: "user-7",
+    });
     expect(storageMock.dismissFact).toHaveBeenCalledWith("s1");
     expect(storageMock.dismissFact).toHaveBeenCalledWith("s2");
   });
@@ -89,9 +103,13 @@ describe("bulkAcceptFactSheetConflicts", () => {
       brandId: "brand-1",
       side: "scraped",
       domain: "positioning",
+      acceptedBy: "user-7",
     });
     expect(affected).toBe(1);
-    expect(storageMock.acceptFact).toHaveBeenCalledWith("s1", { dismissOtherSide: false });
+    expect(storageMock.acceptFact).toHaveBeenCalledWith("s1", {
+      dismissOtherSide: false,
+      acceptedBy: "user-7",
+    });
     expect(storageMock.dismissFact).toHaveBeenCalledWith("u1");
     expect(storageMock.acceptFact).not.toHaveBeenCalledWith("s2", expect.anything());
   });
@@ -101,9 +119,13 @@ describe("bulkAcceptFactSheetConflicts", () => {
       brandId: "brand-1",
       side: "user",
       runId: "run-2",
+      acceptedBy: "user-7",
     });
     expect(affected).toBe(1);
-    expect(storageMock.acceptFact).toHaveBeenCalledWith("u2", { dismissOtherSide: false });
+    expect(storageMock.acceptFact).toHaveBeenCalledWith("u2", {
+      dismissOtherSide: false,
+      acceptedBy: "user-7",
+    });
     expect(storageMock.acceptFact).not.toHaveBeenCalledWith("u1", expect.anything());
   });
 });
