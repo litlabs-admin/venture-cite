@@ -9,6 +9,8 @@ import { createFactOpportunitySource } from "./sources/factOpportunities";
 import { createQuestionOpportunitySource } from "./sources/questionOpportunities";
 import { createPageImprovementOpportunitySource } from "./sources/pageImprovementOpportunities";
 import { createEarnedMediaOpportunitySource } from "./sources/earnedMediaOpportunities";
+import { createExperimentOpportunitySource } from "./sources/experimentOpportunities";
+import { createOutcomeReviewOpportunitySource } from "./sources/outcomeReviewOpportunities";
 import { registerProductionBaselineOpportunitySource } from "./sources/productionBaselineOpportunities";
 import {
   readFactOpportunityRecords,
@@ -16,6 +18,8 @@ import {
   readCommunityPostOpportunityRecords,
   readListicleOpportunityRecords,
   readQuestionOpportunityRecords,
+  readExperimentOpportunityRecords,
+  readOutcomeReviewOpportunityRecords,
 } from "../../storage/workOpportunityStorage";
 import type { WorkTaskView } from "../../storage/workStorage";
 
@@ -70,6 +74,12 @@ export async function reconcileBrandWorkOpportunities(
           readPageImprovementOpportunityRecords(transaction, sourceActor, sourceBrandId),
         ),
     }),
+    createExperimentOpportunitySource({
+      readContent: ({ actor: sourceActor, brandId: sourceBrandId }) =>
+        readInRequestTransaction(database, sourceActor, (transaction) =>
+          readExperimentOpportunityRecords(transaction, sourceActor, sourceBrandId),
+        ),
+    }),
     createEarnedMediaOpportunitySource({
       readCommunityPosts: ({ actor: sourceActor, brandId: sourceBrandId }) =>
         readInRequestTransaction(database, sourceActor, (transaction) =>
@@ -78,6 +88,12 @@ export async function reconcileBrandWorkOpportunities(
       readListicles: ({ actor: sourceActor, brandId: sourceBrandId }) =>
         readInRequestTransaction(database, sourceActor, (transaction) =>
           readListicleOpportunityRecords(transaction, sourceActor, sourceBrandId),
+        ),
+    }),
+    createOutcomeReviewOpportunitySource({
+      readTasks: ({ actor: sourceActor, brandId: sourceBrandId }) =>
+        readInRequestTransaction(database, sourceActor, (transaction) =>
+          readOutcomeReviewOpportunityRecords(transaction, sourceActor, sourceBrandId),
         ),
     }),
     baselineRegistration.source,

@@ -9,6 +9,8 @@ import type {
   CommunityPostOpportunityRecord,
   ListicleOpportunityRecord,
 } from "../services/work/sources/earnedMediaOpportunities";
+import type { ExperimentOpportunityRecord } from "../services/work/sources/experimentOpportunities";
+import type { OutcomeReviewOpportunityRecord } from "../services/work/sources/outcomeReviewOpportunities";
 import type {
   BaselineBrand,
   BaselineGeneration,
@@ -80,6 +82,25 @@ type ListicleOpportunityRow = {
   sourcePublication: string | null;
   isIncluded: number;
   outreachStatus: string;
+};
+
+type ExperimentOpportunityRow = {
+  id: string;
+  brandId: string;
+  publishedAt: Date | string;
+  baselineRunId: string;
+  baselineRunAt: Date | string;
+  laterRunId: string;
+  laterRunAt: Date | string;
+};
+
+type OutcomeReviewOpportunityRow = {
+  id: string;
+  brandId: string;
+  taskVersion: number;
+  taskType: string;
+  title: string;
+  completedAt: Date | string;
 };
 
 type BaselineBrandRow = {
@@ -379,6 +400,104 @@ export async function readListicleOpportunityRecords(
     sourcePublication: row.sourcePublication,
     isIncluded: row.isIncluded,
     outreachStatus: row.outreachStatus,
+  }));
+}
+
+/** Read published BOFU pages that sit between completed citation runs. */
+export async function readExperimentOpportunityRecords(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  brandId: BrandId,
+): Promise<readonly ExperimentOpportunityRecord[]> {
+  const result = await transaction.execute<ExperimentOpportunityRow>(sql`
+    select
+      content.id as "id",
+      content.brand_id as "brandId",
+      content.published_at as "publishedAt",
+      baseline.id as "baselineRunId",
+      baseline.completed_at as "baselineRunAt",
+      later.id as "laterRunId",
+      later.completed_at as "laterRunAt"
+    from public.brands brand
+    inner join public.bofu_content content
+      on content.brand_id = brand.id
+    inner join lateral (
+      select run.id, run.completed_at
+      from public.citation_runs run
+      where run.brand_id = brand.id
+        and run.status = 'succeeded'
+        and run.completed_at is not null
+        and run.completed_at < content.published_at
+      order by run.completed_at desc, run.id desc
+      limit 1
+    ) baseline on true
+    inner join lateral (
+      select run.id, run.completed_at
+      from public.citation_runs run
+      where run.brand_id = brand.id
+        and run.status = 'succeeded'
+        and run.completed_at is not null
+        and run.completed_at > content.published_at
+      order by run.completed_at, run.id
+      limit 1
+    ) later on true
+    where brand.id = ${brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and content.status = 'published'
+      and content.published_at is not null
+    order by content.published_at, content.id
+  `);
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    brandId,
+    publishedAt: asDate(row.publishedAt).toISOString(),
+    baselineRunId: row.baselineRunId,
+    baselineRunAt: asDate(row.baselineRunAt).toISOString(),
+    laterRunId: row.laterRunId,
+    laterRunAt: asDate(row.laterRunAt).toISOString(),
+  }));
+}
+
+/** Read verified tasks that do not yet have an outcome review. */
+export async function readOutcomeReviewOpportunityRecords(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  brandId: BrandId,
+): Promise<readonly OutcomeReviewOpportunityRecord[]> {
+  const result = await transaction.execute<OutcomeReviewOpportunityRow>(sql`
+    select
+      task.id as "id",
+      task.brand_id as "brandId",
+      task.task_version as "taskVersion",
+      task.task_type as "taskType",
+      task.title as "title",
+      task.updated_at as "completedAt"
+    from public.brands brand
+    inner join public.work_tasks task
+      on task.brand_id = brand.id
+    where brand.id = ${brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and task.state = 'verified'
+      and not exists (
+        select 1
+        from public.work_outcome_reviews review
+        where review.task_id = task.id
+          and review.brand_id = task.brand_id
+          and review.task_version = task.task_version
+      )
+    order by task.updated_at, task.id
+  `);
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    brandId,
+    taskVersion: row.taskVersion,
+    taskType: row.taskType,
+    title: row.title,
+    completedAt: asDate(row.completedAt).toISOString(),
   }));
 }
 
