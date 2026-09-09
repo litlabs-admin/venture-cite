@@ -8,6 +8,11 @@ import type {
   WorkEvidenceReaders,
 } from "./repository";
 
+const FACT_RECORD_ARTIFACT_PREFIX = "fact-record:";
+
+type ArtifactTarget =
+  { kind: "fact-record"; factId: string } | { kind: "prompt-generation"; generationId: string };
+
 /**
  * Creates readers for evidence that already exists in an authoritative domain table.
  * Submitted work evidence is deliberately excluded from every query in this module.
@@ -20,13 +25,103 @@ export function createWorkEvidenceReaders(
     source: (input) => readSource(transaction, actor, input),
     measurement: (input) => readMeasurement(transaction, actor, input),
     content_change: (input) => readContentChange(transaction, actor, input),
-    artifact: async () => "owned_unusable",
+    artifact: (input) => readArtifact(transaction, actor, input),
     fault_repair: async () => "owned_unusable",
     authored_work: async () => "owned_unusable",
     confirmation: async () => "owned_unusable",
     decision: async () => "owned_unusable",
     experiment: async () => "owned_unusable",
   };
+}
+
+async function readArtifact(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["artifact"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const target = artifactTarget(input.reference.artifactId);
+  switch (target.kind) {
+    case "fact-record":
+      return readFactRecordArtifact(transaction, actor, input.brandId, target.factId);
+    case "prompt-generation":
+      return readPromptGenerationArtifact(transaction, actor, input, target.generationId);
+  }
+}
+
+async function readFactRecordArtifact(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  brandId: string,
+  factId: string,
+): Promise<WorkEvidenceReaderResult> {
+  const fact = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.brand_fact_sheet fact
+      on fact.brand_id = brand.id
+    where brand.id = ${brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and fact.id = ${factId}
+  `);
+  return fact.rows.length > 0 ? "owned_usable" : "not_found";
+}
+
+async function readPromptGenerationArtifact(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["artifact"]>[0],
+  generationId: string,
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const identity = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.prompt_generations generation
+      on generation.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and generation.id = ${generationId}
+  `);
+  if (identity.rows.length === 0) return "not_found";
+
+  const version = await transaction.execute(sql`
+    select 1
+    from public.prompt_generations generation
+    where generation.id = ${generationId}
+      and generation.brand_id = ${input.brandId}
+      and generation.generation_number = ${reference.version}
+  `);
+  if (version.rows.length === 0) return "not_found";
+
+  if (reference.duplicateCheck !== reference.artifactId) return "owned_unusable";
+
+  const coverage = reference.coverage.split(",");
+  const coveredPrompts = await transaction.execute<{ id: string }>(sql`
+    select prompt.id
+    from public.brand_prompts prompt
+    where prompt.id in (${sql.join(
+      coverage.map((promptId) => sql`${promptId}`),
+      sql`, `,
+    )})
+      and prompt.generation_id = ${generationId}
+      and prompt.brand_id = ${input.brandId}
+      and prompt.status = 'tracked'
+      and prompt.paused = false
+      and nullif(btrim(prompt.prompt), '') is not null
+  `);
+  const coveredPromptIds = new Set(coveredPrompts.rows.map((prompt) => prompt.id));
+  return coverage.every((promptId) => coveredPromptIds.has(promptId))
+    ? "owned_usable"
+    : "owned_unusable";
+}
+
+function artifactTarget(artifactId: string): ArtifactTarget {
+  if (artifactId.startsWith(FACT_RECORD_ARTIFACT_PREFIX)) {
+    return { kind: "fact-record", factId: artifactId.slice(FACT_RECORD_ARTIFACT_PREFIX.length) };
+  }
+  return { kind: "prompt-generation", generationId: artifactId };
 }
 
 /**

@@ -25,6 +25,19 @@ const sourceReference = (
   ...overrides,
 });
 
+const artifactReference = (
+  overrides: Partial<Extract<EvidenceReference, { kind: "artifact" }>> = {},
+) => ({
+  kind: "artifact" as const,
+  label: "Tracked buyer-question generation",
+  artifactId: "generation-a",
+  version: 3,
+  reviewedByUserId: USER_ID,
+  coverage: "prompt-a,prompt-b",
+  duplicateCheck: "generation-a",
+  ...overrides,
+});
+
 function transactionFor(...rows: Array<unknown[]>) {
   const execute = vi.fn();
   for (const result of rows) execute.mockResolvedValueOnce({ rows: result });
@@ -88,21 +101,83 @@ describe("database work evidence readers", () => {
     ).resolves.toBe("owned_unusable");
   });
 
-  it("rejects mismatched identifiers without using submitted evidence as proof", async () => {
-    const transaction = transactionFor([]);
-    const authorizer = createDatabaseWorkEvidenceAuthorizer(transaction, ACTOR);
-    const submittedArtifact: EvidenceReference = {
-      kind: "artifact",
-      label: "User submitted artifact",
-      artifactId: "arbitrary",
-      version: 1,
-      reviewedByUserId: USER_ID,
-      coverage: "facts",
-      duplicateCheck: "passed",
-    };
+  it("returns owned_usable for a generation with tracked unpaused covered questions", async () => {
+    const transaction = transactionFor([{}], [{}], [{ id: "prompt-a" }, { id: "prompt-b" }]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
 
-    await expect(authorizer(input(submittedArtifact))).resolves.toBe("invalid_evidence");
-    expect(transaction.execute).not.toHaveBeenCalled();
+    await expect(
+      readers.artifact({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: artifactReference(),
+      }),
+    ).resolves.toBe("owned_usable");
+  });
+
+  it("returns owned_unusable when a covered question is paused", async () => {
+    const transaction = transactionFor([{}], [{}], [{ id: "prompt-a" }]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.artifact({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: artifactReference(),
+      }),
+    ).resolves.toBe("owned_unusable");
+  });
+
+  it("returns not_found for a generation from another brand", async () => {
+    const transaction = transactionFor([]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.artifact({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: artifactReference(),
+      }),
+    ).resolves.toBe("not_found");
+  });
+
+  it("returns not_found for a generation version mismatch", async () => {
+    const transaction = transactionFor([{}], []);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.artifact({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: artifactReference(),
+      }),
+    ).resolves.toBe("not_found");
+  });
+
+  it("returns owned_usable for a fact-record artifact", async () => {
+    const transaction = transactionFor([{}]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.artifact({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: artifactReference({
+          artifactId: "fact-record:fact-a",
+          coverage: "fact-a",
+          duplicateCheck: "fact-a",
+        }),
+      }),
+    ).resolves.toBe("owned_usable");
   });
 
   it("rejects an arbitrary system check identifier", async () => {
