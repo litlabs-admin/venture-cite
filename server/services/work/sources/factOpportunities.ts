@@ -87,7 +87,7 @@ export function createFactOpportunitySource({
         const hasScrapedFact = group.some((record) => record.source === "scraped");
         if (hasUserFact && hasScrapedFact) {
           conflictKeys.add(groupKey);
-          opportunities.push(toConflictOpportunity(group, groupKey));
+          opportunities.push(toConflictOpportunity(group));
         }
       }
 
@@ -150,7 +150,7 @@ function toFactOpportunity(record: FactOpportunityRecord): WorkOpportunity {
   };
 }
 
-function toConflictOpportunity(records: FactOpportunityRecord[], tuple: string): WorkOpportunity {
+function toConflictOpportunity(records: FactOpportunityRecord[]): WorkOpportunity {
   const sorted = [...records].sort((left, right) => left.id.localeCompare(right.id));
   const first = sorted[0];
   if (!first) throw new Error("A fact conflict group must contain a record");
@@ -166,7 +166,13 @@ function toConflictOpportunity(records: FactOpportunityRecord[], tuple: string):
     ruleVersion: 1,
     title: "Review conflicting essential fact sources",
     reason: "Conflicting sources require human review before a definitive claim is recorded.",
-    completionRule: { ...FACT_COMPLETION_RULE, conflictKey: tuple },
+    // `tuple` is the in-memory grouping key and joins its parts with U+0000,
+    // which is a good separator precisely because it cannot occur in a fact
+    // value - but Postgres rejects a NUL byte in text and jsonb, so writing it
+    // into the persisted completion rule failed the whole reconcile for any
+    // brand that had a fact conflict. The persisted key uses the same encoding
+    // as the task key instead, which is NUL-free and equally unambiguous.
+    completionRule: { ...FACT_COMPLETION_RULE, conflictKey: encodedFactTuple(first) },
     evidence,
   };
 }
