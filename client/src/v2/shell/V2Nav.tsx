@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  Activity,
   BookOpen,
   GraduationCap,
   ListChecks,
@@ -8,26 +9,37 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-// The five Guided areas, in the order a user moves through them. Item
+// The six Guided areas, in the order a user moves through them. Item
 // grammar (12px text, px-2 py-2, rounded-sm, 150ms colour transition, 16px
 // icon, accent-subtle tint when active) is reproduced from the shipped nav
 // item, not imported from it - Sidebar.tsx is out of scope for this tree and
 // stays untouched.
 //
-// `href` is present only for an area whose route exists. The other four are
-// rendered as non-interactive rows rather than as links to nowhere: a typed
-// `Link` cannot address a route that is not in the tree, and a row that
-// silently does nothing when clicked is worse than a row that says it is not
-// ready. They gain an `href` as each screen lands.
+// `href` is present only for an area whose route exists. The one that does
+// not - Visibility - is rendered as a non-interactive row rather than as a
+// link to nowhere: a typed `Link` cannot address a route that is not in the
+// tree, and a row that silently does nothing when clicked is worse than a row
+// that says it is not ready. It gains an `href` when its screen lands.
 type V2NavEntry = {
   label: string;
   icon: LucideIcon;
-  href?: "/v2/today" | "/v2/visibility" | "/v2/my-work" | "/v2/brand-facts" | "/v2/learn";
+  href?:
+    | "/v2/today"
+    | "/v2/visibility"
+    | "/v2/diagnostics"
+    | "/v2/my-work"
+    | "/v2/brand-facts"
+    | "/v2/learn";
 };
 
 const ITEMS: V2NavEntry[] = [
   { label: "Today", icon: Sun, href: "/v2/today" },
   { label: "Visibility", icon: TrendingUp, href: "/v2/visibility" },
+  // Diagnostics sits where the board puts it, between Visibility and My work.
+  // It is a link because the route exists; the honesty about three of its four
+  // tabs being unbuilt is carried on the screen itself, in words, not by
+  // making the nav row unclickable.
+  { label: "Diagnostics", icon: Activity, href: "/v2/diagnostics" },
   { label: "My work", icon: ListChecks, href: "/v2/my-work" },
   { label: "Brand facts", icon: BookOpen, href: "/v2/brand-facts" },
   // Learn is reachable, and what it reaches is an empty frame that says so.
