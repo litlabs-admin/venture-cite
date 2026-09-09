@@ -4,6 +4,11 @@ import type { RequestRepositoryTransaction } from "../data/requestRepositoryTran
 import type { BrandId } from "../domains/work/types";
 import type { FactOpportunityRecord } from "../services/work/sources/factOpportunities";
 import type { QuestionOpportunityRecord } from "../services/work/sources/questionOpportunities";
+import type { PageImprovementOpportunityRecord } from "../services/work/sources/pageImprovementOpportunities";
+import type {
+  CommunityPostOpportunityRecord,
+  ListicleOpportunityRecord,
+} from "../services/work/sources/earnedMediaOpportunities";
 import type {
   BaselineBrand,
   BaselineGeneration,
@@ -39,6 +44,42 @@ type QuestionOpportunityRow = {
   prompt: string;
   status: string;
   paused: boolean;
+};
+
+type PageImprovementOpportunityRow = {
+  id: string;
+  brandId: string;
+  contentType: string;
+  title: string;
+  primaryKeyword: string | null;
+  targetIntent: string | null;
+  status: string | null;
+  publishedUrl: string | null;
+  publishedAt: Date | string | null;
+  updatedAt: Date | string | null;
+};
+
+type CommunityPostOpportunityRow = {
+  id: string;
+  brandId: string;
+  platform: string;
+  groupName: string;
+  groupUrl: string | null;
+  title: string | null;
+  content: string;
+  status: string;
+  postUrl: string | null;
+  postedAt: Date | string | null;
+};
+
+type ListicleOpportunityRow = {
+  id: string;
+  brandId: string;
+  title: string;
+  url: string;
+  sourcePublication: string | null;
+  isIncluded: number;
+  outreachStatus: string;
 };
 
 type BaselineBrandRow = {
@@ -124,14 +165,14 @@ export async function readFactOpportunityRecords(
         on run.id = candidate.run_id
        and run.brand_id = brand.id
       where candidate.run_id = fact.run_id
-        and candidate.status in ('done', 'completed', 'succeeded', 'success')
+        and candidate.status = 'done'
         and candidate.fetched_at is not null
         and candidate.status_code between 200 and 299
         and (
           candidate.url = fact.source_url
           or candidate.canonical_url = fact.source_url
         )
-        and run.status in ('completed', 'succeeded', 'done')
+        and run.status = 'completed'
         and run.completed_at is not null
       order by candidate.fetched_at desc, candidate.id
       limit 1
@@ -204,6 +245,140 @@ export async function readQuestionOpportunityRecords(
     prompt: row.prompt,
     status: normalizePromptStatus(row.status),
     paused: row.paused,
+  }));
+}
+
+/**
+ * Read unpublished BOFU pages with a buyer need that are not tracked yet.
+ * The query excludes FAQ rows because content-change evidence reads BOFU rows.
+ */
+export async function readPageImprovementOpportunityRecords(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  brandId: BrandId,
+): Promise<readonly PageImprovementOpportunityRecord[]> {
+  const result = await transaction.execute<PageImprovementOpportunityRow>(sql`
+    select
+      content.id as "id",
+      content.brand_id as "brandId",
+      content.content_type as "contentType",
+      content.title as "title",
+      content.primary_keyword as "primaryKeyword",
+      content.target_intent as "targetIntent",
+      content.status as "status",
+      content.published_url as "publishedUrl",
+      content.published_at as "publishedAt",
+      content.updated_at as "updatedAt"
+    from public.brands brand
+    inner join public.bofu_content content
+      on content.brand_id = brand.id
+    where brand.id = ${brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and content.status <> 'published'
+      and coalesce(content.target_intent, content.primary_keyword) is not null
+      and not exists (
+        select 1
+        from public.tracked_content_urls tracked
+        where tracked.brand_id = content.brand_id
+          and tracked.source_type = 'bofu'
+          and tracked.source_id = content.id
+      )
+    order by content.id
+  `);
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    brandId,
+    contentType: row.contentType,
+    title: row.title,
+    primaryKeyword: row.primaryKeyword,
+    targetIntent: row.targetIntent,
+    status: row.status,
+    publishedUrl: row.publishedUrl,
+    publishedAt: isoOrNull(row.publishedAt),
+    updatedAt: isoOrNull(row.updatedAt),
+  }));
+}
+
+/** Read draft community posts that have content and a target group. */
+export async function readCommunityPostOpportunityRecords(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  brandId: BrandId,
+): Promise<readonly CommunityPostOpportunityRecord[]> {
+  const result = await transaction.execute<CommunityPostOpportunityRow>(sql`
+    select
+      post.id as "id",
+      post.brand_id as "brandId",
+      post.platform as "platform",
+      post.group_name as "groupName",
+      post.group_url as "groupUrl",
+      post.title as "title",
+      post.content as "content",
+      post.status as "status",
+      post.post_url as "postUrl",
+      post.posted_at as "postedAt"
+    from public.brands brand
+    inner join public.community_posts post
+      on post.brand_id = brand.id
+    where brand.id = ${brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and post.status = 'draft'
+      and post.content <> ''
+      and post.group_url is not null
+    order by post.id
+  `);
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    brandId,
+    platform: row.platform,
+    groupName: row.groupName,
+    groupUrl: row.groupUrl,
+    title: row.title,
+    content: row.content,
+    status: row.status,
+    postUrl: row.postUrl,
+    postedAt: isoOrNull(row.postedAt),
+  }));
+}
+
+/** Read listicles that need new outreach and do not include the brand. */
+export async function readListicleOpportunityRecords(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  brandId: BrandId,
+): Promise<readonly ListicleOpportunityRecord[]> {
+  const result = await transaction.execute<ListicleOpportunityRow>(sql`
+    select
+      listicle.id as "id",
+      listicle.brand_id as "brandId",
+      listicle.title as "title",
+      listicle.url as "url",
+      listicle.source_publication as "sourcePublication",
+      listicle.is_included as "isIncluded",
+      listicle.outreach_status as "outreachStatus"
+    from public.brands brand
+    inner join public.listicles listicle
+      on listicle.brand_id = brand.id
+    where brand.id = ${brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and listicle.is_included = 0
+      and listicle.outreach_status = 'new'
+    order by listicle.id
+  `);
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    brandId,
+    title: row.title,
+    url: row.url,
+    sourcePublication: row.sourcePublication,
+    isIncluded: row.isIncluded,
+    outreachStatus: row.outreachStatus,
   }));
 }
 

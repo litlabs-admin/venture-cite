@@ -7,9 +7,14 @@ import { createWorkRepository } from "../../domains/work/repository";
 import { createOpportunityReconciler } from "./OpportunityReconciler";
 import { createFactOpportunitySource } from "./sources/factOpportunities";
 import { createQuestionOpportunitySource } from "./sources/questionOpportunities";
+import { createPageImprovementOpportunitySource } from "./sources/pageImprovementOpportunities";
+import { createEarnedMediaOpportunitySource } from "./sources/earnedMediaOpportunities";
 import { registerProductionBaselineOpportunitySource } from "./sources/productionBaselineOpportunities";
 import {
   readFactOpportunityRecords,
+  readPageImprovementOpportunityRecords,
+  readCommunityPostOpportunityRecords,
+  readListicleOpportunityRecords,
   readQuestionOpportunityRecords,
 } from "../../storage/workOpportunityStorage";
 import type { WorkTaskView } from "../../storage/workStorage";
@@ -57,6 +62,22 @@ export async function reconcileBrandWorkOpportunities(
       readQuestions: ({ actor: sourceActor, brandId: sourceBrandId }) =>
         readInRequestTransaction(database, sourceActor, (transaction) =>
           readQuestionOpportunityRecords(transaction, sourceActor, sourceBrandId),
+        ),
+    }),
+    createPageImprovementOpportunitySource({
+      readPages: ({ actor: sourceActor, brandId: sourceBrandId }) =>
+        readInRequestTransaction(database, sourceActor, (transaction) =>
+          readPageImprovementOpportunityRecords(transaction, sourceActor, sourceBrandId),
+        ),
+    }),
+    createEarnedMediaOpportunitySource({
+      readCommunityPosts: ({ actor: sourceActor, brandId: sourceBrandId }) =>
+        readInRequestTransaction(database, sourceActor, (transaction) =>
+          readCommunityPostOpportunityRecords(transaction, sourceActor, sourceBrandId),
+        ),
+      readListicles: ({ actor: sourceActor, brandId: sourceBrandId }) =>
+        readInRequestTransaction(database, sourceActor, (transaction) =>
+          readListicleOpportunityRecords(transaction, sourceActor, sourceBrandId),
         ),
     }),
     baselineRegistration.source,
