@@ -211,6 +211,7 @@ export const geoRankings = pgTable(
     authorityScore: integer("authority_score"),
     relevanceScore: integer("relevance_score"),
     checkedAt: timestamp("checked_at").defaultNow().notNull(),
+    outcome: text("outcome"),
     // Set by the "Re-check stored" flow when updated name variations
     // newly reveal a citation that the original run missed. Rank stays
     // null on these rows since the LLM rank pass didn't see them as cited.

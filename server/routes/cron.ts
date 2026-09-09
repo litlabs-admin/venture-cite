@@ -70,6 +70,7 @@ import {
 } from "../services/cronRetention";
 import { runFactReverificationBatchStep } from "../services/cronFactVerification";
 import { Orchestrator, ORCHESTRATOR_BUDGET_MS } from "../services/cronOrchestrator";
+import { runWorkOpportunityReconciliationJob } from "../services/work/workOpportunityReconciliationJob";
 
 export function setupCronRoutes(app: Express): void {
   app.all(
@@ -119,6 +120,9 @@ export function setupCronRoutes(app: Express): void {
       await orch.run("tour-events-cleanup", () => runTourEventsCleanupJob());
       await orch.run("detect-fact-scrape-failure", () => detectFactScrapeFailureRate());
       await orch.run("ops-health-check", () => runOpsHealthCheck());
+      await orch.run("work-opportunity-reconciliation", () =>
+        runWorkOpportunityReconciliationJob(),
+      );
 
       // v2 backstop: completes any run abandoned by the client. Runs once a day
       // here (Hobby cron limit); when on Pro we'll also have a dedicated

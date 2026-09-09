@@ -277,6 +277,10 @@ export const brandHallucinations = pgTable(
     verifiedBy: text("verified_by"),
     // Source traceback: copied from the originating geo_ranking at detect time.
     rankingId: varchar("ranking_id"),
+    // The observation that demonstrated the repair, paired with rankingId which
+    // recorded the one that found the fault. Without it a fault_repair evidence
+    // reference has a before and no after, and can never be authorised.
+    resolvedRankingId: varchar("resolved_ranking_id"),
     citingOutletUrl: text("citing_outlet_url"),
     citationContext: text("citation_context"),
     articleTitle: text("article_title"),

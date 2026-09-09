@@ -101,6 +101,7 @@ export const STEP_CAPS_MS = {
   // outbox_commands, system_state, citation_runs). Same order of magnitude
   // as the other cheap housekeeping steps above.
   "ops-health-check": 5_000,
+  "work-opportunity-reconciliation": 30_000,
 } as const;
 
 export type StepName = keyof typeof STEP_CAPS_MS;

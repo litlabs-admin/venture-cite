@@ -8,6 +8,11 @@ import type {
   WorkEvidenceReaders,
 } from "./repository";
 
+const FACT_RECORD_ARTIFACT_PREFIX = "fact-record:";
+
+type ArtifactTarget =
+  { kind: "fact-record"; factId: string } | { kind: "prompt-generation"; generationId: string };
+
 /**
  * Creates readers for evidence that already exists in an authoritative domain table.
  * Submitted work evidence is deliberately excluded from every query in this module.
@@ -20,13 +25,124 @@ export function createWorkEvidenceReaders(
     source: (input) => readSource(transaction, actor, input),
     measurement: (input) => readMeasurement(transaction, actor, input),
     content_change: (input) => readContentChange(transaction, actor, input),
-    artifact: async () => "owned_unusable",
-    fault_repair: async () => "owned_unusable",
-    authored_work: async () => "owned_unusable",
-    confirmation: async () => "owned_unusable",
-    decision: async () => "owned_unusable",
-    experiment: async () => "owned_unusable",
+    artifact: (input) => readArtifact(transaction, actor, input),
+    fault_repair: (input) => readFaultRepair(transaction, actor, input),
+    authored_work: (input) => readAuthoredWork(transaction, actor, input),
+    confirmation: (input) => readConfirmation(actor, input),
+    decision: (input) => readDecision(transaction, actor, input),
+    experiment: (input) => readExperiment(transaction, actor, input),
   };
+}
+
+/**
+ * This deliberately does not read a database table.
+ * Confirmation evidence is a self-attested claim that policy binds to the acting user.
+ */
+async function readConfirmation(
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["confirmation"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const confirmedAt = Date.parse(reference.confirmedAt);
+  if (
+    reference.confirmedByUserId !== actor.userId ||
+    !reference.note.trim() ||
+    Number.isNaN(confirmedAt) ||
+    confirmedAt > Date.now()
+  ) {
+    return "owned_unusable";
+  }
+  return "owned_usable";
+}
+
+async function readArtifact(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["artifact"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const target = artifactTarget(input.reference.artifactId);
+  switch (target.kind) {
+    case "fact-record":
+      return readFactRecordArtifact(transaction, actor, input.brandId, target.factId);
+    case "prompt-generation":
+      return readPromptGenerationArtifact(transaction, actor, input, target.generationId);
+  }
+}
+
+async function readFactRecordArtifact(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  brandId: string,
+  factId: string,
+): Promise<WorkEvidenceReaderResult> {
+  const fact = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.brand_fact_sheet fact
+      on fact.brand_id = brand.id
+    where brand.id = ${brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and fact.id = ${factId}
+  `);
+  return fact.rows.length > 0 ? "owned_usable" : "not_found";
+}
+
+async function readPromptGenerationArtifact(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["artifact"]>[0],
+  generationId: string,
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const identity = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.prompt_generations generation
+      on generation.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and generation.id = ${generationId}
+  `);
+  if (identity.rows.length === 0) return "not_found";
+
+  const version = await transaction.execute(sql`
+    select 1
+    from public.prompt_generations generation
+    where generation.id = ${generationId}
+      and generation.brand_id = ${input.brandId}
+      and generation.generation_number = ${reference.version}
+  `);
+  if (version.rows.length === 0) return "not_found";
+
+  if (reference.duplicateCheck !== reference.artifactId) return "owned_unusable";
+
+  const coverage = reference.coverage.split(",");
+  const coveredPrompts = await transaction.execute<{ id: string }>(sql`
+    select prompt.id
+    from public.brand_prompts prompt
+    where prompt.id in (${sql.join(
+      coverage.map((promptId) => sql`${promptId}`),
+      sql`, `,
+    )})
+      and prompt.generation_id = ${generationId}
+      and prompt.brand_id = ${input.brandId}
+      and prompt.status = 'tracked'
+      and prompt.paused = false
+      and nullif(btrim(prompt.prompt), '') is not null
+  `);
+  const coveredPromptIds = new Set(coveredPrompts.rows.map((prompt) => prompt.id));
+  return coverage.every((promptId) => coveredPromptIds.has(promptId))
+    ? "owned_usable"
+    : "owned_unusable";
+}
+
+function artifactTarget(artifactId: string): ArtifactTarget {
+  if (artifactId.startsWith(FACT_RECORD_ARTIFACT_PREFIX)) {
+    return { kind: "fact-record", factId: artifactId.slice(FACT_RECORD_ARTIFACT_PREFIX.length) };
+  }
+  return { kind: "prompt-generation", generationId: artifactId };
 }
 
 /**
@@ -111,9 +227,9 @@ async function readSource(
       and fact.accepted_at is not null
       and fact.dismissed_at is null
       and fact.is_active = 1
-      and run.status in ('completed', 'succeeded')
+      and run.status = 'completed'
       and run.completed_at is not null
-      and page.status in ('completed', 'succeeded', 'success', 'done')
+      and page.status = 'done'
       and page.fetched_at is not null
       and page.status_code between 200 and 299
       and page.canonical_url = ${reference.canonicalUrl}
@@ -243,6 +359,219 @@ async function readContentChange(
   return usable.rows.length > 0 ? "owned_usable" : "owned_unusable";
 }
 
+async function readAuthoredWork(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["authored_work"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const destinationUrl = normalizeUrl(reference.destinationUrl);
+  if (!destinationUrl || reference.authoredByUserId !== actor.userId) {
+    return "owned_unusable";
+  }
+
+  const identity = await transaction.execute<{ kind: "community_post" | "listicle" }>(sql`
+    select 'community_post' as kind
+    from public.brands brand
+    inner join public.community_posts post
+      on post.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and post.id = ${reference.submissionId}
+    union all
+    select 'listicle' as kind
+    from public.brands brand
+    inner join public.listicles listicle
+      on listicle.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and listicle.id = ${reference.submissionId}
+    limit 1
+  `);
+  const target = identity.rows[0];
+  if (!target) return "not_found";
+
+  switch (target.kind) {
+    case "community_post": {
+      // community_posts has no author column. This proves that the brand owner submitted the post.
+      const usable = await transaction.execute<{ destination_url: string | null }>(sql`
+        select post.post_url as destination_url
+        from public.brands brand
+        inner join public.community_posts post
+          on post.brand_id = brand.id
+        where brand.id = ${input.brandId}
+          and brand.user_id = ${actor.userId}
+          and brand.deleted_at is null
+          and post.id = ${reference.submissionId}
+          and post.posted_at = ${reference.submittedAt}
+          and post.status = 'posted'
+      `);
+      return normalizeUrl(usable.rows[0]?.destination_url ?? "") === destinationUrl
+        ? "owned_usable"
+        : "owned_unusable";
+    }
+    case "listicle": {
+      const usable = await transaction.execute<{ destination_url: string | null }>(sql`
+        select listicle.url as destination_url
+        from public.brands brand
+        inner join public.listicles listicle
+          on listicle.brand_id = brand.id
+        where brand.id = ${input.brandId}
+          and brand.user_id = ${actor.userId}
+          and brand.deleted_at is null
+          and listicle.id = ${reference.submissionId}
+          and listicle.outreach_status in ('contacted', 'won')
+      `);
+      return normalizeUrl(usable.rows[0]?.destination_url ?? "") === destinationUrl
+        ? "owned_usable"
+        : "owned_unusable";
+    }
+  }
+}
+
+async function readExperiment(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["experiment"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const changedAt = Date.parse(reference.changedAt);
+  // Hypothesis is free text. A non-empty value is the deliberate verification limit.
+  if (!reference.hypothesis.trim() || !reference.conclusion.trim() || Number.isNaN(changedAt)) {
+    return "owned_unusable";
+  }
+
+  const identity = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.bofu_content content
+      on content.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and content.id = ${reference.experimentId}
+  `);
+  if (identity.rows.length === 0) return "not_found";
+
+  const usable = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.bofu_content content
+      on content.brand_id = brand.id
+    inner join public.citation_runs baseline
+      on baseline.brand_id = brand.id
+    inner join public.citation_runs later
+      on later.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and content.id = ${reference.experimentId}
+      and content.published_at = ${reference.changedAt}
+      and baseline.id = ${reference.baselineMeasurementId}
+      and baseline.status = 'succeeded'
+      and baseline.completed_at is not null
+      and baseline.completed_at < ${reference.changedAt}
+      and later.id = ${reference.laterMeasurementId}
+      and later.status = 'succeeded'
+      and later.completed_at is not null
+      and later.completed_at > ${reference.changedAt}
+  `);
+  return usable.rows.length > 0 ? "owned_usable" : "owned_unusable";
+}
+
+async function readDecision(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["decision"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const identity = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.work_outcome_reviews review
+      on review.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and review.id = ${reference.decisionId}
+      and review.user_id = ${actor.userId}
+  `);
+  if (identity.rows.length === 0) return "not_found";
+
+  const usable = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.work_outcome_reviews review
+      on review.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and review.id = ${reference.decisionId}
+      and review.user_id = ${actor.userId}
+      and review.cycle_key = ${reference.reviewPeriod}
+      and review.decision = ${reference.decision}
+  `);
+  return usable.rows.length > 0 ? "owned_usable" : "owned_unusable";
+}
+
+async function readFaultRepair(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["fault_repair"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const identity = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.brand_hallucinations hallucination
+      on hallucination.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and hallucination.id = ${reference.faultId}
+  `);
+  if (identity.rows.length === 0) return "not_found";
+
+  const usable = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.brand_hallucinations hallucination
+      on hallucination.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and hallucination.id = ${reference.faultId}
+      and hallucination.ranking_id = ${reference.beforeCheckId}
+      and hallucination.resolved_ranking_id = ${reference.afterCheckId}
+      and hallucination.resolved_at = ${reference.checkedAt}
+      and hallucination.is_resolved = 1
+      and hallucination.remediation_status = 'verified'
+  `);
+  if (usable.rows.length === 0) return "owned_unusable";
+
+  const beforeCheck = await readSystemCheck(transaction, actor, {
+    actor,
+    brandId: input.brandId,
+    taskId: input.taskId,
+    taskVersion: input.taskVersion,
+    verification: { kind: "system_check", checkId: reference.beforeCheckId },
+    evidence: [reference],
+  });
+  const afterCheck = await readSystemCheck(transaction, actor, {
+    actor,
+    brandId: input.brandId,
+    taskId: input.taskId,
+    taskVersion: input.taskVersion,
+    verification: { kind: "system_check", checkId: reference.afterCheckId },
+    evidence: [reference],
+  });
+  return beforeCheck === "owned_usable" && afterCheck === "owned_usable"
+    ? "owned_usable"
+    : "owned_unusable";
+}
+
 async function readSystemCheck(
   transaction: RequestRepositoryTransaction,
   actor: RequestActor,
@@ -264,9 +593,9 @@ async function readSystemCheck(
       and brand.deleted_at is null
       and fact.run_id = run.id
       and (fact.id = ${checkId} or run.id = ${checkId} or page.id = ${checkId})
-      and run.status in ('completed', 'succeeded')
+      and run.status = 'completed'
       and run.completed_at is not null
-      and page.status in ('completed', 'succeeded', 'success', 'done')
+      and page.status = 'done'
       and page.fetched_at is not null
       and page.status_code between 200 and 299
     union all

@@ -39,6 +39,9 @@ const schedulerLockKeys = {
   brandPurge: 910014 as LockKey,
 };
 
+const WORK_OPPORTUNITY_RECONCILIATION_CRON =
+  process.env.WORK_OPPORTUNITY_RECONCILIATION_CRON || "0 * * * *";
+
 export async function runWeeklyReportJob(): Promise<{ sent: number; skipped: number }> {
   // Debounce OUTSIDE the advisory lock. The lock stops two runners racing;
   // it does nothing about the in-process cron firing at 08:00 and an external
@@ -869,6 +872,21 @@ export function initScheduler(): void {
       cronCrashGuard(SCHEDULER_JOB_NAMES.autoCitation, runAutoCitationJob),
     );
     logger.info({ cron: AUTO_CITATION_CRON }, "auto-citation job scheduled");
+  }
+
+  if (cron.validate(WORK_OPPORTUNITY_RECONCILIATION_CRON)) {
+    cron.schedule(
+      WORK_OPPORTUNITY_RECONCILIATION_CRON,
+      cronCrashGuard(SCHEDULER_JOB_NAMES.workOpportunityReconciliation, async () => {
+        const { runWorkOpportunityReconciliationJob } =
+          await import("./services/work/workOpportunityReconciliationJob");
+        await runWorkOpportunityReconciliationJob();
+      }),
+    );
+    logger.info(
+      { cron: WORK_OPPORTUNITY_RECONCILIATION_CRON },
+      "work opportunity reconciliation job scheduled",
+    );
   }
 
   // Brand activation. Supersedes the three separate Monday crons that used to
