@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
   LogOut,
   Settings,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -46,7 +47,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 /** The fixed set of top-level spine destinations this nav renders - kept as
  *  a literal union (not `string`) so every `<Link to={href}>` below stays
  *  type-checked against the generated route tree. */
-type SpineHref = "/" | "/setup" | "/monitor" | "/diagnose" | "/act" | "/report";
+type SpineHref = "/" | "/setup" | "/monitor" | "/diagnose" | "/act" | "/report" | "/v2/today";
 
 function NavItem({
   href,
@@ -188,6 +189,16 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             onNavigate={onNavigate}
           />
         </div>
+        {/* The guided tree at /v2/. It carries no data-tour-id: the welcome
+            tour walks the five spine stages, and adding a sixth stop would
+            change a tour this change is not allowed to touch. */}
+        <NavItem
+          href="/v2/today"
+          label="Gamified"
+          icon={Sparkles}
+          active={isActive("/v2")}
+          onNavigate={onNavigate}
+        />
       </nav>
 
       {/* Bottom: user */}
