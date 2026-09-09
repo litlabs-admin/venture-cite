@@ -38,6 +38,17 @@ const artifactReference = (
   ...overrides,
 });
 
+const confirmationReference = (
+  overrides: Partial<Extract<EvidenceReference, { kind: "confirmation" }>> = {},
+) => ({
+  kind: "confirmation" as const,
+  label: "User confirmation",
+  confirmedByUserId: USER_ID,
+  note: "I confirmed the repair.",
+  confirmedAt: "2026-09-08T00:00:00.000Z",
+  ...overrides,
+});
+
 function transactionFor(...rows: Array<unknown[]>) {
   const execute = vi.fn();
   for (const result of rows) execute.mockResolvedValueOnce({ rows: result });
@@ -193,5 +204,66 @@ describe("database work evidence readers", () => {
       ),
     ).resolves.toBe("invalid_evidence");
     expect(transaction.execute).not.toHaveBeenCalled();
+  });
+
+  it("returns owned_usable for a coherent confirmation", async () => {
+    const transaction = transactionFor();
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.confirmation({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: confirmationReference(),
+      }),
+    ).resolves.toBe("owned_usable");
+    expect(transaction.execute).not.toHaveBeenCalled();
+  });
+
+  it("returns owned_unusable when a confirmation names another user", async () => {
+    const transaction = transactionFor();
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.confirmation({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: confirmationReference({ confirmedByUserId: "user-b" }),
+      }),
+    ).resolves.toBe("owned_unusable");
+  });
+
+  it("returns owned_unusable when a confirmation has a blank note", async () => {
+    const transaction = transactionFor();
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.confirmation({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: confirmationReference({ note: "  \t" }),
+      }),
+    ).resolves.toBe("owned_unusable");
+  });
+
+  it("returns owned_unusable when a confirmation is in the future", async () => {
+    const transaction = transactionFor();
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.confirmation({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: confirmationReference({ confirmedAt: "2099-01-01T00:00:00.000Z" }),
+      }),
+    ).resolves.toBe("owned_unusable");
   });
 });

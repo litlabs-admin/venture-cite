@@ -28,10 +28,31 @@ export function createWorkEvidenceReaders(
     artifact: (input) => readArtifact(transaction, actor, input),
     fault_repair: async () => "owned_unusable",
     authored_work: async () => "owned_unusable",
-    confirmation: async () => "owned_unusable",
+    confirmation: (input) => readConfirmation(actor, input),
     decision: async () => "owned_unusable",
     experiment: async () => "owned_unusable",
   };
+}
+
+/**
+ * This deliberately does not read a database table.
+ * Confirmation evidence is a self-attested claim that policy binds to the acting user.
+ */
+async function readConfirmation(
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["confirmation"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const confirmedAt = Date.parse(reference.confirmedAt);
+  if (
+    reference.confirmedByUserId !== actor.userId ||
+    !reference.note.trim() ||
+    Number.isNaN(confirmedAt) ||
+    confirmedAt > Date.now()
+  ) {
+    return "owned_unusable";
+  }
+  return "owned_usable";
 }
 
 async function readArtifact(
