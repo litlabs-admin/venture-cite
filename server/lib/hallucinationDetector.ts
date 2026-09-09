@@ -288,6 +288,13 @@ export async function reverifyHallucinationsForRun(
 
   const cited = rankings.filter((r) => r.isCited === 1 && r.citationContext);
   const blobsByPlatform = new Map<string, string>();
+  // The blob concatenates every response for a platform, which is what the
+  // absence check needs but loses which observation proved the absence. Keep
+  // the last contributing ranking per platform so a verified repair can name
+  // the observation that demonstrated it, not only the one that found the
+  // fault. Without it a fault_repair reference has a before and no after and
+  // can never be authorised.
+  const provingRankingByPlatform = new Map<string, string>();
   for (const r of cited) {
     const ex = extractResponseText(r.citationContext);
     if (ex.kind !== "text") continue;
@@ -295,6 +302,7 @@ export async function reverifyHallucinationsForRun(
       r.aiPlatform,
       (blobsByPlatform.get(r.aiPlatform) ?? "") + "\n" + ex.text.toLowerCase(),
     );
+    provingRankingByPlatform.set(r.aiPlatform, r.id);
   }
   if (blobsByPlatform.size === 0) return 0;
 
@@ -316,6 +324,7 @@ export async function reverifyHallucinationsForRun(
           remediationStatus: "verified",
           isResolved: 1,
           resolvedAt: new Date(),
+          resolvedRankingId: provingRankingByPlatform.get(hall.aiPlatform) ?? null,
         } as any);
         verified += 1;
       } catch {

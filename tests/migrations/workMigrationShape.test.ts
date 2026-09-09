@@ -281,4 +281,23 @@ describe("work domain migration", () => {
     expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS accepted_by/i);
     expect(sql).toMatch(/REFERENCES public\.users\s*\(id\)\s*ON DELETE SET NULL/i);
   });
+
+  it("records a per-observation outcome", () => {
+    const sql = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0137_geo_rankings_outcome.sql"),
+      "utf8",
+    );
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS outcome/i);
+    expect(sql).toMatch(/'successful'/);
+    expect(sql).toMatch(/'unavailable'/);
+    expect(sql).toMatch(/'failed'/);
+  });
+
+  it("records the ranking that confirmed a repair", () => {
+    const sql = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0138_hallucination_resolved_ranking.sql"),
+      "utf8",
+    );
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS resolved_ranking_id/i);
+  });
 });
