@@ -49,6 +49,30 @@ const confirmationReference = (
   ...overrides,
 });
 
+const decisionReference = (
+  overrides: Partial<Extract<EvidenceReference, { kind: "decision" }>> = {},
+) => ({
+  kind: "decision" as const,
+  label: "Outcome review decision",
+  decisionId: "review-a",
+  reviewPeriod: "2026-09",
+  decision: "improvement",
+  basedOnMeasurementId: "ranking-a",
+  ...overrides,
+});
+
+const faultRepairReference = (
+  overrides: Partial<Extract<EvidenceReference, { kind: "fault_repair" }>> = {},
+) => ({
+  kind: "fault_repair" as const,
+  label: "Verified fault repair",
+  faultId: "fault-a",
+  beforeCheckId: "ranking-before",
+  afterCheckId: "ranking-after",
+  checkedAt: "2026-09-08T00:00:00.000Z",
+  ...overrides,
+});
+
 function transactionFor(...rows: Array<unknown[]>) {
   const execute = vi.fn();
   for (const result of rows) execute.mockResolvedValueOnce({ rows: result });
@@ -263,6 +287,111 @@ describe("database work evidence readers", () => {
         taskId: "task-a",
         taskVersion: 1,
         reference: confirmationReference({ confirmedAt: "2099-01-01T00:00:00.000Z" }),
+      }),
+    ).resolves.toBe("owned_unusable");
+  });
+
+  it("returns owned_usable for a matching outcome review", async () => {
+    const transaction = transactionFor([{}], [{}]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.decision({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: decisionReference(),
+      }),
+    ).resolves.toBe("owned_usable");
+  });
+
+  it("returns owned_unusable when an outcome review field disagrees", async () => {
+    const transaction = transactionFor([{}], []);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.decision({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: decisionReference(),
+      }),
+    ).resolves.toBe("owned_unusable");
+  });
+
+  it("returns not_found for an outcome review from another brand", async () => {
+    const transaction = transactionFor([]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.decision({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: decisionReference(),
+      }),
+    ).resolves.toBe("not_found");
+  });
+
+  it("returns owned_usable for a verified repair with completed ranking checks", async () => {
+    const transaction = transactionFor([{}], [{}], [{}], [{}]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.fault_repair({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: faultRepairReference(),
+      }),
+    ).resolves.toBe("owned_usable");
+  });
+
+  it("returns owned_unusable when a stored repair field disagrees", async () => {
+    const transaction = transactionFor([{}], []);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.fault_repair({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: faultRepairReference(),
+      }),
+    ).resolves.toBe("owned_unusable");
+  });
+
+  it("returns not_found for a repair from another brand", async () => {
+    const transaction = transactionFor([]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.fault_repair({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: faultRepairReference(),
+      }),
+    ).resolves.toBe("not_found");
+  });
+
+  it("returns owned_unusable when the resolved ranking run never completed", async () => {
+    const transaction = transactionFor([{}], [{}], [{}], []);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.fault_repair({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: faultRepairReference(),
       }),
     ).resolves.toBe("owned_unusable");
   });

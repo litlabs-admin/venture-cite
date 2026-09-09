@@ -26,10 +26,10 @@ export function createWorkEvidenceReaders(
     measurement: (input) => readMeasurement(transaction, actor, input),
     content_change: (input) => readContentChange(transaction, actor, input),
     artifact: (input) => readArtifact(transaction, actor, input),
-    fault_repair: async () => "owned_unusable",
+    fault_repair: (input) => readFaultRepair(transaction, actor, input),
     authored_work: async () => "owned_unusable",
     confirmation: (input) => readConfirmation(actor, input),
-    decision: async () => "owned_unusable",
+    decision: (input) => readDecision(transaction, actor, input),
     experiment: async () => "owned_unusable",
   };
 }
@@ -357,6 +357,97 @@ async function readContentChange(
       and tracked.normalized_url = ${normalizedUrl}
   `);
   return usable.rows.length > 0 ? "owned_usable" : "owned_unusable";
+}
+
+async function readDecision(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["decision"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const identity = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.work_outcome_reviews review
+      on review.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and review.id = ${reference.decisionId}
+      and review.user_id = ${actor.userId}
+  `);
+  if (identity.rows.length === 0) return "not_found";
+
+  const usable = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.work_outcome_reviews review
+      on review.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and review.id = ${reference.decisionId}
+      and review.user_id = ${actor.userId}
+      and review.cycle_key = ${reference.reviewPeriod}
+      and review.decision = ${reference.decision}
+  `);
+  return usable.rows.length > 0 ? "owned_usable" : "owned_unusable";
+}
+
+async function readFaultRepair(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["fault_repair"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const identity = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.brand_hallucinations hallucination
+      on hallucination.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and hallucination.id = ${reference.faultId}
+  `);
+  if (identity.rows.length === 0) return "not_found";
+
+  const usable = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.brand_hallucinations hallucination
+      on hallucination.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and hallucination.id = ${reference.faultId}
+      and hallucination.ranking_id = ${reference.beforeCheckId}
+      and hallucination.resolved_ranking_id = ${reference.afterCheckId}
+      and hallucination.resolved_at = ${reference.checkedAt}
+      and hallucination.is_resolved = 1
+      and hallucination.remediation_status = 'verified'
+  `);
+  if (usable.rows.length === 0) return "owned_unusable";
+
+  const beforeCheck = await readSystemCheck(transaction, actor, {
+    actor,
+    brandId: input.brandId,
+    taskId: input.taskId,
+    taskVersion: input.taskVersion,
+    verification: { kind: "system_check", checkId: reference.beforeCheckId },
+    evidence: [reference],
+  });
+  const afterCheck = await readSystemCheck(transaction, actor, {
+    actor,
+    brandId: input.brandId,
+    taskId: input.taskId,
+    taskVersion: input.taskVersion,
+    verification: { kind: "system_check", checkId: reference.afterCheckId },
+    evidence: [reference],
+  });
+  return beforeCheck === "owned_usable" && afterCheck === "owned_usable"
+    ? "owned_usable"
+    : "owned_unusable";
 }
 
 async function readSystemCheck(
