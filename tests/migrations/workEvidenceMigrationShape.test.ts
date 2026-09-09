@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const migrationPath = path.resolve(process.cwd(), "migrations/0127_work_evidence_readers_rls.sql");
+const migrationPath = path.resolve(process.cwd(), "migrations/0132_work_evidence_readers_rls.sql");
 
 function migrationSql(): string {
   return fs

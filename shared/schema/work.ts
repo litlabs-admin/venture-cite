@@ -548,6 +548,11 @@ export const workOutcomeReviews = pgTable(
     }).onDelete("no action"),
     index("work_outcome_reviews_brand_id_idx").on(table.brandId),
     index("work_outcome_reviews_task_cycle_idx").on(table.taskId, table.cycleKey),
+    uniqueIndex("work_outcome_reviews_task_cycle_key").on(
+      table.taskId,
+      table.taskVersion,
+      table.cycleKey,
+    ),
     index("work_outcome_reviews_brand_created_idx").on(table.brandId, table.createdAt.desc()),
     index("work_outcome_reviews_user_created_idx").on(table.userId, table.createdAt.desc()),
     check(

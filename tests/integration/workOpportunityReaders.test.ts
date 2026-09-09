@@ -40,8 +40,8 @@ describeIfLocal("work opportunity readers through the restricted request role", 
 
     ownerPool = new Pool({ connectionString: testDatabaseUrl, max: 2, ssl: false });
     for (const migrationName of [
-      "0127_work_evidence_readers_rls.sql",
-      "0128_work_opportunity_reader_columns.sql",
+      "0132_work_evidence_readers_rls.sql",
+      "0133_work_opportunity_reader_columns.sql",
     ]) {
       const migration = fs.readFileSync(
         path.resolve(process.cwd(), "migrations", migrationName),

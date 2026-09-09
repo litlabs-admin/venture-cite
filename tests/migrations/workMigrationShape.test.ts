@@ -14,7 +14,7 @@ import {
   workTasks,
 } from "../../shared/schema/work";
 
-const migrationPath = path.resolve(process.cwd(), "migrations/0126_work_domain.sql");
+const migrationPath = path.resolve(process.cwd(), "migrations/0131_work_domain.sql");
 
 const workTables = {
   brand_goals: brandGoals,
@@ -262,5 +262,23 @@ describe("work domain migration", () => {
       "grant select, insert on table public.work_task_evidence, public.work_task_events, public.work_award_events, public.brand_capability_events to venturecite_request",
     );
     expect(sql).not.toMatch(/grant select, insert, update on table[^;]*public\.work_task_evidence/);
+  });
+
+  it("constrains outcome reviews to one per task version and cycle", () => {
+    const sql = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0135_work_outcome_review_unique.sql"),
+      "utf8",
+    );
+    expect(sql).toMatch(/work_outcome_reviews_task_cycle_key/);
+    expect(sql).toMatch(/task_id,\s*task_version,\s*cycle_key/);
+  });
+
+  it("records the actor who accepted a fact", () => {
+    const sql = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0136_brand_fact_sheet_accepted_by.sql"),
+      "utf8",
+    );
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS accepted_by/i);
+    expect(sql).toMatch(/REFERENCES public\.users\s*\(id\)\s*ON DELETE SET NULL/i);
   });
 });

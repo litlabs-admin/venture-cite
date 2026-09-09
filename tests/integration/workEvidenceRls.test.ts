@@ -11,7 +11,7 @@ const describeIfLocal =
     ? describe
     : describe.skip;
 
-describeIfLocal("work evidence reader RLS (migration 0127)", () => {
+describeIfLocal("work evidence reader RLS (migration 0132)", () => {
   const userAId = randomUUID();
   const userBId = randomUUID();
   const brandAId = randomUUID();
@@ -26,7 +26,7 @@ describeIfLocal("work evidence reader RLS (migration 0127)", () => {
   beforeAll(async () => {
     ownerPool = new Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 2, ssl: false });
     const migration = fs.readFileSync(
-      path.resolve(process.cwd(), "migrations/0127_work_evidence_readers_rls.sql"),
+      path.resolve(process.cwd(), "migrations/0132_work_evidence_readers_rls.sql"),
       "utf8",
     );
     await ownerPool.query(migration);
