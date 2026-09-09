@@ -22,7 +22,7 @@ import {
 type V2NavEntry = {
   label: string;
   icon: LucideIcon;
-  href?: "/v2/today" | "/v2/my-work" | "/v2/brand-facts";
+  href?: "/v2/today" | "/v2/my-work" | "/v2/brand-facts" | "/v2/learn";
 };
 
 const ITEMS: V2NavEntry[] = [
@@ -30,7 +30,12 @@ const ITEMS: V2NavEntry[] = [
   { label: "Visibility", icon: TrendingUp },
   { label: "My work", icon: ListChecks, href: "/v2/my-work" },
   { label: "Brand facts", icon: BookOpen, href: "/v2/brand-facts" },
-  { label: "Learn", icon: GraduationCap },
+  // Learn is reachable, and what it reaches is an empty frame that says so.
+  // It is a link rather than a "Soon" row because the route exists and the
+  // screen behind it is the thing under review; the honesty about there
+  // being no lessons is carried on the screen itself, in words, not by
+  // making the nav row unclickable.
+  { label: "Learn", icon: GraduationCap, href: "/v2/learn" },
 ];
 
 const ROW =
