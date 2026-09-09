@@ -27,10 +27,10 @@ export function createWorkEvidenceReaders(
     content_change: (input) => readContentChange(transaction, actor, input),
     artifact: (input) => readArtifact(transaction, actor, input),
     fault_repair: (input) => readFaultRepair(transaction, actor, input),
-    authored_work: async () => "owned_unusable",
+    authored_work: (input) => readAuthoredWork(transaction, actor, input),
     confirmation: (input) => readConfirmation(actor, input),
     decision: (input) => readDecision(transaction, actor, input),
-    experiment: async () => "owned_unusable",
+    experiment: (input) => readExperiment(transaction, actor, input),
   };
 }
 
@@ -227,9 +227,9 @@ async function readSource(
       and fact.accepted_at is not null
       and fact.dismissed_at is null
       and fact.is_active = 1
-      and run.status in ('completed', 'succeeded')
+      and run.status = 'completed'
       and run.completed_at is not null
-      and page.status in ('completed', 'succeeded', 'success', 'done')
+      and page.status = 'done'
       and page.fetched_at is not null
       and page.status_code between 200 and 299
       and page.canonical_url = ${reference.canonicalUrl}
@@ -359,6 +359,128 @@ async function readContentChange(
   return usable.rows.length > 0 ? "owned_usable" : "owned_unusable";
 }
 
+async function readAuthoredWork(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["authored_work"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const destinationUrl = normalizeUrl(reference.destinationUrl);
+  if (!destinationUrl || reference.authoredByUserId !== actor.userId) {
+    return "owned_unusable";
+  }
+
+  const identity = await transaction.execute<{ kind: "community_post" | "listicle" }>(sql`
+    select 'community_post' as kind
+    from public.brands brand
+    inner join public.community_posts post
+      on post.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and post.id = ${reference.submissionId}
+    union all
+    select 'listicle' as kind
+    from public.brands brand
+    inner join public.listicles listicle
+      on listicle.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and listicle.id = ${reference.submissionId}
+    limit 1
+  `);
+  const target = identity.rows[0];
+  if (!target) return "not_found";
+
+  switch (target.kind) {
+    case "community_post": {
+      // community_posts has no author column. This proves that the brand owner submitted the post.
+      const usable = await transaction.execute<{ destination_url: string | null }>(sql`
+        select post.post_url as destination_url
+        from public.brands brand
+        inner join public.community_posts post
+          on post.brand_id = brand.id
+        where brand.id = ${input.brandId}
+          and brand.user_id = ${actor.userId}
+          and brand.deleted_at is null
+          and post.id = ${reference.submissionId}
+          and post.posted_at = ${reference.submittedAt}
+          and post.status = 'posted'
+      `);
+      return normalizeUrl(usable.rows[0]?.destination_url ?? "") === destinationUrl
+        ? "owned_usable"
+        : "owned_unusable";
+    }
+    case "listicle": {
+      const usable = await transaction.execute<{ destination_url: string | null }>(sql`
+        select listicle.url as destination_url
+        from public.brands brand
+        inner join public.listicles listicle
+          on listicle.brand_id = brand.id
+        where brand.id = ${input.brandId}
+          and brand.user_id = ${actor.userId}
+          and brand.deleted_at is null
+          and listicle.id = ${reference.submissionId}
+          and listicle.outreach_status in ('contacted', 'won')
+      `);
+      return normalizeUrl(usable.rows[0]?.destination_url ?? "") === destinationUrl
+        ? "owned_usable"
+        : "owned_unusable";
+    }
+  }
+}
+
+async function readExperiment(
+  transaction: RequestRepositoryTransaction,
+  actor: RequestActor,
+  input: Parameters<WorkEvidenceReaders["experiment"]>[0],
+): Promise<WorkEvidenceReaderResult> {
+  const { reference } = input;
+  const changedAt = Date.parse(reference.changedAt);
+  // Hypothesis is free text. A non-empty value is the deliberate verification limit.
+  if (!reference.hypothesis.trim() || !reference.conclusion.trim() || Number.isNaN(changedAt)) {
+    return "owned_unusable";
+  }
+
+  const identity = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.bofu_content content
+      on content.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and content.id = ${reference.experimentId}
+  `);
+  if (identity.rows.length === 0) return "not_found";
+
+  const usable = await transaction.execute(sql`
+    select 1
+    from public.brands brand
+    inner join public.bofu_content content
+      on content.brand_id = brand.id
+    inner join public.citation_runs baseline
+      on baseline.brand_id = brand.id
+    inner join public.citation_runs later
+      on later.brand_id = brand.id
+    where brand.id = ${input.brandId}
+      and brand.user_id = ${actor.userId}
+      and brand.deleted_at is null
+      and content.id = ${reference.experimentId}
+      and content.published_at = ${reference.changedAt}
+      and baseline.id = ${reference.baselineMeasurementId}
+      and baseline.status = 'succeeded'
+      and baseline.completed_at is not null
+      and baseline.completed_at < ${reference.changedAt}
+      and later.id = ${reference.laterMeasurementId}
+      and later.status = 'succeeded'
+      and later.completed_at is not null
+      and later.completed_at > ${reference.changedAt}
+  `);
+  return usable.rows.length > 0 ? "owned_usable" : "owned_unusable";
+}
+
 async function readDecision(
   transaction: RequestRepositoryTransaction,
   actor: RequestActor,
@@ -471,9 +593,9 @@ async function readSystemCheck(
       and brand.deleted_at is null
       and fact.run_id = run.id
       and (fact.id = ${checkId} or run.id = ${checkId} or page.id = ${checkId})
-      and run.status in ('completed', 'succeeded')
+      and run.status = 'completed'
       and run.completed_at is not null
-      and page.status in ('completed', 'succeeded', 'success', 'done')
+      and page.status = 'done'
       and page.fetched_at is not null
       and page.status_code between 200 and 299
     union all

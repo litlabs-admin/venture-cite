@@ -73,6 +73,32 @@ const faultRepairReference = (
   ...overrides,
 });
 
+const authoredWorkReference = (
+  overrides: Partial<Extract<EvidenceReference, { kind: "authored_work" }>> = {},
+) => ({
+  kind: "authored_work" as const,
+  label: "Published community submission",
+  submissionId: "submission-a",
+  destinationUrl: "https://www.example.test/community-post/",
+  authoredByUserId: USER_ID,
+  submittedAt: "2026-09-08T00:00:00.000Z",
+  ...overrides,
+});
+
+const experimentReference = (
+  overrides: Partial<Extract<EvidenceReference, { kind: "experiment" }>> = {},
+) => ({
+  kind: "experiment" as const,
+  label: "Visibility experiment",
+  experimentId: "content-a",
+  hypothesis: "A comparison page improves citations.",
+  baselineMeasurementId: "baseline-a",
+  changedAt: "2026-09-04T00:00:00.000Z",
+  laterMeasurementId: "later-a",
+  conclusion: "The later run showed an improvement.",
+  ...overrides,
+});
+
 function transactionFor(...rows: Array<unknown[]>) {
   const execute = vi.fn();
   for (const result of rows) execute.mockResolvedValueOnce({ rows: result });
@@ -392,6 +418,147 @@ describe("database work evidence readers", () => {
         taskId: "task-a",
         taskVersion: 1,
         reference: faultRepairReference(),
+      }),
+    ).resolves.toBe("owned_unusable");
+  });
+
+  it("returns owned_usable for a posted community submission with a normalized URL", async () => {
+    const transaction = transactionFor(
+      [{ kind: "community_post" }],
+      [
+        {
+          destination_url: "https://example.test/community-post",
+          submitted_at: "2026-09-08T00:00:00.000Z",
+          status: "posted",
+        },
+      ],
+    );
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.authored_work({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: authoredWorkReference(),
+      }),
+    ).resolves.toBe("owned_usable");
+  });
+
+  it("returns owned_usable for contacted listicle outreach", async () => {
+    const transaction = transactionFor(
+      [{ kind: "listicle" }],
+      [{ destination_url: "https://example.test/community-post", outreach_status: "contacted" }],
+    );
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.authored_work({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: authoredWorkReference(),
+      }),
+    ).resolves.toBe("owned_usable");
+  });
+
+  it("returns owned_unusable when a submitted work field disagrees", async () => {
+    const transaction = transactionFor(
+      [{ kind: "community_post" }],
+      [
+        {
+          destination_url: "https://example.test/other-post",
+          submitted_at: "2026-09-08T00:00:00.000Z",
+          status: "posted",
+        },
+      ],
+    );
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.authored_work({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: authoredWorkReference(),
+      }),
+    ).resolves.toBe("owned_unusable");
+  });
+
+  it("returns not_found for submitted work from another brand", async () => {
+    const transaction = transactionFor([]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.authored_work({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: authoredWorkReference(),
+      }),
+    ).resolves.toBe("not_found");
+  });
+
+  it("returns owned_usable for a measured experiment after a published change", async () => {
+    const transaction = transactionFor([{}], [{}]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.experiment({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: experimentReference(),
+      }),
+    ).resolves.toBe("owned_usable");
+  });
+
+  it("returns owned_unusable when an experiment field disagrees", async () => {
+    const transaction = transactionFor([{}], []);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.experiment({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: experimentReference({ conclusion: "  " }),
+      }),
+    ).resolves.toBe("owned_unusable");
+  });
+
+  it("returns not_found for an experiment from another brand", async () => {
+    const transaction = transactionFor([]);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.experiment({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: experimentReference(),
+      }),
+    ).resolves.toBe("not_found");
+  });
+
+  it("returns owned_unusable when the later measurement predates the change", async () => {
+    const transaction = transactionFor([{}], []);
+    const readers = createWorkEvidenceReaders(transaction, ACTOR);
+
+    await expect(
+      readers.experiment({
+        actor: ACTOR,
+        brandId: BRAND_ID,
+        taskId: "task-a",
+        taskVersion: 1,
+        reference: experimentReference(),
       }),
     ).resolves.toBe("owned_unusable");
   });
