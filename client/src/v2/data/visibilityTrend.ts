@@ -74,6 +74,39 @@ export function hasNoObservations(weeks: VisibilityWeek[] | undefined): boolean 
   return !weeks || weeks.every((week) => week.measured === 0);
 }
 
+/**
+ * The instant this area's observation window opens, for the dashboard reads
+ * that take a `since`.
+ *
+ * WHY EVERY READ ON THESE SCREENS NEEDS IT. `/api/dashboard/hero`,
+ * `/api/dashboard/rankings` and `/api/dashboard/cited-urls` all fall back to a
+ * 30-DAY window when no `since` is given (`loadRankingsContext`), while the
+ * mention rate covers eight Monday-anchored weeks. Left alone, one panel counts
+ * 94 successful answers and the engine list beside it counts 36 of the same
+ * observations, and "attributed sources recorded in this window" names a window
+ * no other number on the screen uses. Passing the first bucket's start makes
+ * every read draw on the sample the trend plots: the engine totals then sum to
+ * exactly `observed`.
+ *
+ * `undefined` until the rate has loaded, which is what holds the dependent
+ * reads back rather than letting them fetch the wrong window first. Once it
+ * HAS loaded this always answers, including for a brand whose buckets are all
+ * empty - a dependent read that could never start would sit on a skeleton for
+ * ever instead of reaching one of the four states.
+ */
+export function observationWindowStart(
+  rate: VisibilityMentionRate | undefined,
+): string | undefined {
+  if (!rate) return undefined;
+  const first = rate.weeks[0]?.weekStart;
+  if (first) return `${first}T00:00:00.000Z`;
+  return new Date(Date.now() - WINDOW_WEEKS * 7 * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/** The window `server/services/v2Visibility.ts` covers. Restated here only for
+ *  the empty-bucket fallback above. */
+const WINDOW_WEEKS = 8;
+
 /** The most recent week that actually holds answers, or null. */
 export function latestObservedWeek(weeks: VisibilityWeek[] | undefined): VisibilityWeek | null {
   if (!weeks) return null;

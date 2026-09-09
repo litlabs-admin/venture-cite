@@ -20,6 +20,7 @@ import { latestObservedWeek, useVisibilityMentionRate } from "../data/visibility
 import {
   REVIEW_DECISIONS,
   grantedAwards,
+  useAwardEvents,
   useRecordResultsReview,
   useReviewTask,
   useVerifiedWork,
@@ -120,6 +121,7 @@ export default function ResultsReviewPage() {
   const summaryQuery = useWorkSummary(selectedBrandId);
   const rateQuery = useVisibilityMentionRate(selectedBrandId);
   const workQuery = useVerifiedWork(selectedBrandId);
+  const awardQuery = useAwardEvents(selectedBrandId);
   const reviewQuery = useReviewTask(selectedBrandId);
   const record = useRecordResultsReview(selectedBrandId);
 
@@ -201,7 +203,10 @@ export default function ResultsReviewPage() {
   const weeks = rateQuery.data?.weeks;
   const period = latestObservedWeek(weeks);
   const verifiedEvents = workQuery.data?.items ?? [];
-  const awards = grantedAwards(workQuery.data?.items);
+  // From the award stream, not the verified-change list: a `status=verified`
+  // read never carries an award (see `useAwardEvents`), which is what left this
+  // panel reading "No points have been awarded yet" beside a scored rail.
+  const awards = grantedAwards(awardQuery.data?.items);
   const awardSum = awards.reduce((total, award) => total + award.points, 0);
   const reviewTask = reviewQuery.data?.items[0] ?? null;
   const next = summary?.nextThreshold ?? null;
@@ -447,9 +452,9 @@ export default function ResultsReviewPage() {
             <PanelHeading>
               <span id="v2-results-awards-heading">Award history</span>
             </PanelHeading>
-            {workQuery.isError ? (
+            {awardQuery.isError ? (
               <p className="mt-3 text-body text-vc-tertiary">Award history could not be loaded.</p>
-            ) : workQuery.isPending ? (
+            ) : awardQuery.isPending ? (
               <div className="mt-3">
                 <Bar className="h-4 w-full" />
                 <Bar className="mt-3 h-4 w-full" />
@@ -461,7 +466,7 @@ export default function ResultsReviewPage() {
             ) : (
               <>
                 <ul className="mt-3 space-y-2.5" data-testid="v2-results-awards">
-                  {verifiedEvents
+                  {(awardQuery.data?.items ?? [])
                     .filter(
                       (event) => event.award?.awarded && event.award.awardStatus === "awarded",
                     )

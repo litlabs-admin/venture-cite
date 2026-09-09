@@ -250,6 +250,8 @@ type Responses = {
   history?: unknown;
   summary?: unknown;
   tasks?: unknown;
+  approval?: unknown;
+  awardsFeed?: unknown;
   pending?: boolean;
   fail?: "hero" | "summary" | "rate" | "cited";
   onPost?: (body: unknown) => Response;
@@ -272,19 +274,23 @@ function stubFetch(responses: Responses) {
       return new Response(JSON.stringify({ success: false, error: "boom" }), { status: 500 });
     }
 
-    const body = url.includes("/dashboard/hero/")
-      ? responses.hero
-      : url.includes("/v2/visibility/mention-rate/")
-        ? responses.rate
-        : url.includes("cited-urls")
-          ? responses.cited
-          : url.includes("/dashboard/rankings/")
-            ? responses.engines
-            : url.includes("/work/history")
-              ? responses.history
-              : url.includes("/work/summary")
-                ? responses.summary
-                : responses.tasks;
+    const body = url.includes("taskType=approve_buyer_question_set")
+      ? (responses.approval ?? { items: [], nextCursor: null })
+      : url.includes("/dashboard/hero/")
+        ? responses.hero
+        : url.includes("/v2/visibility/mention-rate/")
+          ? responses.rate
+          : url.includes("cited-urls")
+            ? responses.cited
+            : url.includes("/dashboard/rankings/")
+              ? responses.engines
+              : url.includes("/work/history")
+                ? url.includes("status=verified")
+                  ? responses.history
+                  : (responses.awardsFeed ?? responses.history)
+                : url.includes("/work/summary")
+                  ? responses.summary
+                  : responses.tasks;
 
     return new Response(JSON.stringify({ success: true, data: body }), {
       status: 200,
@@ -434,6 +440,93 @@ describe("Visibility overview - the states that are not the happy path", () => {
   // The trend has no failure of its own to test: it is drawn from the same
   // payload as the headline rate, so a screen can never show one without the
   // other. A read that IS separate carries the same resilience question.
+  // `WorkService.getHistory` emits an award event only on an UNFILTERED read,
+  // so the `status=verified` list this panel is built from never carries one.
+  // Reading the award off that list printed "no points" for a brand holding a
+  // recorded award; the points come from the award stream instead.
+  it("shows the points a verified change earned, from the award stream", async () => {
+    const verifiedOnly = historyEvent();
+    delete (verifiedOnly as { award?: unknown }).award;
+    stubFetch(
+      populated({
+        history: { items: [verifiedOnly], nextCursor: null },
+        awardsFeed: { items: [historyEvent()], nextCursor: null },
+      }),
+    );
+    renderPage(VisibilityPage);
+
+    await screen.findByTestId("v2-vis-rate");
+    const row = await screen.findByTestId("v2-vis-work-row");
+    expect(row).toHaveTextContent("+40 work points");
+  });
+
+  // "Approved questions" was a hardcoded null on the belief that no read
+  // returned the count. Approval is a reviewer confirming the question-set
+  // task, and the confirmed task names the very questions it approved.
+  it("counts the questions a verified approval actually confirmed", async () => {
+    stubFetch(
+      populated({
+        approval: {
+          items: [
+            {
+              state: "verified",
+              updatedAt: "2026-09-08T00:00:00.000Z",
+              completionRule: { questionIds: ["q-1", "q-2", "q-3"] },
+            },
+          ],
+          nextCursor: null,
+        },
+      }),
+    );
+    renderPage(VisibilityPage);
+
+    await screen.findByTestId("v2-vis-rate");
+    expect(screen.getByText("Approved questions").parentElement).toHaveTextContent("3");
+  });
+
+  // A set nobody has confirmed is not an approved count of zero, and tracked
+  // questions are not approved ones - the generator tracks them itself.
+  it("reads Not measured while the question set is still awaiting review", async () => {
+    stubFetch(
+      populated({
+        approval: {
+          items: [
+            {
+              state: "suggested",
+              updatedAt: "2026-09-08T00:00:00.000Z",
+              completionRule: { questionIds: ["q-1", "q-2", "q-3"] },
+            },
+          ],
+          nextCursor: null,
+        },
+      }),
+    );
+    renderPage(VisibilityPage);
+
+    await screen.findByTestId("v2-vis-rate");
+    expect(screen.getByText("Approved questions").parentElement).toHaveTextContent("Not measured");
+  });
+
+  // The defect this pins: the three dashboard reads default to a 30-DAY window
+  // when no `since` is sent, while the mention rate covers eight weeks. Left
+  // undefaulted the rail counted engines over one sample and answers over
+  // another, and the source line named a window nothing else on the screen
+  // drew. Every dependent read must carry the first bucket's start.
+  it("reads the dashboard endpoints over the window the trend draws", async () => {
+    const fetchMock = stubFetch(populated());
+    renderPage(VisibilityPage);
+
+    await screen.findByTestId("v2-vis-rate");
+
+    const since = `since=${encodeURIComponent("2026-08-17T00:00:00.000Z")}`;
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+    for (const path of ["/dashboard/hero/", "/dashboard/rankings/", "cited-urls"]) {
+      const called = urls.filter((url) => url.includes(path));
+      expect(called.length).toBeGreaterThan(0);
+      for (const url of called) expect(url).toContain(since);
+    }
+  });
+
   it("keeps the screen standing when a secondary read fails", async () => {
     stubFetch(populated({ fail: "cited" }));
     renderPage(VisibilityPage);

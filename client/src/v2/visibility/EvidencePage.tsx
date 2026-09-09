@@ -5,9 +5,13 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { StateBadge } from "../state/StateBadge";
-import { useVisibilityMentionRate } from "../data/visibilityTrend";
+import { observationWindowStart, useVisibilityMentionRate } from "../data/visibilityTrend";
 import {
+  awardForTask,
   grantedAwards,
+  approvedQuestionCount,
+  useApprovedQuestions,
+  useAwardEvents,
   useCitedUrls,
   useEngineRankings,
   useVerifiedWork,
@@ -159,7 +163,7 @@ function SourceEvidence({
 
       {total !== null && total > shown.length && (
         <p className="mt-3 text-caption text-vc-tertiary" data-testid="v2-evidence-total">
-          {total} attributed sources recorded in this window.
+          {total} attributed sources recorded across the observed answers.
         </p>
       )}
     </div>
@@ -168,16 +172,20 @@ function SourceEvidence({
 
 function VerifiedWork({
   events,
+  awards: awardEvents,
   summary,
   isPending,
   isError,
 }: {
   events: WorkHistoryEventView[] | undefined;
+  /** The award stream. A `status=verified` read carries no award of its own
+   *  (see `useAwardEvents`), so points are matched in from here by task id. */
+  awards: WorkHistoryEventView[] | undefined;
   summary: WorkSummaryView | undefined;
   isPending: boolean;
   isError: boolean;
 }) {
-  const awards = grantedAwards(events);
+  const awards = grantedAwards(awardEvents);
   const points = summary?.points ?? awards.reduce((sum, award) => sum + award.points, 0);
   const verified = (events ?? []).length;
   const next = summary?.nextThreshold ?? null;
@@ -243,23 +251,26 @@ function VerifiedWork({
 
           {(events ?? []).length > 0 && (
             <ul className="mt-4 space-y-2">
-              {(events ?? []).slice(0, 2).map((event) => (
-                <li
-                  key={event.id}
-                  className="flex items-center gap-2 text-body"
-                  data-testid="v2-evidence-work-row"
-                >
-                  <CircleCheck className="h-4 w-4 shrink-0 text-positive" aria-hidden="true" />
-                  <span className="min-w-0 flex-1 truncate text-vc-secondary">
-                    {event.taskTitle}
-                  </span>
-                  {event.award?.awarded && (
-                    <span className="shrink-0 text-caption font-medium tabular-nums text-vc-accent">
-                      +{event.award.points}
+              {(events ?? []).slice(0, 2).map((event) => {
+                const award = awardForTask(awardEvents, event.taskId);
+                return (
+                  <li
+                    key={event.id}
+                    className="flex items-center gap-2 text-body"
+                    data-testid="v2-evidence-work-row"
+                  >
+                    <CircleCheck className="h-4 w-4 shrink-0 text-positive" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate text-vc-secondary">
+                      {event.taskTitle}
                     </span>
-                  )}
-                </li>
-              ))}
+                    {award && (
+                      <span className="shrink-0 text-caption font-medium tabular-nums text-vc-accent">
+                        +{award.points}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </>
@@ -369,12 +380,45 @@ function EnginesObserved({
 export default function EvidencePage() {
   const { selectedBrandId, isLoading: brandsLoading } = useBrandSelection();
   const [tab, setTab] = useState<SubTab>("mentions");
-  const heroQuery = useVisibilityHero(selectedBrandId);
   const rateQuery = useVisibilityMentionRate(selectedBrandId);
-  const citedQuery = useCitedUrls(selectedBrandId);
-  const enginesQuery = useEngineRankings(selectedBrandId);
+  // Held to the window the trend draws, for the reason `visibilityEvidence.ts`
+  // records: undefaulted these three cover 30 days, and the coverage rail would
+  // count engines over one sample and answers over another.
+  const since = observationWindowStart(rateQuery.data);
+  const heroQuery = useVisibilityHero(selectedBrandId, since);
+  const citedQuery = useCitedUrls(selectedBrandId, since);
+  const enginesQuery = useEngineRankings(selectedBrandId, since);
   const workQuery = useVerifiedWork(selectedBrandId);
+  const awardQuery = useAwardEvents(selectedBrandId);
   const summaryQuery = useWorkSummary(selectedBrandId);
+  const approvalQuery = useApprovedQuestions(selectedBrandId);
+
+  // ORDER MATTERS. The hero read is held behind the rate now (it takes the
+  // rate's window), so a failed rate leaves the hero permanently disabled and
+  // therefore permanently `isPending`. Testing the error branch first is what
+  // keeps a failed read reaching its error frame instead of a skeleton that
+  // never resolves.
+  if (!brandsLoading && selectedBrandId && (heroQuery.isError || rateQuery.isError)) {
+    return (
+      <VisibilityFrame
+        main={
+          <div data-testid="v2-evidence-error">
+            <Breadcrumb trail={["Visibility", "Evidence"]} />
+            <ErrorState
+              title="Evidence could not be loaded"
+              description="The measurement for this brand did not load. Nothing has been lost - try again."
+              onRetry={() => {
+                void heroQuery.refetch();
+                void rateQuery.refetch();
+              }}
+              isRetrying={heroQuery.isFetching || rateQuery.isFetching}
+            />
+          </div>
+        }
+        rail={<p className="text-body text-vc-secondary">Coverage is unavailable right now.</p>}
+      />
+    );
+  }
 
   if (brandsLoading || (selectedBrandId && (heroQuery.isPending || rateQuery.isPending))) {
     return (
@@ -422,28 +466,6 @@ export default function EvidencePage() {
         rail={
           <p className="text-body text-vc-secondary">Coverage appears with your first brand.</p>
         }
-      />
-    );
-  }
-
-  if (heroQuery.isError || rateQuery.isError) {
-    return (
-      <VisibilityFrame
-        main={
-          <div data-testid="v2-evidence-error">
-            <Breadcrumb trail={["Visibility", "Evidence"]} />
-            <ErrorState
-              title="Evidence could not be loaded"
-              description="The measurement for this brand did not load. Nothing has been lost - try again."
-              onRetry={() => {
-                void heroQuery.refetch();
-                void rateQuery.refetch();
-              }}
-              isRetrying={heroQuery.isFetching || rateQuery.isFetching}
-            />
-          </div>
-        }
-        rail={<p className="text-body text-vc-secondary">Coverage is unavailable right now.</p>}
       />
     );
   }
@@ -551,6 +573,7 @@ export default function EvidencePage() {
           <div className="mt-6 grid grid-cols-1 border-t border-vc-default lg:grid-cols-3">
             <VerifiedWork
               events={workQuery.data?.items}
+              awards={awardQuery.data?.items}
               summary={summaryQuery.data}
               isPending={workQuery.isPending}
               isError={workQuery.isError}
@@ -579,7 +602,12 @@ export default function EvidencePage() {
                 label="Failed attempts"
                 value={rate && rate.observed > 0 ? rate.failed : null}
               />
-              <RailRow label="Approved questions" value={null} />
+              {/* The confirmed set's size, from the verified approval task -
+                  not the tracked-prompt count, which nobody approved. */}
+              <RailRow
+                label="Approved questions"
+                value={approvedQuestionCount(approvalQuery.data?.items)}
+              />
               <RailRow
                 label="Engines"
                 value={enginesQuery.data ? enginesQuery.data.platforms.length || null : null}

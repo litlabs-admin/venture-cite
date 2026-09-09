@@ -5,11 +5,16 @@ import { ErrorState } from "@/components/ui/error-state";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { StateBadge } from "../state/StateBadge";
 import {
+  observationWindowStart,
   useVisibilityMentionRate,
   type VisibilityMentionRate,
   type VisibilityWeek,
 } from "../data/visibilityTrend";
 import {
+  approvedQuestionCount,
+  awardForTask,
+  useApprovedQuestions,
+  useAwardEvents,
   useCitedUrls,
   useEngineRankings,
   useReviewTask,
@@ -226,10 +231,14 @@ export function NoBandNote() {
 
 function CompletedWork({
   events,
+  awards,
   isPending,
   isError,
 }: {
   events: WorkHistoryEventView[] | undefined;
+  /** The award stream. A `status=verified` read carries no award of its own,
+   *  so the points a change earned are matched in from here by task id. */
+  awards: WorkHistoryEventView[] | undefined;
   isPending: boolean;
   isError: boolean;
 }) {
@@ -250,29 +259,34 @@ function CompletedWork({
         </p>
       ) : (
         <ul className="mt-3 space-y-3">
-          {rows.map((event) => (
-            <li key={event.id} className="flex items-start gap-2.5" data-testid="v2-vis-work-row">
-              <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-vc-muted text-vc-secondary"
-                aria-hidden="true"
-              >
-                <FileText className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-body font-medium text-vc-primary">{event.taskTitle}</p>
-                {verificationLabel(event.verificationMethod) && (
-                  <p className="text-caption text-vc-accent">
-                    {verificationLabel(event.verificationMethod)}
+          {rows.map((event) => {
+            const award = awardForTask(awards, event.taskId);
+            return (
+              <li key={event.id} className="flex items-start gap-2.5" data-testid="v2-vis-work-row">
+                <span
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-vc-muted text-vc-secondary"
+                  aria-hidden="true"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-body font-medium text-vc-primary">
+                    {event.taskTitle}
                   </p>
-                )}
-                {event.award?.awarded && (
-                  <p className="text-caption font-medium tabular-nums text-vc-accent">
-                    +{event.award.points} work points
-                  </p>
-                )}
-              </div>
-            </li>
-          ))}
+                  {verificationLabel(event.verificationMethod) && (
+                    <p className="text-caption text-vc-accent">
+                      {verificationLabel(event.verificationMethod)}
+                    </p>
+                  )}
+                  {award && (
+                    <p className="text-caption font-medium tabular-nums text-vc-accent">
+                      +{award.points} work points
+                    </p>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
       <Link
@@ -397,13 +411,46 @@ export function BusinessResults() {
 
 export default function VisibilityPage() {
   const { selectedBrandId, isLoading: brandsLoading } = useBrandSelection();
-  const heroQuery = useVisibilityHero(selectedBrandId);
   const rateQuery = useVisibilityMentionRate(selectedBrandId);
+  // Every dashboard read on this screen is held to the window the trend draws.
+  // Undefaulted they cover 30 days, and the rail would then report engine
+  // totals over one sample beside an answer count over another.
+  const since = observationWindowStart(rateQuery.data);
+  const heroQuery = useVisibilityHero(selectedBrandId, since);
   const workQuery = useVerifiedWork(selectedBrandId);
-  const enginesQuery = useEngineRankings(selectedBrandId);
-  const citedQuery = useCitedUrls(selectedBrandId);
+  const awardQuery = useAwardEvents(selectedBrandId);
+  const enginesQuery = useEngineRankings(selectedBrandId, since);
+  const citedQuery = useCitedUrls(selectedBrandId, since);
   const summaryQuery = useWorkSummary(selectedBrandId);
   const reviewQuery = useReviewTask(selectedBrandId);
+  const approvalQuery = useApprovedQuestions(selectedBrandId);
+
+  // ORDER MATTERS. The hero read is held behind the rate now (it takes the
+  // rate's window), so a failed rate leaves the hero permanently disabled and
+  // therefore permanently `isPending`. Testing the error branch first is what
+  // keeps a failed read reaching its error frame instead of a skeleton that
+  // never resolves.
+  if (!brandsLoading && selectedBrandId && (heroQuery.isError || rateQuery.isError)) {
+    return (
+      <VisibilityFrame
+        main={
+          <div data-testid="v2-vis-error">
+            <Heading trail={["Visibility"]} title="Understand what changed" />
+            <ErrorState
+              title="Visibility could not be loaded"
+              description="The measurement for this brand did not load. Nothing has been lost - try again."
+              onRetry={() => {
+                void heroQuery.refetch();
+                void rateQuery.refetch();
+              }}
+              isRetrying={heroQuery.isFetching || rateQuery.isFetching}
+            />
+          </div>
+        }
+        rail={<p className="text-body text-vc-secondary">Coverage is unavailable right now.</p>}
+      />
+    );
+  }
 
   // The rate is the headline, so the screen waits for it as well as the hero
   // (which is still read for the last-observation stamp).
@@ -456,28 +503,6 @@ export default function VisibilityPage() {
     );
   }
 
-  if (heroQuery.isError || rateQuery.isError) {
-    return (
-      <VisibilityFrame
-        main={
-          <div data-testid="v2-vis-error">
-            <Heading trail={["Visibility"]} title="Understand what changed" />
-            <ErrorState
-              title="Visibility could not be loaded"
-              description="The measurement for this brand did not load. Nothing has been lost - try again."
-              onRetry={() => {
-                void heroQuery.refetch();
-                void rateQuery.refetch();
-              }}
-              isRetrying={heroQuery.isFetching || rateQuery.isFetching}
-            />
-          </div>
-        }
-        rail={<p className="text-body text-vc-secondary">Coverage is unavailable right now.</p>}
-      />
-    );
-  }
-
   const hero = heroQuery.data;
   const rate = rateQuery.data;
   const measured = Boolean(rate && rate.measured > 0);
@@ -511,6 +536,7 @@ export default function VisibilityPage() {
           <div className="mt-6 grid grid-cols-1 border-t border-vc-default lg:grid-cols-3">
             <CompletedWork
               events={workQuery.data?.items}
+              awards={awardQuery.data?.items}
               isPending={workQuery.isPending}
               isError={workQuery.isError}
             />
@@ -529,12 +555,18 @@ export default function VisibilityPage() {
               <span id="v2-vis-coverage-heading">Coverage and evidence</span>
             </RailHeading>
             <div className="mt-3">
-              {/* No read in this area returns the approved-question count, so
-                  it alone is stated as unmeasured. Failed attempts ARE counted:
-                  a failed provider call is a geo_rankings row whose status line
-                  starts "Check failed:", and the v2 mention-rate read reports
-                  them rather than dividing by them. */}
-              <RailRow label="Approved questions" value={null} />
+              {/* The size of the question set a reviewer confirmed, read from
+                  the verified approval task. Never the tracked-prompt count:
+                  the generator writes `status: "tracked"` itself, so counting
+                  those rows would report an approval nobody gave. Failed
+                  attempts ARE counted too: a failed provider call is a
+                  geo_rankings row whose status line starts "Check failed:",
+                  and the v2 mention-rate read reports them rather than
+                  dividing by them. */}
+              <RailRow
+                label="Approved questions"
+                value={approvedQuestionCount(approvalQuery.data?.items)}
+              />
               <RailRow label="Successful answers" value={measured && rate ? rate.measured : null} />
               {/* A failure count is only a measurement once something was
                   attempted: with no attempt at all, 0 would read as a

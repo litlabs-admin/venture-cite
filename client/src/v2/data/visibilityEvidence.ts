@@ -24,13 +24,37 @@ import type { WorkTaskSummaryView } from "./workSummary";
 //     "Check failed:" status line, which is what
 //     `GET /api/v2/visibility/mention-rate/:brandId` counts and excludes from
 //     its denominator. None of the endpoints below report it.
-//   - No approved-question count on any endpoint in this area.
 //   - No business-results source anywhere in the API.
+//
+// THE APPROVED-QUESTION COUNT IS NOT ON A VISIBILITY READ, and for a while
+// that was taken to mean it did not exist. It does. Approval in this product
+// is a reviewer confirming the `approve_buyer_question_set` task, and the
+// verified task carries the very question ids it approved in
+// `completionRule.questionIds` (`server/services/work/sources/
+// questionOpportunities.ts`). `useApprovedQuestions` reads it from the work
+// queue. A tracked question is NOT an approved one - `promptGenerator.ts`
+// writes `status: "tracked"` on its own - so nothing here counts prompt rows.
+//
+// THE WINDOW IS PASSED, NEVER DEFAULTED. The three dashboard reads below take
+// an optional `since`; without one, `loadRankingsContext` applies a 30-DAY
+// window, which is not the eight-week window the mention rate and the trend
+// use. Reading them undefaulted put two different samples in one panel - 94
+// successful answers beside engine totals summing to 36, and an "attributed
+// sources ... in this window" line naming a window nothing else on the screen
+// drew. Each hook now requires the window start (`observationWindowStart`) and
+// stays disabled until it is known, so no read can fetch the wrong sample
+// first and show it.
 
 async function readData<T>(url: string): Promise<T> {
   const response = await apiRequest("GET", url);
   const payload = (await response.json()) as { success: boolean; data: T };
   return payload.data;
+}
+
+/** `?since=` for a read that takes one. Encoded here so the three hooks below
+ *  cannot spell the parameter differently. */
+function sinceQuery(since: string): string {
+  return `?since=${encodeURIComponent(since)}`;
 }
 
 /** `GET /api/dashboard/hero/:brandId`. */
@@ -46,12 +70,15 @@ export type VisibilityHero = {
   lastScanAt: string | null;
 };
 
-export function useVisibilityHero(brandId: string) {
+export function useVisibilityHero(brandId: string, since: string | undefined) {
   return useQuery<VisibilityHero>({
-    queryKey: ["v2", "visibility", "hero", brandId],
-    enabled: Boolean(brandId),
+    queryKey: ["v2", "visibility", "hero", brandId, since ?? ""],
+    enabled: Boolean(brandId) && Boolean(since),
     meta: { suppressErrorToast: true },
-    queryFn: () => readData<VisibilityHero>(`/api/dashboard/hero/${encodeURIComponent(brandId)}`),
+    queryFn: () =>
+      readData<VisibilityHero>(
+        `/api/dashboard/hero/${encodeURIComponent(brandId)}${sinceQuery(since!)}`,
+      ),
   });
 }
 
@@ -66,13 +93,15 @@ export type CitedUrlRow = {
 
 export type CitedUrlPage = { items: CitedUrlRow[]; total: number; truncated: boolean };
 
-export function useCitedUrls(brandId: string) {
+export function useCitedUrls(brandId: string, since: string | undefined) {
   return useQuery<CitedUrlPage>({
-    queryKey: ["v2", "visibility", "cited-urls", brandId],
-    enabled: Boolean(brandId),
+    queryKey: ["v2", "visibility", "cited-urls", brandId, since ?? ""],
+    enabled: Boolean(brandId) && Boolean(since),
     meta: { suppressErrorToast: true },
     queryFn: () =>
-      readData<CitedUrlPage>(`/api/dashboard/cited-urls/${encodeURIComponent(brandId)}`),
+      readData<CitedUrlPage>(
+        `/api/dashboard/cited-urls/${encodeURIComponent(brandId)}${sinceQuery(since!)}`,
+      ),
   });
 }
 
@@ -91,14 +120,56 @@ export type EngineRanking = {
   isCitedSnippet: boolean;
 };
 
-export function useEngineRankings(brandId: string) {
+export function useEngineRankings(brandId: string, since: string | undefined) {
   return useQuery<{ platforms: EngineRanking[] }>({
-    queryKey: ["v2", "visibility", "engines", brandId],
-    enabled: Boolean(brandId),
+    queryKey: ["v2", "visibility", "engines", brandId, since ?? ""],
+    enabled: Boolean(brandId) && Boolean(since),
     meta: { suppressErrorToast: true },
     queryFn: () =>
       readData<{ platforms: EngineRanking[] }>(
-        `/api/dashboard/rankings/${encodeURIComponent(brandId)}`,
+        `/api/dashboard/rankings/${encodeURIComponent(brandId)}${sinceQuery(since!)}`,
+      ),
+  });
+}
+
+/** The question-set approval task, in the only fields this count reads. */
+type QuestionApprovalTask = {
+  state: TaskState;
+  updatedAt: string;
+  completionRule?: { questionIds?: string[] } | null;
+};
+
+/** The states in which a reviewer has confirmed the set. `verified` is the
+ *  state confirmation lands in; `waiting_for_observation` is where it moves
+ *  once awarded. Every other state - `suggested` included - is a set nobody
+ *  has approved, which is not an approved count of zero. */
+const APPROVED_STATES: readonly TaskState[] = ["verified", "waiting_for_observation"];
+
+/**
+ * How many buyer questions the reviewer has approved, or `null` for never.
+ *
+ * `null` is the honest answer while the set is still awaiting review, and it
+ * is what the rail renders as "Not measured". A number appears only once a
+ * confirmation exists, and it is the size of the set that confirmation named -
+ * not the count of tracked prompts, which nobody approved.
+ */
+export function approvedQuestionCount(tasks: QuestionApprovalTask[] | undefined): number | null {
+  if (!tasks) return null;
+  const approved = tasks
+    .filter((task) => APPROVED_STATES.includes(task.state))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+  const ids = approved?.completionRule?.questionIds;
+  return Array.isArray(ids) ? ids.length : null;
+}
+
+export function useApprovedQuestions(brandId: string) {
+  return useQuery<{ items: QuestionApprovalTask[]; nextCursor: string | null }>({
+    queryKey: ["v2", "work", "tasks", brandId, "question-approval"],
+    enabled: Boolean(brandId),
+    meta: { suppressErrorToast: true },
+    queryFn: () =>
+      readData<{ items: QuestionApprovalTask[]; nextCursor: string | null }>(
+        `/api/brands/${encodeURIComponent(brandId)}/work/tasks?taskType=approve_buyer_question_set&limit=25`,
       ),
   });
 }
@@ -154,6 +225,50 @@ export function useVerifiedWork(brandId: string) {
         `/api/brands/${encodeURIComponent(brandId)}/work/history?status=verified&limit=25`,
       ),
   });
+}
+
+/**
+ * The award stream.
+ *
+ * WHY THIS IS A SECOND READ AND NOT A FIELD ON THE FIRST. `WorkService.
+ * getHistory` emits an award event only when the request carries NO status
+ * filter (`if (filters.status && filters.status !== "reversed") continue`), and
+ * the state transitions it emits under `status=verified` carry no `award`. So
+ * the verified-change list can never report a point award, however many
+ * `work_award_events` rows a brand holds - which is how a screen came to read
+ * "No points have been awarded yet" beside a rail saying 20 work points.
+ *
+ * The unfiltered stream is read here for the awards alone. The completed-work
+ * list keeps its `status=verified` read, because that filter is what makes it
+ * a list of finished changes rather than of every transition.
+ */
+export function useAwardEvents(brandId: string) {
+  return useQuery<{ items: WorkHistoryEventView[]; nextCursor: string | null }>({
+    queryKey: ["v2", "work", "history", brandId, "awards"],
+    enabled: Boolean(brandId),
+    meta: { suppressErrorToast: true },
+    queryFn: () =>
+      readData<{ items: WorkHistoryEventView[]; nextCursor: string | null }>(
+        `/api/brands/${encodeURIComponent(brandId)}/work/history?limit=50`,
+      ),
+  });
+}
+
+/** The points granted for one task, or `null` when none was. A task can be
+ *  verified without an award - the award is a separate record - so the absence
+ *  is left unsaid rather than printed as zero points. */
+export function awardForTask(
+  events: WorkHistoryEventView[] | undefined,
+  taskId: string,
+): WorkHistoryAwardView | null {
+  const match = (events ?? []).find(
+    (event) =>
+      event.taskId === taskId &&
+      event.award &&
+      event.award.awarded &&
+      event.award.awardStatus === "awarded",
+  );
+  return match?.award ?? null;
 }
 
 /** How a change was proven, in the user's words. `null` when the event
