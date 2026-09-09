@@ -68,6 +68,11 @@ const stubs = vi.hoisted(() => ({
   deleteOldTourEvents: vi.fn(async () => 0),
   detectFactScrapeFailureRate: vi.fn(async () => ({ alerted: 0 })),
   runBrandActivationSweep: vi.fn(async () => ({ processed: 0, total: 0 })),
+  runWorkOpportunityReconciliationJob: vi.fn(async () => ({
+    processed: 0,
+    failed: 0,
+    skipped: false,
+  })),
   runContentCostOutboxDrain: vi.fn(async () => ({
     claimed: 0,
     succeeded: 0,
@@ -86,6 +91,9 @@ const stubs = vi.hoisted(() => ({
 vi.mock("../../server/lib/brandActivation", () => ({
   runBrandActivationSweep: stubs.runBrandActivationSweep,
   populateBrandDashboard: vi.fn(async () => ({ ran: [], skipped: [] })),
+}));
+vi.mock("../../server/services/work/workOpportunityReconciliationJob", () => ({
+  runWorkOpportunityReconciliationJob: stubs.runWorkOpportunityReconciliationJob,
 }));
 
 vi.mock("../../server/scheduler", () => ({
