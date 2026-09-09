@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   awardDecision,
   awardKey,
+  capabilityMilestoneForTask,
+  LEVELS,
   levelForProgress,
   pointsForTask,
   transitionTask,
@@ -340,5 +342,42 @@ describe("work policy", () => {
         awarded: true,
       }),
     ).toMatchObject({ points: 20, awarded: true });
+  });
+});
+
+describe("capabilityMilestoneForTask", () => {
+  /**
+   * A level needs a milestone as well as points. When no task type mapped to
+   * one, no milestone was ever recorded and every brand stayed at Start no
+   * matter how much verified work it had. A task type with no milestone is
+   * work that can never raise a level, so the mapping has to be total.
+   */
+  it("maps every task type to a milestone", () => {
+    for (const taskType of TASK_TYPES) {
+      expect(capabilityMilestoneForTask(taskType as TaskType)).toBeTruthy();
+    }
+  });
+
+  /** Every level's milestone must be reachable by verifying some task. */
+  it("covers every milestone a level requires", () => {
+    const reachable = new Set<CapabilityMilestone>(
+      TASK_TYPES.map((taskType) => capabilityMilestoneForTask(taskType as TaskType)),
+    );
+    for (const level of LEVELS) {
+      expect(reachable.has(level.capabilityMilestone)).toBe(true);
+    }
+  });
+
+  it("holds a brand below a level until it has that level's milestone", () => {
+    const ready = LEVELS[1];
+    expect(
+      levelForProgress({ points: ready.points, milestones: new Set<CapabilityMilestone>() }).level,
+    ).toBe(1);
+    expect(
+      levelForProgress({
+        points: ready.points,
+        milestones: new Set<CapabilityMilestone>([ready.capabilityMilestone]),
+      }).level,
+    ).toBe(ready.level);
   });
 });
