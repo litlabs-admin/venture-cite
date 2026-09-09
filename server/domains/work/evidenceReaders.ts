@@ -113,7 +113,7 @@ async function readSource(
       and fact.is_active = 1
       and run.status in ('completed', 'succeeded')
       and run.completed_at is not null
-      and page.status in ('completed', 'succeeded', 'success')
+      and page.status in ('completed', 'succeeded', 'success', 'done')
       and page.fetched_at is not null
       and page.status_code between 200 and 299
       and page.canonical_url = ${reference.canonicalUrl}
@@ -266,7 +266,7 @@ async function readSystemCheck(
       and (fact.id = ${checkId} or run.id = ${checkId} or page.id = ${checkId})
       and run.status in ('completed', 'succeeded')
       and run.completed_at is not null
-      and page.status in ('completed', 'succeeded', 'success')
+      and page.status in ('completed', 'succeeded', 'success', 'done')
       and page.fetched_at is not null
       and page.status_code between 200 and 299
     union all
