@@ -211,6 +211,11 @@ export interface IStorage {
     promptIds: string[],
     since: Date,
   ): Promise<Array<{ weekStart: string; total: number; cited: number }>>;
+  /** Weekly counts with failed provider calls split out. The v2 read. */
+  getWeeklyMentionTrendExcludingFailures(
+    promptIds: string[],
+    since: Date,
+  ): Promise<Array<{ weekStart: string; total: number; cited: number; failed: number }>>;
   getGeoRankingsByArticleIds(ids: string[], sinceDate?: Date): Promise<GeoRanking[]>;
   updateGeoRanking(id: string, update: Partial<GeoRanking>): Promise<GeoRanking | undefined>;
 

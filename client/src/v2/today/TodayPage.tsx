@@ -3,7 +3,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Button } from "@/components/ui/button";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useAssignedTasks, useWorkSummary, type WorkSummaryView } from "../data/workSummary";
-import { useVisibilityTrend, type VisibilityWeek } from "../data/visibilityTrend";
+import { useVisibilityMentionRate, type VisibilityWeek } from "../data/visibilityTrend";
 import { PriorityTask, QueuedTaskRow } from "./PriorityTask";
 import { ProgressRail } from "./ProgressRail";
 import { ObservedVisibility } from "./ObservedVisibility";
@@ -192,7 +192,7 @@ export default function TodayPage() {
   const { selectedBrandId, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
   const summaryQuery = useWorkSummary(selectedBrandId);
   const tasksQuery = useAssignedTasks(selectedBrandId);
-  const trendQuery = useVisibilityTrend(selectedBrandId);
+  const trendQuery = useVisibilityMentionRate(selectedBrandId);
 
   if (brandsLoading) return <LoadingToday />;
   if (!selectedBrandId) return <NoBrand />;

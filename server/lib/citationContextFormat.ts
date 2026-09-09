@@ -24,6 +24,36 @@
 export const RAW_RESPONSE_DELIMITER = "||| RAW_RESPONSE |||";
 export const LEGACY_RAW_RESPONSE_DELIMITER = "--- RAW RESPONSE ---";
 
+/**
+ * Status-line prefix citationChecker writes when a provider call did not
+ * return an answer (see the `fetchError` branch in server/citationChecker.ts).
+ *
+ * A failed call still becomes a geo_rankings row, with `is_cited = 0`. That
+ * makes a failure indistinguishable from an honest "not cited" to any reader
+ * that only looks at `is_cited` - which is why every count(*) denominator over
+ * geo_rankings silently mixes "the engine answered and did not mention the
+ * brand" with "the engine never answered". This prefix is the only recorded
+ * difference between the two, so it is the classifier.
+ */
+export const CHECK_FAILED_PREFIX = "Check failed:";
+
+/**
+ * SQL LIKE pattern matching the same rows as `isFailedCheck`, for aggregate
+ * queries that must exclude failed calls without loading every row. Kept
+ * beside the predicate so the two cannot drift apart.
+ */
+export const CHECK_FAILED_LIKE_PATTERN = `${CHECK_FAILED_PREFIX}%`;
+
+/**
+ * True when the stored citationContext records a failed provider call rather
+ * than an answer. Case-insensitive, matching the live UI's own test in
+ * client/src/components/citations/PlatformResultCard.tsx.
+ */
+export function isFailedCheck(ctx: string | null | undefined): boolean {
+  if (!ctx) return false;
+  return ctx.trimStart().toLowerCase().startsWith(CHECK_FAILED_PREFIX.toLowerCase());
+}
+
 const RAW_RESPONSE_MARKER = `\n\n${RAW_RESPONSE_DELIMITER}\n`;
 const LEGACY_RAW_RESPONSE_MARKER = `\n\n${LEGACY_RAW_RESPONSE_DELIMITER}\n`;
 

@@ -22,12 +22,12 @@ import {
 type V2NavEntry = {
   label: string;
   icon: LucideIcon;
-  href?: "/v2/today" | "/v2/my-work" | "/v2/brand-facts" | "/v2/learn";
+  href?: "/v2/today" | "/v2/visibility" | "/v2/my-work" | "/v2/brand-facts" | "/v2/learn";
 };
 
 const ITEMS: V2NavEntry[] = [
   { label: "Today", icon: Sun, href: "/v2/today" },
-  { label: "Visibility", icon: TrendingUp },
+  { label: "Visibility", icon: TrendingUp, href: "/v2/visibility" },
   { label: "My work", icon: ListChecks, href: "/v2/my-work" },
   { label: "Brand facts", icon: BookOpen, href: "/v2/brand-facts" },
   // Learn is reachable, and what it reaches is an empty frame that says so.

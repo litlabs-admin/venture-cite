@@ -40,6 +40,7 @@ import { setupPromptsRoutes } from "./routes/prompts";
 import { setupPublicationsRoutes } from "./routes/publications";
 import { setupAnalyticsRoutes } from "./routes/analytics";
 import { setupDashboardRoutes } from "./routes/dashboard";
+import { setupV2Routes } from "./routes/v2";
 import { setupContentTypesRoutes } from "./routes/contentTypes";
 import { setupIntelligenceRoutes } from "./routes/intelligence";
 import { setupGeoSignalsRoutes } from "./routes/geoSignals";
@@ -529,6 +530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAdminScrapeInspectorRoutes(app);
   setupLlmJobsRoutes(app);
   setupWorkRoutes(app);
+  setupV2Routes(app);
   app.use("/api/brand-mentions", mentionsRouter);
 
   const httpServer = createServer(app);
