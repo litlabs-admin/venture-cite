@@ -79,9 +79,16 @@ export function PriorityTask({ task }: { task: WorkTaskSummaryView }) {
             )}
           </div>
 
+          {/* The board shows two lines because they say different things - what
+              was observed, then what to change. Several derived task types set
+              `reason` and `recommendedChange` to the same sentence, and
+              printing it twice reads as a rendering fault rather than as
+              emphasis, so the duplicate is dropped. */}
           <div className="mt-3 space-y-0.5 text-body text-vc-secondary">
             {task.reason && <p>{task.reason}</p>}
-            <p>{task.recommendedChange}</p>
+            {task.recommendedChange && task.recommendedChange !== task.reason && (
+              <p>{task.recommendedChange}</p>
+            )}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
