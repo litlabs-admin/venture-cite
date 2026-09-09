@@ -58,6 +58,7 @@ import { Route as AppContentArticleIdRouteImport } from './routes/_app/content.$
 import { Route as AppPromptsIndexRouteImport } from './routes/_app/prompts.index'
 import { Route as AppPromptsPromptIdRouteImport } from './routes/_app/prompts.$promptId'
 import { Route as AppV2BrandFactsRouteImport } from './routes/_app/v2.brand-facts'
+import { Route as AppV2DiagnosticsRouteImport } from './routes/_app/v2.diagnostics'
 import { Route as AppV2LearnRouteImport } from './routes/_app/v2.learn'
 import { Route as AppV2MyWorkRouteImport } from './routes/_app/v2.my-work'
 import { Route as AppV2TodayRouteImport } from './routes/_app/v2.today'
@@ -309,6 +310,11 @@ const AppV2BrandFactsRoute = AppV2BrandFactsRouteImport.update({
   path: '/brand-facts',
   getParentRoute: () => AppV2Route,
 } as any)
+const AppV2DiagnosticsRoute = AppV2DiagnosticsRouteImport.update({
+  id: '/diagnostics',
+  path: '/diagnostics',
+  getParentRoute: () => AppV2Route,
+} as any)
 const AppV2LearnRoute = AppV2LearnRouteImport.update({
   id: '/learn',
   path: '/learn',
@@ -389,6 +395,7 @@ export interface FileRoutesByFullPath {
   '/content/$articleId': typeof AppContentArticleIdRoute
   '/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
   '/v2/brand-facts': typeof AppV2BrandFactsRoute
+  '/v2/diagnostics': typeof AppV2DiagnosticsRoute
   '/v2/learn': typeof AppV2LearnRoute
   '/v2/my-work': typeof AppV2MyWorkRoute
   '/v2/today': typeof AppV2TodayRoute
@@ -443,6 +450,7 @@ export interface FileRoutesByTo {
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
   '/v2/brand-facts': typeof AppV2BrandFactsRoute
+  '/v2/diagnostics': typeof AppV2DiagnosticsRoute
   '/v2/learn': typeof AppV2LearnRoute
   '/v2/my-work': typeof AppV2MyWorkRoute
   '/v2/today': typeof AppV2TodayRoute
@@ -501,6 +509,7 @@ export interface FileRoutesById {
   '/_app/content/$articleId': typeof AppContentArticleIdRoute
   '/_app/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
   '/_app/v2/brand-facts': typeof AppV2BrandFactsRoute
+  '/_app/v2/diagnostics': typeof AppV2DiagnosticsRoute
   '/_app/v2/learn': typeof AppV2LearnRoute
   '/_app/v2/my-work': typeof AppV2MyWorkRoute
   '/_app/v2/today': typeof AppV2TodayRoute
@@ -559,6 +568,7 @@ export interface FileRouteTypes {
     | '/content/$articleId'
     | '/prompts/$promptId'
     | '/v2/brand-facts'
+    | '/v2/diagnostics'
     | '/v2/learn'
     | '/v2/my-work'
     | '/v2/today'
@@ -613,6 +623,7 @@ export interface FileRouteTypes {
     | '/admin/scrape'
     | '/content/$articleId'
     | '/v2/brand-facts'
+    | '/v2/diagnostics'
     | '/v2/learn'
     | '/v2/my-work'
     | '/v2/today'
@@ -670,6 +681,7 @@ export interface FileRouteTypes {
     | '/_app/content/$articleId'
     | '/_app/prompts/$promptId'
     | '/_app/v2/brand-facts'
+    | '/_app/v2/diagnostics'
     | '/_app/v2/learn'
     | '/_app/v2/my-work'
     | '/_app/v2/today'
@@ -1036,6 +1048,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppV2BrandFactsRouteImport
       parentRoute: typeof AppV2Route
     }
+    '/_app/v2/diagnostics': {
+      id: '/_app/v2/diagnostics'
+      path: '/diagnostics'
+      fullPath: '/v2/diagnostics'
+      preLoaderRoute: typeof AppV2DiagnosticsRouteImport
+      parentRoute: typeof AppV2Route
+    }
     '/_app/v2/learn': {
       id: '/_app/v2/learn'
       path: '/learn'
@@ -1122,6 +1141,7 @@ const AppPromptsRouteWithChildren = AppPromptsRoute._addFileChildren(
 
 interface AppV2RouteChildren {
   AppV2BrandFactsRoute: typeof AppV2BrandFactsRoute
+  AppV2DiagnosticsRoute: typeof AppV2DiagnosticsRoute
   AppV2LearnRoute: typeof AppV2LearnRoute
   AppV2MyWorkRoute: typeof AppV2MyWorkRoute
   AppV2TodayRoute: typeof AppV2TodayRoute
@@ -1129,6 +1149,7 @@ interface AppV2RouteChildren {
 
 const AppV2RouteChildren: AppV2RouteChildren = {
   AppV2BrandFactsRoute: AppV2BrandFactsRoute,
+  AppV2DiagnosticsRoute: AppV2DiagnosticsRoute,
   AppV2LearnRoute: AppV2LearnRoute,
   AppV2MyWorkRoute: AppV2MyWorkRoute,
   AppV2TodayRoute: AppV2TodayRoute,
