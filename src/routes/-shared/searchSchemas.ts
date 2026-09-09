@@ -155,3 +155,17 @@ export const geoToolsSearchSchema = z
     brand: z.string().optional().catch(undefined),
   })
   .passthrough();
+
+/** `/v2/*` - the gamified shell. `brandId` is the app-wide selector key read
+ *  by `useBrandSelection()` from every authenticated surface, so it has to
+ *  survive a hop into (and back out of) the v2 tree unchanged; `task`
+ *  deep-links a single work item on `/v2/today`. Both are plain strings for
+ *  the reason rule 1 above gives - `src/router.tsx` pins the whole app's
+ *  search to string in, string out, so a coerced or numeric field here could
+ *  only ever be a lie about what the URL contains. */
+export const v2SearchSchema = z
+  .object({
+    brandId: z.string().optional().catch(undefined),
+    task: z.string().optional().catch(undefined),
+  })
+  .passthrough();
