@@ -48,6 +48,7 @@ import { Route as AppResetPasswordRouteImport } from './routes/_app/reset-passwo
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSetupRouteImport } from './routes/_app/setup'
 import { Route as AppSiteHealthRouteImport } from './routes/_app/site-health'
+import { Route as AppV2RouteImport } from './routes/_app/v2'
 import { Route as AppVerifyEmailRouteImport } from './routes/_app/verify-email'
 import { Route as AppWelcomeRouteImport } from './routes/_app/welcome'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
@@ -56,6 +57,7 @@ import { Route as AppAdminScrapeRouteImport } from './routes/_app/admin.scrape'
 import { Route as AppContentArticleIdRouteImport } from './routes/_app/content.$articleId'
 import { Route as AppPromptsIndexRouteImport } from './routes/_app/prompts.index'
 import { Route as AppPromptsPromptIdRouteImport } from './routes/_app/prompts.$promptId'
+import { Route as AppV2TodayRouteImport } from './routes/_app/v2.today'
 import { Route as AppAdminScrapeRunIdRouteImport } from './routes/_app/admin.scrape.$runId'
 import { Route as AppPromptsPromptIdIndexRouteImport } from './routes/_app/prompts.$promptId.index'
 import { Route as AppPromptsPromptIdDiagnoseRouteImport } from './routes/_app/prompts.$promptId.diagnose'
@@ -254,6 +256,11 @@ const AppSiteHealthRoute = AppSiteHealthRouteImport.update({
   path: '/site-health',
   getParentRoute: () => AppRoute,
 } as any)
+const AppV2Route = AppV2RouteImport.update({
+  id: '/v2',
+  path: '/v2',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppVerifyEmailRoute = AppVerifyEmailRouteImport.update({
   id: '/verify-email',
   path: '/verify-email',
@@ -293,6 +300,11 @@ const AppPromptsPromptIdRoute = AppPromptsPromptIdRouteImport.update({
   id: '/$promptId',
   path: '/$promptId',
   getParentRoute: () => AppPromptsRoute,
+} as any)
+const AppV2TodayRoute = AppV2TodayRouteImport.update({
+  id: '/today',
+  path: '/today',
+  getParentRoute: () => AppV2Route,
 } as any)
 const AppAdminScrapeRunIdRoute = AppAdminScrapeRunIdRouteImport.update({
   id: '/$runId',
@@ -350,6 +362,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/setup': typeof AppSetupRoute
   '/site-health': typeof AppSiteHealthRoute
+  '/v2': typeof AppV2RouteWithChildren
   '/verify-email': typeof AppVerifyEmailRoute
   '/welcome': typeof AppWelcomeRoute
   '/api/$': typeof ApiSplatRoute
@@ -357,6 +370,7 @@ export interface FileRoutesByFullPath {
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
   '/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
+  '/v2/today': typeof AppV2TodayRoute
   '/prompts/': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
   '/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
@@ -400,12 +414,14 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/setup': typeof AppSetupRoute
   '/site-health': typeof AppSiteHealthRoute
+  '/v2': typeof AppV2RouteWithChildren
   '/verify-email': typeof AppVerifyEmailRoute
   '/welcome': typeof AppWelcomeRoute
   '/api/$': typeof ApiSplatRoute
   '/webhooks/$': typeof WebhooksSplatRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
+  '/v2/today': typeof AppV2TodayRoute
   '/prompts': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
   '/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
@@ -452,6 +468,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/setup': typeof AppSetupRoute
   '/_app/site-health': typeof AppSiteHealthRoute
+  '/_app/v2': typeof AppV2RouteWithChildren
   '/_app/verify-email': typeof AppVerifyEmailRoute
   '/_app/welcome': typeof AppWelcomeRoute
   '/api/$': typeof ApiSplatRoute
@@ -459,6 +476,7 @@ export interface FileRoutesById {
   '/_app/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/_app/content/$articleId': typeof AppContentArticleIdRoute
   '/_app/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
+  '/_app/v2/today': typeof AppV2TodayRoute
   '/_app/prompts/': typeof AppPromptsIndexRoute
   '/_app/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
   '/_app/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
@@ -505,6 +523,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/setup'
     | '/site-health'
+    | '/v2'
     | '/verify-email'
     | '/welcome'
     | '/api/$'
@@ -512,6 +531,7 @@ export interface FileRouteTypes {
     | '/admin/scrape'
     | '/content/$articleId'
     | '/prompts/$promptId'
+    | '/v2/today'
     | '/prompts/'
     | '/admin/scrape/$runId'
     | '/prompts/$promptId/diagnose'
@@ -555,12 +575,14 @@ export interface FileRouteTypes {
     | '/settings'
     | '/setup'
     | '/site-health'
+    | '/v2'
     | '/verify-email'
     | '/welcome'
     | '/api/$'
     | '/webhooks/$'
     | '/admin/scrape'
     | '/content/$articleId'
+    | '/v2/today'
     | '/prompts'
     | '/admin/scrape/$runId'
     | '/prompts/$promptId/diagnose'
@@ -606,6 +628,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/setup'
     | '/_app/site-health'
+    | '/_app/v2'
     | '/_app/verify-email'
     | '/_app/welcome'
     | '/api/$'
@@ -613,6 +636,7 @@ export interface FileRouteTypes {
     | '/_app/admin/scrape'
     | '/_app/content/$articleId'
     | '/_app/prompts/$promptId'
+    | '/_app/v2/today'
     | '/_app/prompts/'
     | '/_app/admin/scrape/$runId'
     | '/_app/prompts/$promptId/diagnose'
@@ -906,6 +930,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSiteHealthRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/v2': {
+      id: '/_app/v2'
+      path: '/v2'
+      fullPath: '/v2'
+      preLoaderRoute: typeof AppV2RouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/verify-email': {
       id: '/_app/verify-email'
       path: '/verify-email'
@@ -961,6 +992,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/prompts/$promptId'
       preLoaderRoute: typeof AppPromptsPromptIdRouteImport
       parentRoute: typeof AppPromptsRoute
+    }
+    '/_app/v2/today': {
+      id: '/_app/v2/today'
+      path: '/today'
+      fullPath: '/v2/today'
+      preLoaderRoute: typeof AppV2TodayRouteImport
+      parentRoute: typeof AppV2Route
     }
     '/_app/admin/scrape/$runId': {
       id: '/_app/admin/scrape/$runId'
@@ -1025,6 +1063,16 @@ const AppPromptsRouteWithChildren = AppPromptsRoute._addFileChildren(
   AppPromptsRouteChildren,
 )
 
+interface AppV2RouteChildren {
+  AppV2TodayRoute: typeof AppV2TodayRoute
+}
+
+const AppV2RouteChildren: AppV2RouteChildren = {
+  AppV2TodayRoute: AppV2TodayRoute,
+}
+
+const AppV2RouteWithChildren = AppV2Route._addFileChildren(AppV2RouteChildren)
+
 interface AppAdminScrapeRouteChildren {
   AppAdminScrapeRunIdRoute: typeof AppAdminScrapeRunIdRoute
 }
@@ -1070,6 +1118,7 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppSetupRoute: typeof AppSetupRoute
   AppSiteHealthRoute: typeof AppSiteHealthRoute
+  AppV2Route: typeof AppV2RouteWithChildren
   AppVerifyEmailRoute: typeof AppVerifyEmailRoute
   AppWelcomeRoute: typeof AppWelcomeRoute
   AppAdminScrapeRoute: typeof AppAdminScrapeRouteWithChildren
@@ -1108,6 +1157,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppSetupRoute: AppSetupRoute,
   AppSiteHealthRoute: AppSiteHealthRoute,
+  AppV2Route: AppV2RouteWithChildren,
   AppVerifyEmailRoute: AppVerifyEmailRoute,
   AppWelcomeRoute: AppWelcomeRoute,
   AppAdminScrapeRoute: AppAdminScrapeRouteWithChildren,
