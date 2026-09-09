@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { WorkPolicyError } from "@shared/work";
 import type {
   AwardDecision,
+  CapabilityMilestone,
   EvidenceReference,
   LevelDefinition,
   LevelProgress,
@@ -55,6 +56,40 @@ const REQUIRED_EVIDENCE_KINDS: Readonly<Record<TaskType, readonly EvidenceRefere
   review_results_and_record_decision: ["measurement", "decision"],
   complete_visibility_experiment: ["experiment", "measurement", "decision"],
 };
+
+/**
+ * The capability milestone a verified task proves.
+ *
+ * Levels need BOTH points and a milestone (see `levelForProgress`), and no
+ * mapping from task type to milestone existed - so no milestone was ever
+ * recorded, and every brand stayed at Start no matter how many points it
+ * earned. The whole ladder above level 1 was unreachable.
+ *
+ * This is derived from the verified task on the server. It must never be sent
+ * by the client: a client-supplied milestone would let any caller claim any
+ * level without doing the work the level stands for.
+ *
+ * Each milestone names the capability its level is about:
+ *  - reviewing what is tracked is the level 1 capability;
+ *  - a recorded baseline is what "Ready" means;
+ *  - changes carried through with evidence are what "Improve" means;
+ *  - a recorded decision about a result is what "Learn" means;
+ *  - an experiment observed across periods is what "Maintain" means.
+ */
+const TASK_CAPABILITY_MILESTONE: Readonly<Record<TaskType, CapabilityMilestone>> = {
+  approve_essential_brand_facts: "goal_selected_and_queue_reviewed",
+  approve_buyer_question_set: "goal_selected_and_queue_reviewed",
+  establish_measurement_baseline: "baseline_ready",
+  repair_confirmed_access_or_factual_fault: "evidenced_changes_complete",
+  improve_page_for_buyer_need: "evidenced_changes_complete",
+  complete_earned_media_or_community_work: "evidenced_changes_complete",
+  review_results_and_record_decision: "decision_recorded",
+  complete_visibility_experiment: "multi_period_maintenance",
+};
+
+export function capabilityMilestoneForTask(taskType: TaskType): CapabilityMilestone {
+  return TASK_CAPABILITY_MILESTONE[taskType];
+}
 
 export function validateCompletionRuleForTask(
   taskType: TaskType,

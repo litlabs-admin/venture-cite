@@ -7,6 +7,7 @@ import {
   reviewOutcome,
   transitionTask as applyTaskTransition,
   validateEvidenceActor,
+  capabilityMilestoneForTask,
   validateEvidenceForTask,
   validateEvidenceReferences,
   validateTriggerEvidenceActor,
@@ -677,16 +678,26 @@ export function createWorkRepository({
           ));
         if (!finalAward) throw new Error("Work award was not persisted");
         let capability: WorkCapabilityEventView | undefined;
-        if (input.capability) {
+        // The milestone is DERIVED from the verified task, never taken from
+        // the caller. Levels need a milestone as well as points, and until this
+        // was derived no milestone was ever recorded through the HTTP route -
+        // so every brand stayed at Start no matter how much work it verified.
+        // Deriving it here also means no request body can claim a level: the
+        // only way to earn one is to verify the task that stands for it.
+        const milestone = capabilityMilestoneForTask(lookup.row.taskType);
+        const capabilityEventKey =
+          input.capability?.eventKey ??
+          `capability_v1_${milestone}_${taskId}_${lookup.row.taskVersion}_${input.cycleKey}`;
+        {
           const capabilityRow = await insertBrandCapabilityEvent(transaction, {
             brandId,
             userId: actor.userId,
             taskId,
             taskVersion: lookup.row.taskVersion,
-            milestone: input.capability.milestone,
-            eventKey: input.capability.eventKey,
-            eventKind: input.capability.eventKind,
-            reason: input.capability.reason,
+            milestone,
+            eventKey: capabilityEventKey,
+            eventKind: input.capability?.eventKind,
+            reason: input.capability?.reason ?? "Verified work task",
             evidenceVersion,
           });
           const finalCapability =
@@ -695,7 +706,7 @@ export function createWorkRepository({
               transaction,
               brandId,
               actor.userId,
-              input.capability.eventKey,
+              capabilityEventKey,
               taskId,
               lookup.row.taskVersion,
             ));
@@ -703,7 +714,7 @@ export function createWorkRepository({
             !finalCapability ||
             finalCapability.taskId !== taskId ||
             finalCapability.taskVersion !== lookup.row.taskVersion ||
-            finalCapability.milestone !== input.capability.milestone
+            finalCapability.milestone !== milestone
           ) {
             throw new Error("Work capability event key conflicts with another task milestone");
           }
