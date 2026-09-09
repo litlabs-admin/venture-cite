@@ -22,14 +22,14 @@ import {
 type V2NavEntry = {
   label: string;
   icon: LucideIcon;
-  href?: "/v2/today" | "/v2/my-work";
+  href?: "/v2/today" | "/v2/my-work" | "/v2/brand-facts";
 };
 
 const ITEMS: V2NavEntry[] = [
   { label: "Today", icon: Sun, href: "/v2/today" },
   { label: "Visibility", icon: TrendingUp },
   { label: "My work", icon: ListChecks, href: "/v2/my-work" },
-  { label: "Brand facts", icon: BookOpen },
+  { label: "Brand facts", icon: BookOpen, href: "/v2/brand-facts" },
   { label: "Learn", icon: GraduationCap },
 ];
 
