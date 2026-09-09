@@ -1,4 +1,4 @@
-import type { Express, Request, Response, RequestHandler } from "express";
+import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -11,6 +11,7 @@ import {
   type WorkOutcomeReviewResult,
   type WorkVerificationResult,
 } from "../domains/work/repository";
+import { LEVELS, levelForProgress } from "../domains/work/policy";
 import {
   createWorkService,
   isWorkCursor,
@@ -199,13 +200,6 @@ const todayQuerySchema = z
 
 type WorkContext = { service: WorkService };
 
-const bearerOnly: RequestHandler = (req, res, next) => {
-  if (!/^Bearer\s+\S+$/i.test(req.headers.authorization ?? "")) {
-    return res.status(401).json({ success: false, error: "Not authenticated" });
-  }
-  return next();
-};
-
 function context(req: Request): WorkContext {
   const user = requireUser(req);
   const actor = createRequestActor(user.id);
@@ -226,7 +220,6 @@ function context(req: Request): WorkContext {
 export function setupWorkRoutes(app: Express): void {
   app.get(
     "/api/brands/:brandId/work/summary",
-    bearerOnly,
     isAuthenticated,
     asyncHandler(async (req, res) => {
       const query = todayQuerySchema.safeParse(req.query);
@@ -237,14 +230,23 @@ export function setupWorkRoutes(app: Express): void {
         const result = await context(req).service.getToday({ brandId, mode: query.data.mode });
         if (isNotFound(result)) return res.status(404).json({ success: false, error: "not_found" });
         const summary = result.summary;
+        const points = summary?.awards.points ?? 0;
+        const milestoneList = summary?.capabilityState.map((m) => m.milestone) ?? [];
+        const current = levelForProgress({ points, milestones: new Set(milestoneList) });
+        const next = LEVELS.find((level) => level.level === current.level + 1) ?? null;
         const projectedTasks = result.tasks.map((task) => projectTask(task));
         return res.json({
           success: true,
           data: {
             brandId,
-            points: summary?.awards.points ?? 0,
+            points,
             pendingCount: summary?.taskCounts.pending ?? 0,
-            milestones: summary?.capabilityState.map((milestone) => milestone.milestone) ?? [],
+            milestones: milestoneList,
+            currentLevel: { level: current.level, name: current.name, points: current.points },
+            nextThreshold: next
+              ? { level: next.level, name: next.name, points: next.points }
+              : null,
+            goal: result.goal ?? null,
             nextTask: projectedTasks[0] ?? null,
             waitingTasks: projectedTasks.filter((task) => task.state === "waiting_for_observation"),
             mode: result.mode,
@@ -258,7 +260,6 @@ export function setupWorkRoutes(app: Express): void {
 
   app.get(
     "/api/brands/:brandId/work/tasks",
-    bearerOnly,
     isAuthenticated,
     asyncHandler(async (req, res) => {
       const query = listQuerySchema.safeParse(req.query);
@@ -291,9 +292,31 @@ export function setupWorkRoutes(app: Express): void {
     }),
   );
 
+  app.post(
+    "/api/brands/:brandId/work/reconcile",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      const brandId = await ownedBrand(req);
+      if (!brandId) return;
+      try {
+        const { reconcileBrandWorkOpportunities } =
+          await import("../services/work/productionOpportunities");
+        const links = await reconcileBrandWorkOpportunities({
+          actor: createRequestActor(requireUser(req).id),
+          brandId,
+        });
+        return res.json({
+          success: true,
+          data: { links: links ?? [], count: links?.length ?? 0 },
+        });
+      } catch (error) {
+        return respondError(res, error, "Unable to reconcile work opportunities");
+      }
+    }),
+  );
+
   app.get(
     "/api/brands/:brandId/work/tasks/:taskId",
-    bearerOnly,
     isAuthenticated,
     asyncHandler(async (req, res) => {
       const brandId = await ownedBrand(req);
@@ -310,7 +333,6 @@ export function setupWorkRoutes(app: Express): void {
 
   app.post(
     "/api/brands/:brandId/work/tasks/:taskId/commands",
-    bearerOnly,
     isAuthenticated,
     asyncHandler(async (req, res) => {
       const parsed = commandRequestSchema.safeParse(req.body);
@@ -333,7 +355,6 @@ export function setupWorkRoutes(app: Express): void {
 
   app.post(
     "/api/brands/:brandId/work/tasks/:taskId/verify",
-    bearerOnly,
     isAuthenticated,
     asyncHandler(async (req, res) => {
       const parsed = verifyRequestSchema.safeParse(req.body);
@@ -358,7 +379,6 @@ export function setupWorkRoutes(app: Express): void {
 
   app.post(
     "/api/brands/:brandId/work/tasks/:taskId/review",
-    bearerOnly,
     isAuthenticated,
     asyncHandler(async (req, res) => {
       const parsed = reviewRequestSchema.safeParse(req.body);
@@ -380,7 +400,6 @@ export function setupWorkRoutes(app: Express): void {
 
   app.get(
     "/api/brands/:brandId/work/history",
-    bearerOnly,
     isAuthenticated,
     asyncHandler(async (req, res) => {
       const query = listQuerySchema.safeParse(req.query);
@@ -412,7 +431,6 @@ export function setupWorkRoutes(app: Express): void {
 
   app.get(
     "/api/brands/:brandId/work/export",
-    bearerOnly,
     isAuthenticated,
     asyncHandler(async (req, res) => {
       const brandId = await ownedBrand(req);

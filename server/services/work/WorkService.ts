@@ -14,6 +14,7 @@ import type {
 } from "../../domains/work/repository";
 import type {
   WorkAwardView,
+  WorkGoal,
   WorkSummaryInputs,
   WorkTaskDetailsView,
   WorkTaskView,
@@ -75,6 +76,7 @@ export type WorkHistoryAward = {
 export type WorkTodayResult = {
   mode: "guided" | "expert";
   summary: WorkSummaryInputs | undefined;
+  goal: WorkGoal | null;
   tasks: Array<WorkTaskView | WorkTaskWithDetails>;
 };
 
@@ -98,11 +100,12 @@ export function createWorkService({
     mode: "guided" | "expert";
   }): Promise<WorkTodayResult | { kind: "not_found" }> {
     if (!(await ownsBrand(input.brandId))) return { kind: "not_found" };
-    const [summary, listedTasks] = await Promise.all([
+    const [summary, goal, listedTasks] = await Promise.all([
       repository.getSummaryInputs(input.brandId),
+      repository.getActiveBrandGoal(input.brandId),
       repository.listTasks(input.brandId, { limit: 100 }),
     ]);
-    if (listedTasks === undefined) return { kind: "not_found" };
+    if (goal === undefined || listedTasks === undefined) return { kind: "not_found" };
     const topTasks = listedTasks
       .filter((item) => isActionableState(item.state))
       .sort(compareWorkTasks)
@@ -116,7 +119,7 @@ export function createWorkService({
               return details ? { ...item, details } : item;
             }),
           );
-    return { mode: input.mode, summary, tasks };
+    return { mode: input.mode, summary, goal, tasks };
   }
 
   async function getTasks(input: { brandId: string }) {

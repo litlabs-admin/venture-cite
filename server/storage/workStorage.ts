@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   brandCapabilityEvents,
+  brandGoals,
   brands,
   workOutcomeReviews,
   workTaskEvidence,
@@ -366,6 +367,11 @@ export type WorkSummaryInputs = {
   capabilityState: WorkMilestoneSummary[];
 };
 
+export type WorkGoal = {
+  title: string;
+  statement: string;
+};
+
 const TASK_STATES: readonly TaskState[] = [
   "suggested",
   "accepted",
@@ -622,6 +628,18 @@ export async function selectSummaryInputs(
     awards: normalizeAwardTotals(awardTotals),
     capabilityState: rowsFromResult(capabilityResult).map(normalizeMilestoneSummary),
   };
+}
+
+export async function selectActiveBrandGoal(
+  transaction: RequestRepositoryTransaction,
+  brandId: string,
+): Promise<WorkGoal | null> {
+  const [row] = await transaction
+    .select({ title: brandGoals.title, statement: brandGoals.statement })
+    .from(brandGoals)
+    .where(and(eq(brandGoals.brandId, brandId), eq(brandGoals.status, "active")))
+    .limit(1);
+  return row ?? null;
 }
 
 export async function findActiveBrand(

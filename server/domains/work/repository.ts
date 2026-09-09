@@ -40,6 +40,7 @@ import {
   listWorkTaskEvents,
   nextWorkEvidenceVersion,
   selectBrandCapabilityEventByKey,
+  selectActiveBrandGoal,
   selectSummaryInputs,
   selectWorkAwardById,
   selectWorkAwardByKey,
@@ -63,6 +64,7 @@ import {
   type WorkTaskFilters,
   type WorkTaskView,
   type WorkTaskDetailsView,
+  type WorkGoal,
 } from "../../storage/workStorage";
 import { createDatabaseWorkEvidenceAuthorizer } from "./evidenceReaders";
 import type { TriggerEvidenceReference } from "./opportunities";
@@ -73,6 +75,7 @@ export type {
   WorkTaskFilters,
   WorkTaskView,
   WorkTaskDetailsView,
+  WorkGoal,
 } from "../../storage/workStorage";
 
 export type { WorkAwardView, WorkCapabilityEventView, WorkEvidenceInput, WorkOutcomeReviewView };
@@ -217,6 +220,7 @@ export type WorkRepository = {
   getTask(brandId: string, taskId: string): Promise<WorkTaskView | undefined>;
   listTasks(brandId: string, filters?: WorkTaskFilters): Promise<WorkTaskView[] | undefined>;
   getSummaryInputs(brandId: string): Promise<WorkSummaryInputs | undefined>;
+  getActiveBrandGoal(brandId: string): Promise<WorkGoal | null | undefined>;
   getTaskDetails(brandId: string, taskId: string): Promise<WorkTaskDetailsView | undefined>;
   listAwardEvents(brandId: string): Promise<WorkAwardView[] | undefined>;
   createTask(brandId: string, input: WorkTaskCreateInput): Promise<WorkTaskView | undefined>;
@@ -301,6 +305,14 @@ export function createWorkRepository({
         const visibility = await findActiveBrand(transaction, brandId, actor.userId);
         if (visibility.kind !== "owned_active") return undefined;
         return selectSummaryInputs(transaction, brandId, actor.userId);
+      });
+    },
+
+    getActiveBrandGoal(brandId) {
+      return run(async (transaction) => {
+        const visibility = await findActiveBrand(transaction, brandId, actor.userId);
+        if (visibility.kind !== "owned_active") return undefined;
+        return selectActiveBrandGoal(transaction, brandId);
       });
     },
 

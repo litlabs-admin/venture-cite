@@ -72,6 +72,7 @@ const mocks = vi.hoisted(() => ({
     verifyTask: vi.fn(),
     reviewTask: vi.fn(),
   },
+  reconcileBrandWorkOpportunities: vi.fn(),
   repository: { getTaskDetails: vi.fn() },
   requireBrand: vi.fn(),
 }));
@@ -82,7 +83,7 @@ vi.mock("../../server/storage", () => ({
 }));
 vi.mock("../../server/auth", () => ({
   isAuthenticated: (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (req.headers.authorization !== "Bearer test-token")
+    if (req.headers.authorization !== "Bearer test-token" && !req.headers.cookie)
       return res.status(401).json({ success: false, error: "Not authenticated" });
     (req as express.Request & { user?: typeof user }).user = user;
     return next();
@@ -103,6 +104,9 @@ vi.mock("../../server/services/work/WorkService", () => ({
       JSON.stringify({ timestamp: "2026-09-02T00:00:00.000Z", id: "task-a" }),
       "utf8",
     ).toString("base64url"),
+}));
+vi.mock("../../server/services/work/productionOpportunities", () => ({
+  reconcileBrandWorkOpportunities: mocks.reconcileBrandWorkOpportunities,
 }));
 vi.mock("../../server/lib/routesShared", () => ({
   asyncHandler: (handler: unknown) => handler,
@@ -187,12 +191,83 @@ describe("work routes", () => {
     });
   });
 
-  it("requires Bearer authentication and ignores cookies", async () => {
-    await request(makeApp())
+  it("allows a cookie-session request with no bearer header", async () => {
+    const res = await request(makeApp())
       .get(`/api/brands/${brand.id}/work/summary`)
-      .set("Cookie", "session=fake")
-      .expect(401);
-    expect(mocks.service.getToday).not.toHaveBeenCalled();
+      .set("Cookie", "connect.sid=s%3Avalid");
+    expect(res.status).not.toBe(401);
+  });
+
+  it("reconciles opportunities on demand", async () => {
+    const links = [
+      {
+        id: "task-a",
+        taskKey: "baseline",
+        taskVersion: 1,
+        taskType: task.taskType,
+        state: task.state,
+      },
+    ];
+    mocks.reconcileBrandWorkOpportunities.mockResolvedValueOnce(links);
+    const res = await request(makeApp())
+      .post(`/api/brands/${brand.id}/work/reconcile`)
+      .set("Authorization", "Bearer test-token");
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      success: true,
+      data: { links: expect.any(Array), count: expect.any(Number) },
+    });
+  });
+
+  it("surfaces reconcile failures", async () => {
+    mocks.reconcileBrandWorkOpportunities.mockRejectedValueOnce(new Error("reconcile failed"));
+    const res = await request(makeApp())
+      .post(`/api/brands/${brand.id}/work/reconcile`)
+      .set("Authorization", "Bearer test-token");
+    expect(res.status).toBe(500);
+    expect(res.body).toMatchObject({
+      success: false,
+      error: "Unable to reconcile work opportunities",
+    });
+  });
+
+  it("returns the level and next threshold the today page reads", async () => {
+    mocks.service.getToday.mockResolvedValueOnce({
+      mode: "guided",
+      summary: {
+        ...summary,
+        awards: { ...summary.awards, points: 60 },
+      },
+      tasks: [],
+      goal: { title: "Improve visibility", statement: "Reach more buyers" },
+    });
+    const res = await request(makeApp())
+      .get(`/api/brands/${brand.id}/work/summary`)
+      .set("Authorization", "Bearer test-token");
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({
+      currentLevel: { level: 2, name: "Ready", points: 60 },
+      nextThreshold: { level: 3, name: "Improve", points: 160 },
+      goal: { title: "Improve visibility", statement: "Reach more buyers" },
+    });
+  });
+
+  it("reports Start for a brand with no awards", async () => {
+    mocks.service.getToday.mockResolvedValueOnce({
+      mode: "guided",
+      summary: {
+        ...summary,
+        awards: { ...summary.awards, points: 0 },
+        capabilityState: [],
+      },
+      tasks: [],
+      goal: null,
+    });
+    const res = await request(makeApp())
+      .get("/api/brands/brand-empty/work/summary")
+      .set("Authorization", "Bearer test-token");
+    expect(res.body.data.currentLevel).toMatchObject({ level: 1, name: "Start", points: 0 });
+    expect(res.body.data.nextThreshold).toMatchObject({ level: 2, name: "Ready", points: 60 });
   });
 
   it("returns 404 for a foreign brand", async () => {

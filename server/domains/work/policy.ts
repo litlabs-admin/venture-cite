@@ -25,7 +25,7 @@ const TASK_POINTS: Readonly<Record<TaskType, number>> = {
   complete_visibility_experiment: 50,
 };
 
-const LEVELS: readonly LevelDefinition[] = [
+export const LEVELS: readonly LevelDefinition[] = [
   { level: 1, name: "Start", points: 0, capabilityMilestone: "goal_selected_and_queue_reviewed" },
   { level: 2, name: "Ready", points: 60, capabilityMilestone: "baseline_ready" },
   { level: 3, name: "Improve", points: 160, capabilityMilestone: "evidenced_changes_complete" },
