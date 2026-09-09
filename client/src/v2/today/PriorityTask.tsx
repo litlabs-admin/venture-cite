@@ -1,19 +1,9 @@
 import { useState } from "react";
-import {
-  AlertCircle,
-  BarChart3,
-  BookOpen,
-  ChevronRight,
-  Clock,
-  FileText,
-  FlaskConical,
-  Gauge,
-  ListChecks,
-  Megaphone,
-  type LucideIcon,
-} from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { AlertCircle, ChevronRight, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { TaskType } from "@shared/work";
+import { TASK_ICONS, TRIGGERS, formatEffort } from "../data/taskVocabulary";
 import type { WorkTaskSummaryView } from "../data/workSummary";
 
 // The lead task, and the ranked rows under it.
@@ -24,42 +14,10 @@ import type { WorkTaskSummaryView } from "../data/workSummary";
 // screen's whole argument - the work is the subject, the measurement is the
 // evidence - so promoting the percentage to a display number here would
 // invert it.
-
-const TASK_ICONS: Readonly<Record<TaskType, LucideIcon>> = {
-  approve_essential_brand_facts: FileText,
-  approve_buyer_question_set: ListChecks,
-  establish_measurement_baseline: Gauge,
-  repair_confirmed_access_or_factual_fault: FileText,
-  improve_page_for_buyer_need: BookOpen,
-  complete_earned_media_or_community_work: Megaphone,
-  review_results_and_record_decision: BarChart3,
-  complete_visibility_experiment: FlaskConical,
-};
-
-/** What put this task in the queue. Only a confirmed fault is an alarm; the
- *  rest are neutral openings, and are toned that way rather than borrowing
- *  urgency they have not earned. */
-const TRIGGERS: Readonly<Record<TaskType, { label: string; alarming: boolean }>> = {
-  approve_essential_brand_facts: { label: "Facts not approved yet", alarming: false },
-  approve_buyer_question_set: { label: "Question set not approved", alarming: false },
-  establish_measurement_baseline: { label: "No baseline recorded", alarming: false },
-  repair_confirmed_access_or_factual_fault: { label: "Confirmed fact conflict", alarming: true },
-  improve_page_for_buyer_need: { label: "Buyer need unanswered", alarming: false },
-  complete_earned_media_or_community_work: { label: "Coverage gap", alarming: false },
-  review_results_and_record_decision: { label: "Results ready to review", alarming: false },
-  complete_visibility_experiment: { label: "Experiment ready to run", alarming: false },
-};
-
-/** `effort` is nullable minutes. An absent effort renders nothing at all -
- *  a guessed "About 15 minutes" would be an invented measurement. */
-export function formatEffort(minutes: number | null): string | null {
-  if (minutes === null || !Number.isFinite(minutes) || minutes <= 0) return null;
-  if (minutes < 60) return `About ${minutes} minutes`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  const hourPart = `${hours} hour${hours === 1 ? "" : "s"}`;
-  return rest === 0 ? `About ${hourPart}` : `About ${hourPart} ${rest} minutes`;
-}
+//
+// The icon, the trigger phrase and the effort wording come from
+// `data/taskVocabulary.ts`, shared with My work: the two screens show the same
+// tasks and must call them the same things.
 
 function TaskTile({ type, size = "lg" }: { type: TaskType; size?: "lg" | "sm" }) {
   const Icon = TASK_ICONS[type];
@@ -165,8 +123,9 @@ export function PriorityTask({ task }: { task: WorkTaskSummaryView }) {
 /**
  * A ranked row under the lead task.
  *
- * It expands in place rather than linking: `/v2/my-work` does not exist yet,
- * and a chevron that navigates nowhere is worse than one that opens the row.
+ * It expands in place rather than navigating: the row's own summary answers
+ * "what is this?" without leaving Today. The expanded panel then offers the
+ * one link that does leave - the task's own page under My work.
  * The chevron rotates so the affordance still reads as "there is more here".
  */
 export function QueuedTaskRow({ task }: { task: WorkTaskSummaryView }) {
@@ -191,7 +150,18 @@ export function QueuedTaskRow({ task }: { task: WorkTaskSummaryView }) {
           aria-hidden="true"
         />
       </button>
-      {open && <p className="pb-4 pl-11 text-body text-vc-secondary">{task.recommendedChange}</p>}
+      {open && (
+        <div className="pb-4 pl-11">
+          <p className="text-body text-vc-secondary">{task.recommendedChange}</p>
+          <Link
+            to="/v2/my-work"
+            search={{ task: task.id }}
+            className="mt-2 inline-block text-caption font-medium text-vc-accent hover:underline"
+          >
+            Open task
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
