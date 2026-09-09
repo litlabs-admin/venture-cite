@@ -149,6 +149,7 @@ function repository(overrides: Partial<WorkRepository> = {}) {
       .fn<WorkRepository["listTasks"]>()
       .mockResolvedValue(TASK_IDS.map((id) => task(id))),
     getSummaryInputs: vi.fn<WorkRepository["getSummaryInputs"]>().mockResolvedValue(summary),
+    getActiveBrandGoal: vi.fn<WorkRepository["getActiveBrandGoal"]>().mockResolvedValue(null),
     getTaskDetails: vi.fn<WorkRepository["getTaskDetails"]>().mockResolvedValue({
       evidence: [],
       history: [],
@@ -272,6 +273,21 @@ describe("WorkService", () => {
     expect(repo.getSummaryInputs).toHaveBeenCalledWith(BRAND_A_ID);
     expect(repo.listTasks).toHaveBeenCalledWith(BRAND_A_ID, expect.anything());
     expect(repo.createTask).not.toHaveBeenCalled();
+  });
+
+  it("exposes the active brand goal through getToday", async () => {
+    const repo = repository({
+      getActiveBrandGoal: vi.fn().mockResolvedValue({
+        title: "Improve visibility",
+        statement: "Reach more buyers",
+      }),
+    });
+    const service = makeService({ actor: actorA, repository: repo, brandReader: brandReader() });
+
+    await expect(service.getToday({ brandId: BRAND_A_ID, mode: "guided" })).resolves.toMatchObject({
+      goal: { title: "Improve visibility", statement: "Reach more buyers" },
+    });
+    expect(repo.getActiveBrandGoal).toHaveBeenCalledWith(BRAND_A_ID);
   });
 
   it("limits Guided mode to three deterministic tasks", async () => {
