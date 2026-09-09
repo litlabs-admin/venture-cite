@@ -73,13 +73,13 @@ describeIfLocal("work opportunity readers through the restricted request role", 
     await ownerPool.query(
       `insert into public.brand_fact_scrape_runs
        (id, brand_id, status, triggered_by, completed_at)
-       values ($1, $2, 'completed', 'test', now())`,
+       values ($1, $2, 'completed', 'manual_rescrape', now())`,
       [runAId, brandAId],
     );
     await ownerPool.query(
       `insert into public.brand_fact_scrape_pages
        (id, run_id, url, canonical_url, status, fetched_at, status_code, excerpt)
-       values ($1, $2, 'https://reader.example/facts', 'https://reader.example/facts', 'completed', now(), 200, 'Reader source excerpt.')`,
+       values ($1, $2, 'https://reader.example/facts', 'https://reader.example/facts', 'done', now(), 200, 'Reader source excerpt.')`,
       [pageAId, runAId],
     );
     await ownerPool.query(

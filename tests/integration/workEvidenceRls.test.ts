@@ -55,13 +55,13 @@ describeIfLocal("work evidence reader RLS (migration 0132)", () => {
     await ownerPool.query(
       `insert into public.brand_fact_scrape_runs
        (id, brand_id, status, triggered_by, completed_at)
-       values ($1, $2, 'completed', 'test', now())`,
+       values ($1, $2, 'completed', 'manual_rescrape', now())`,
       [runId, brandAId],
     );
     await ownerPool.query(
       `insert into public.brand_fact_scrape_pages
        (id, run_id, url, canonical_url, status, fetched_at, status_code)
-       values ($1, $2, 'https://evidence.example/facts', 'https://evidence.example/facts', 'completed', now(), 200)`,
+       values ($1, $2, 'https://evidence.example/facts', 'https://evidence.example/facts', 'done', now(), 200)`,
       [pageId, runId],
     );
     await ownerPool.query(
@@ -99,7 +99,7 @@ describeIfLocal("work evidence reader RLS (migration 0132)", () => {
          where fact.id = $1 and page.id = $2
            and fact.accepted_at is not null and fact.is_active = 1
            and run.status = 'completed' and run.completed_at is not null
-           and page.status = 'completed' and page.status_code between 200 and 299`,
+           and page.status = 'done' and page.status_code between 200 and 299`,
         [factId, pageId],
       );
       await client.query("rollback");

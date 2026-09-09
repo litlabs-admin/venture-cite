@@ -551,13 +551,13 @@ async function seedAuthoritativeSource(pool: Pool, brandId: string): Promise<Sou
   await pool.query(
     `insert into public.brand_fact_scrape_runs
        (id, brand_id, status, triggered_by, completed_at)
-     values ($1, $2, 'completed', 'work-isolation-test', $3::timestamptz)`,
+     values ($1, $2, 'completed', 'manual_rescrape', $3::timestamptz)`,
     [runId, brandId, retrievedAt],
   );
   await pool.query(
     `insert into public.brand_fact_scrape_pages
        (id, run_id, url, canonical_url, status, fetched_at, status_code)
-     values ($1, $2, $3, $3, 'completed', $4::timestamptz, 200)`,
+     values ($1, $2, $3, $3, 'done', $4::timestamptz, 200)`,
     [pageId, runId, sourceUrl, retrievedAt],
   );
   await pool.query(
