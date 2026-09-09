@@ -58,9 +58,13 @@ import { Route as AppContentArticleIdRouteImport } from './routes/_app/content.$
 import { Route as AppPromptsIndexRouteImport } from './routes/_app/prompts.index'
 import { Route as AppPromptsPromptIdRouteImport } from './routes/_app/prompts.$promptId'
 import { Route as AppV2TodayRouteImport } from './routes/_app/v2.today'
+import { Route as AppV2VisibilityRouteImport } from './routes/_app/v2.visibility'
 import { Route as AppAdminScrapeRunIdRouteImport } from './routes/_app/admin.scrape.$runId'
 import { Route as AppPromptsPromptIdIndexRouteImport } from './routes/_app/prompts.$promptId.index'
 import { Route as AppPromptsPromptIdDiagnoseRouteImport } from './routes/_app/prompts.$promptId.diagnose'
+import { Route as AppV2VisibilityIndexRouteImport } from './routes/_app/v2.visibility.index'
+import { Route as AppV2VisibilityEvidenceRouteImport } from './routes/_app/v2.visibility.evidence'
+import { Route as AppV2VisibilityResultsRouteImport } from './routes/_app/v2.visibility.results'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -306,6 +310,11 @@ const AppV2TodayRoute = AppV2TodayRouteImport.update({
   path: '/today',
   getParentRoute: () => AppV2Route,
 } as any)
+const AppV2VisibilityRoute = AppV2VisibilityRouteImport.update({
+  id: '/visibility',
+  path: '/visibility',
+  getParentRoute: () => AppV2Route,
+} as any)
 const AppAdminScrapeRunIdRoute = AppAdminScrapeRunIdRouteImport.update({
   id: '/$runId',
   path: '/$runId',
@@ -322,6 +331,21 @@ const AppPromptsPromptIdDiagnoseRoute =
     path: '/diagnose',
     getParentRoute: () => AppPromptsPromptIdRoute,
   } as any)
+const AppV2VisibilityIndexRoute = AppV2VisibilityIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppV2VisibilityRoute,
+} as any)
+const AppV2VisibilityEvidenceRoute = AppV2VisibilityEvidenceRouteImport.update({
+  id: '/evidence',
+  path: '/evidence',
+  getParentRoute: () => AppV2VisibilityRoute,
+} as any)
+const AppV2VisibilityResultsRoute = AppV2VisibilityResultsRouteImport.update({
+  id: '/results',
+  path: '/results',
+  getParentRoute: () => AppV2VisibilityRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -371,10 +395,14 @@ export interface FileRoutesByFullPath {
   '/content/$articleId': typeof AppContentArticleIdRoute
   '/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
   '/v2/today': typeof AppV2TodayRoute
+  '/v2/visibility': typeof AppV2VisibilityRouteWithChildren
   '/prompts/': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
   '/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
+  '/v2/visibility/evidence': typeof AppV2VisibilityEvidenceRoute
+  '/v2/visibility/results': typeof AppV2VisibilityResultsRoute
   '/prompts/$promptId/': typeof AppPromptsPromptIdIndexRoute
+  '/v2/visibility/': typeof AppV2VisibilityIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -425,7 +453,10 @@ export interface FileRoutesByTo {
   '/prompts': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
   '/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
+  '/v2/visibility/evidence': typeof AppV2VisibilityEvidenceRoute
+  '/v2/visibility/results': typeof AppV2VisibilityResultsRoute
   '/prompts/$promptId': typeof AppPromptsPromptIdIndexRoute
+  '/v2/visibility': typeof AppV2VisibilityIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -477,10 +508,14 @@ export interface FileRoutesById {
   '/_app/content/$articleId': typeof AppContentArticleIdRoute
   '/_app/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
   '/_app/v2/today': typeof AppV2TodayRoute
+  '/_app/v2/visibility': typeof AppV2VisibilityRouteWithChildren
   '/_app/prompts/': typeof AppPromptsIndexRoute
   '/_app/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
   '/_app/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
+  '/_app/v2/visibility/evidence': typeof AppV2VisibilityEvidenceRoute
+  '/_app/v2/visibility/results': typeof AppV2VisibilityResultsRoute
   '/_app/prompts/$promptId/': typeof AppPromptsPromptIdIndexRoute
+  '/_app/v2/visibility/': typeof AppV2VisibilityIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -532,10 +567,14 @@ export interface FileRouteTypes {
     | '/content/$articleId'
     | '/prompts/$promptId'
     | '/v2/today'
+    | '/v2/visibility'
     | '/prompts/'
     | '/admin/scrape/$runId'
     | '/prompts/$promptId/diagnose'
+    | '/v2/visibility/evidence'
+    | '/v2/visibility/results'
     | '/prompts/$promptId/'
+    | '/v2/visibility/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -586,7 +625,10 @@ export interface FileRouteTypes {
     | '/prompts'
     | '/admin/scrape/$runId'
     | '/prompts/$promptId/diagnose'
+    | '/v2/visibility/evidence'
+    | '/v2/visibility/results'
     | '/prompts/$promptId'
+    | '/v2/visibility'
   id:
     | '__root__'
     | '/'
@@ -637,10 +679,14 @@ export interface FileRouteTypes {
     | '/_app/content/$articleId'
     | '/_app/prompts/$promptId'
     | '/_app/v2/today'
+    | '/_app/v2/visibility'
     | '/_app/prompts/'
     | '/_app/admin/scrape/$runId'
     | '/_app/prompts/$promptId/diagnose'
+    | '/_app/v2/visibility/evidence'
+    | '/_app/v2/visibility/results'
     | '/_app/prompts/$promptId/'
+    | '/_app/v2/visibility/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1000,6 +1046,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppV2TodayRouteImport
       parentRoute: typeof AppV2Route
     }
+    '/_app/v2/visibility': {
+      id: '/_app/v2/visibility'
+      path: '/visibility'
+      fullPath: '/v2/visibility'
+      preLoaderRoute: typeof AppV2VisibilityRouteImport
+      parentRoute: typeof AppV2Route
+    }
     '/_app/admin/scrape/$runId': {
       id: '/_app/admin/scrape/$runId'
       path: '/$runId'
@@ -1020,6 +1073,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/prompts/$promptId/diagnose'
       preLoaderRoute: typeof AppPromptsPromptIdDiagnoseRouteImport
       parentRoute: typeof AppPromptsPromptIdRoute
+    }
+    '/_app/v2/visibility/': {
+      id: '/_app/v2/visibility/'
+      path: '/'
+      fullPath: '/v2/visibility/'
+      preLoaderRoute: typeof AppV2VisibilityIndexRouteImport
+      parentRoute: typeof AppV2VisibilityRoute
+    }
+    '/_app/v2/visibility/evidence': {
+      id: '/_app/v2/visibility/evidence'
+      path: '/evidence'
+      fullPath: '/v2/visibility/evidence'
+      preLoaderRoute: typeof AppV2VisibilityEvidenceRouteImport
+      parentRoute: typeof AppV2VisibilityRoute
+    }
+    '/_app/v2/visibility/results': {
+      id: '/_app/v2/visibility/results'
+      path: '/results'
+      fullPath: '/v2/visibility/results'
+      preLoaderRoute: typeof AppV2VisibilityResultsRouteImport
+      parentRoute: typeof AppV2VisibilityRoute
     }
   }
 }
@@ -1063,12 +1137,30 @@ const AppPromptsRouteWithChildren = AppPromptsRoute._addFileChildren(
   AppPromptsRouteChildren,
 )
 
+interface AppV2VisibilityRouteChildren {
+  AppV2VisibilityEvidenceRoute: typeof AppV2VisibilityEvidenceRoute
+  AppV2VisibilityResultsRoute: typeof AppV2VisibilityResultsRoute
+  AppV2VisibilityIndexRoute: typeof AppV2VisibilityIndexRoute
+}
+
+const AppV2VisibilityRouteChildren: AppV2VisibilityRouteChildren = {
+  AppV2VisibilityEvidenceRoute: AppV2VisibilityEvidenceRoute,
+  AppV2VisibilityResultsRoute: AppV2VisibilityResultsRoute,
+  AppV2VisibilityIndexRoute: AppV2VisibilityIndexRoute,
+}
+
+const AppV2VisibilityRouteWithChildren = AppV2VisibilityRoute._addFileChildren(
+  AppV2VisibilityRouteChildren,
+)
+
 interface AppV2RouteChildren {
   AppV2TodayRoute: typeof AppV2TodayRoute
+  AppV2VisibilityRoute: typeof AppV2VisibilityRouteWithChildren
 }
 
 const AppV2RouteChildren: AppV2RouteChildren = {
   AppV2TodayRoute: AppV2TodayRoute,
+  AppV2VisibilityRoute: AppV2VisibilityRouteWithChildren,
 }
 
 const AppV2RouteWithChildren = AppV2Route._addFileChildren(AppV2RouteChildren)

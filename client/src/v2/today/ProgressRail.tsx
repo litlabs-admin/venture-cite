@@ -17,7 +17,7 @@ import type { WorkSummaryView } from "../data/workSummary";
  * is deliberately small and level-keyed so a policy change is a one-line
  * change on this side too.
  */
-const LEVEL_REQUIREMENT: Readonly<Record<number, { milestone: string; label: string }>> = {
+export const LEVEL_REQUIREMENT: Readonly<Record<number, { milestone: string; label: string }>> = {
   1: { milestone: "goal_selected_and_queue_reviewed", label: "Choose a goal and review the queue" },
   2: { milestone: "baseline_ready", label: "Record a measurement baseline" },
   3: { milestone: "evidenced_changes_complete", label: "Verify your evidenced changes" },
@@ -25,7 +25,7 @@ const LEVEL_REQUIREMENT: Readonly<Record<number, { milestone: string; label: str
   5: { milestone: "multi_period_maintenance", label: "Keep the work going across periods" },
 };
 
-function LevelHexagon() {
+export function LevelHexagon() {
   return (
     <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0" aria-hidden="true">
       <path

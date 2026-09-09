@@ -1,0 +1,8 @@
+import { createFileRoute } from "@tanstack/react-router";
+import ResultsReviewPage from "@/v2/visibility/ResultsReviewPage";
+
+// `/v2/visibility/results` - the results review, where a decision is recorded
+// against the period the evidence covers.
+export const Route = createFileRoute("/_app/v2/visibility/results")({
+  component: ResultsReviewPage,
+});
