@@ -101,4 +101,81 @@ describe("createFactOpportunitySource", () => {
 
     expect(new Set(keys).size).toBe(keys.length);
   });
+
+  /**
+   * A brand carries up to a dozen fact tasks at once. When every one of them
+   * was titled "Add a source and confirm the essential fact", the list could
+   * not be read: two adjacent rows looked like the same row rendered twice.
+   */
+  it("gives each fact task a title that names its fact", async () => {
+    const collected = await sourceOf([
+      fact({ id: "f1", subcategory: "Brand name", factKey: "name", sourceUrl: null }),
+      fact({
+        id: "f2",
+        subcategory: "Value proposition",
+        factKey: "valueProposition",
+        sourceUrl: null,
+      }),
+    ]).collect({ actor: ACTOR, brandId: BRAND_ID });
+
+    const titles = collected.map((o) => o.title);
+    expect(new Set(titles).size).toBe(titles.length);
+    expect(titles.join(" ")).toContain("Name");
+    expect(titles.join(" ")).toContain("Value proposition");
+  });
+
+  /**
+   * Real rows carry subcategory "description" for facts whose factKey is
+   * `industry` and `name`. Labelling by subcategory made three different tasks
+   * read identically, which is why the label comes from the key.
+   */
+  it("distinguishes facts whose subcategory collides", async () => {
+    const collected = await sourceOf([
+      fact({ id: "f1", subcategory: "description", factKey: "description", sourceUrl: null }),
+      fact({ id: "f2", subcategory: "description", factKey: "industry", sourceUrl: null }),
+      fact({ id: "f3", subcategory: "description", factKey: "name", sourceUrl: null }),
+    ]).collect({ actor: ACTOR, brandId: BRAND_ID });
+
+    const titles = collected.map((o) => o.title);
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+
+  /**
+   * Subcategory is free text and differs by case on real rows. It used to be
+   * part of the grouping identity, so "Description" and "description" were two
+   * facts, the disagreement between them was never detected, and the user got
+   * two identical-looking tasks instead of one conflict to resolve.
+   */
+  it("treats a case-differing subcategory as the same fact", async () => {
+    const collected = await sourceOf([
+      fact({
+        id: "f1",
+        subcategory: "Description",
+        factKey: "description",
+        factValue: "One",
+        source: "scraped",
+      }),
+      fact({
+        id: "f2",
+        subcategory: "description",
+        factKey: "description",
+        factValue: "Two",
+        source: "user",
+      }),
+    ]).collect({ actor: ACTOR, brandId: BRAND_ID });
+
+    expect(collected).toHaveLength(1);
+    expect(collected[0].taskType).toBe("approve_essential_brand_facts");
+    expect(collected[0].title).toContain("conflicting");
+  });
+
+  it("keeps facts with different keys apart even when the subcategory matches", async () => {
+    const collected = await sourceOf([
+      fact({ id: "f1", subcategory: "description", factKey: "description", sourceUrl: null }),
+      fact({ id: "f2", subcategory: "description", factKey: "industry", sourceUrl: null }),
+    ]).collect({ actor: ACTOR, brandId: BRAND_ID });
+
+    expect(collected).toHaveLength(2);
+    expect(new Set(collected.map((o) => o.title)).size).toBe(2);
+  });
 });

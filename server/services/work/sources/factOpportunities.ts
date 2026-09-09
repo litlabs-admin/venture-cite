@@ -113,13 +113,50 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * The identity two fact rows must share to be the same fact, and therefore to
+ * be a conflict when their values disagree.
+ *
+ * Domain and key only. `subcategory` used to be part of this and it broke
+ * conflict detection twice over: it is free text that differs by case
+ * ("Description" against "description"), and real rows carry the same
+ * subcategory for different keys. Including it split one fact into several
+ * groups, so two sources disagreeing about one fact were never seen as
+ * disagreeing and were raised as two unrelated tasks instead of one conflict.
+ *
+ * `ESSENTIAL_FACT_KEYS` is keyed on domain and key for the same reason.
+ */
 function factTuple(record: FactOpportunityRecord): string {
-  return [record.domain, record.subcategory, record.factKey].join("\u0000");
+  return [record.domain.trim().toLowerCase(), record.factKey.trim()].join("\u0000");
 }
 
+/**
+ * The human-readable name of the fact a task is about.
+ *
+ * Derived from `factKey`, NOT from `subcategory`. Subcategory looks like the
+ * display label and is not trustworthy: real rows carry subcategory
+ * "description" for facts whose factKey is `industry` and `name`, so labelling
+ * by it produces several different tasks that all read the same. `factKey` is
+ * the taxonomy's actual identity - `ESSENTIAL_FACT_KEYS` above is keyed on it -
+ * so it is what distinguishes one fact task from another.
+ */
+function factLabel(record: FactOpportunityRecord): string {
+  const key = record.factKey.trim();
+  if (key.length === 0) return record.subcategory.trim() || "this fact";
+  const words = key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[._-]+/g, " ")
+    .trim()
+    .toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The same identity as `factTuple`, in a form safe to store and to put in a
+ *  task key. Must stay in step with `factTuple` or a conflict group and its
+ *  task key would describe different things. */
 function encodedFactTuple(record: FactOpportunityRecord): string {
-  return [record.domain, record.subcategory, record.factKey]
-    .map((value) => encodeURIComponent(value.trim()))
+  return [record.domain.trim().toLowerCase(), record.factKey.trim()]
+    .map((value) => encodeURIComponent(value))
     .join(":");
 }
 
@@ -139,9 +176,13 @@ function toFactOpportunity(record: FactOpportunityRecord): WorkOpportunity {
     taskKey: `facts:${record.id}`,
     taskType: "approve_essential_brand_facts",
     ruleVersion: 1,
+    // Name the fact. A brand has up to a dozen of these at once, and a list
+    // of identically titled rows cannot be read or chosen between - the
+    // subcategory ("Brand name", "Value proposition") is the taxonomy's own
+    // human-readable label, so it is what the user already recognises.
     title: hasSource
-      ? "Review the essential fact source"
-      : "Add a source and confirm the essential fact",
+      ? `Review the source for ${factLabel(record)}`
+      : `Add a source for ${factLabel(record)}`,
     reason: hasSource
       ? "An active essential fact needs source review and confirmation."
       : "Add an authoritative source before confirming this essential fact.",
@@ -164,7 +205,7 @@ function toConflictOpportunity(records: FactOpportunityRecord[]): WorkOpportunit
     taskKey: `facts:conflict:${encodedFactTuple(first)}`,
     taskType: "approve_essential_brand_facts",
     ruleVersion: 1,
-    title: "Review conflicting essential fact sources",
+    title: `Review conflicting sources for ${factLabel(first)}`,
     reason: "Conflicting sources require human review before a definitive claim is recorded.",
     // `tuple` is the in-memory grouping key and joins its parts with U+0000,
     // which is a good separator precisely because it cannot occur in a fact
