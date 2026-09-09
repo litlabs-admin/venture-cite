@@ -17,6 +17,7 @@ import {
 } from "@shared/schema";
 import type { IStorage } from "../storage";
 import { citationRatePct } from "@shared/visibilityMetrics";
+import { CHECK_FAILED_LIKE_PATTERN } from "../lib/citationContextFormat";
 
 export const citationsStorage = {
   async getCitations(opts?: { limit?: number; offset?: number }): Promise<Citation[]> {
@@ -151,6 +152,42 @@ export const citationsStorage = {
         weekStart,
         total: sql<number>`count(*)::int`,
         cited: sql<number>`count(*) filter (where is_cited = 1)::int`,
+      })
+      .from(schema.geoRankings)
+      .where(
+        and(
+          inArray(schema.geoRankings.brandPromptId, promptIds),
+          gte(schema.geoRankings.checkedAt, since),
+        ),
+      )
+      .groupBy(weekStart)
+      .orderBy(weekStart);
+  },
+
+  /**
+   * Weekly buckets that separate failed provider calls from real answers.
+   *
+   * `getWeeklyCitationTrend` above counts every row in `total`, failures
+   * included, and the live dashboard depends on that number staying as it is.
+   * This is the v2 read: same grouping, but `failed` is split out so the
+   * caller can divide by answers actually collected. Nothing consumes both.
+   */
+  async getWeeklyMentionTrendExcludingFailures(
+    promptIds: string[],
+    since: Date,
+  ): Promise<Array<{ weekStart: string; total: number; cited: number; failed: number }>> {
+    if (promptIds.length === 0) return [];
+    const weekStart = sql<string>`date_trunc('week', ${schema.geoRankings.checkedAt})::date`;
+    const failedPredicate = sql`${schema.geoRankings.citationContext} ilike ${CHECK_FAILED_LIKE_PATTERN}`;
+    return await db
+      .select({
+        weekStart,
+        total: sql<number>`count(*)::int`,
+        // A failed call is never a mention, but guard the filter anyway so a
+        // row that somehow carried both cannot inflate the numerator above
+        // the denominator this function reports.
+        cited: sql<number>`count(*) filter (where is_cited = 1 and not (${failedPredicate}))::int`,
+        failed: sql<number>`count(*) filter (where ${failedPredicate})::int`,
       })
       .from(schema.geoRankings)
       .where(

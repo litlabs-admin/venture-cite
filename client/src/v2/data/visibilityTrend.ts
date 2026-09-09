@@ -1,53 +1,84 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
-// `GET /api/dashboard/citation-trend/:brandId` - eight Monday-anchored weekly
-// buckets computed from geo_rankings (`dashboardVisibility.ts`). Read here,
-// never modified: the live dashboard reads the same endpoint through its own
-// key, and this one is namespaced `["v2", ...]` so the two caches stay apart.
+// `GET /api/v2/visibility/mention-rate/:brandId` - eight Monday-anchored
+// weekly buckets plus the window total, computed from geo_rankings by
+// `server/services/v2Visibility.ts`.
 //
-// `citationRate` is `citationRatePct`, which returns **0 when `total` is 0**.
-// That zero means "nothing was observed", not "observed and never mentioned",
-// so every reader here must branch on `total` before it shows a percentage.
-// Rendering the raw rate would print a measured-looking 0% for a brand that
-// has never been measured.
+// THIS IS NOT THE ENDPOINT THE LIVE DASHBOARD READS, and the difference is
+// the point. A provider call that never returned an answer still becomes a
+// geo_rankings row with `is_cited = 0`, and every denominator on the live
+// dashboard is `count(*)`, so those failures are divided into as though an
+// engine had answered and declined to mention the brand. Across this database
+// 2,604 of 7,302 observations are failed calls. On /v2/ the denominator is
+// answers actually collected; the live dashboard's numbers are unchanged.
+//
+// The fields are named for what they hold. There is deliberately no `total`
+// here: a field by that name is what let a failure-inflated denominator read
+// as a sample size.
+//
+// `mentionRate` is `citationRatePct`, which returns **0 when `measured` is
+// 0**. That zero means "nothing was observed", not "observed and never
+// mentioned", so every reader must branch on `measured` before it shows a
+// percentage. Rendering the raw rate would print a measured-looking 0% for a
+// brand that has never been measured.
 
 export type VisibilityWeek = {
   weekStart: string;
+  /** Of `measured`, the answers that mentioned the brand. */
   cited: number;
-  total: number;
-  citationRate: number;
+  /** Answers actually collected this week. Failed calls are not in here. */
+  measured: number;
+  /** Calls that returned no answer. A real state, never folded into
+   *  `measured` and never shown as a zero-mention week. */
+  failed: number;
+  mentionRate: number;
 };
 
-export function useVisibilityTrend(brandId: string) {
-  return useQuery<{ weeks: VisibilityWeek[] }>({
-    queryKey: ["v2", "visibility", "trend", brandId],
+export type VisibilityMentionRate = {
+  measured: number;
+  cited: number;
+  failed: number;
+  /** Every observation, failures included - what the live dashboard divides
+   *  by. Carried so a screen can name what it excluded instead of letting the
+   *  difference vanish. */
+  observed: number;
+  mentionRate: number;
+  weeks: VisibilityWeek[];
+};
+
+/** The one read. The trend and the headline rate come from the same payload,
+ *  so a screen cannot show a rate that disagrees with its own chart. */
+export function useVisibilityMentionRate(brandId: string) {
+  return useQuery<VisibilityMentionRate>({
+    queryKey: ["v2", "visibility", "mention-rate", brandId],
     enabled: Boolean(brandId),
     meta: { suppressErrorToast: true },
     queryFn: async () => {
       const response = await apiRequest(
         "GET",
-        `/api/dashboard/citation-trend/${encodeURIComponent(brandId)}`,
+        `/api/v2/visibility/mention-rate/${encodeURIComponent(brandId)}`,
       );
       const payload = (await response.json()) as {
         success: boolean;
-        data: { weeks: VisibilityWeek[] };
+        data: VisibilityMentionRate;
       };
       return payload.data;
     },
   });
 }
 
-/** True when no answer was ever collected - the "Not measured" case. */
+/** True when no answer was ever collected - the "Not measured" case. Weeks
+ *  that hold only failed calls are not observations. */
 export function hasNoObservations(weeks: VisibilityWeek[] | undefined): boolean {
-  return !weeks || weeks.every((week) => week.total === 0);
+  return !weeks || weeks.every((week) => week.measured === 0);
 }
 
 /** The most recent week that actually holds answers, or null. */
 export function latestObservedWeek(weeks: VisibilityWeek[] | undefined): VisibilityWeek | null {
   if (!weeks) return null;
   for (let index = weeks.length - 1; index >= 0; index -= 1) {
-    if (weeks[index].total > 0) return weeks[index];
+    if (weeks[index].measured > 0) return weeks[index];
   }
   return null;
 }
