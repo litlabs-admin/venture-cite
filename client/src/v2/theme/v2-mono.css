@@ -1,4 +1,9 @@
-.v2-mono {
+.v2-mono,
+.dark .v2-mono,
+body.v2-mono-portal > [data-radix-popper-content-wrapper],
+body.v2-mono-portal > [role="dialog"],
+body.v2-mono-portal > [role="alertdialog"],
+body.v2-mono-portal > [data-radix-portal] {
   --v2-ink: #17191c;
   --v2-ink2: #4a515b;
   --v2-ink3: #67707d;
@@ -50,8 +55,8 @@
   --positive: var(--v2-ok);
   --positive-subtle: var(--v2-ok-soft);
   --success-accent: var(--v2-ok);
-  --warning: var(--brand-accent);
-  --warning-subtle: var(--brand-accent-subtle);
+  --warning: var(--v2-warn);
+  --warning-subtle: var(--v2-warn-soft);
   --negative: var(--v2-bad);
   --negative-subtle: var(--v2-bad-soft);
   --color-on-strong: var(--v2-paper);
@@ -90,9 +95,55 @@
   --sidebar-border: var(--v2-inset);
   --sidebar-ring: var(--v2-brand);
   --radius: var(--v2-radius);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
   --radius-vc-panel: var(--v2-radius-panel);
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --color-background: var(--v2-paper);
+  --color-foreground: var(--v2-ink);
+  --color-card: var(--v2-paper);
+  --color-card-foreground: var(--v2-ink);
+  --color-popover: var(--v2-paper);
+  --color-popover-foreground: var(--v2-ink);
+  --color-primary: var(--v2-brand-fill);
+  --color-primary-foreground: var(--v2-paper);
+  --color-secondary: var(--v2-paper);
+  --color-secondary-foreground: var(--v2-ink);
+  --color-muted: var(--v2-inset);
+  --color-muted-foreground: var(--v2-ink3);
+  --color-accent: var(--v2-inset);
+  --color-accent-foreground: var(--v2-ink);
+  --color-destructive: var(--v2-bad);
+  --color-destructive-foreground: var(--v2-paper);
+  --color-destructive-subtle: var(--v2-bad-soft);
+  --color-positive: var(--v2-ok);
+  --color-positive-subtle: var(--v2-ok-soft);
+  --color-positive-foreground: var(--v2-paper);
+  --color-warning: var(--v2-warn);
+  --color-warning-subtle: var(--v2-warn-soft);
+  --color-warning-foreground: var(--v2-paper);
+  --color-border: var(--v2-line);
+  --color-input: var(--v2-line);
+  --color-ring: var(--v2-brand-soft);
+  --color-chart-1: var(--v2-series-1);
+  --color-chart-2: var(--v2-series-2);
+  --color-chart-3: var(--v2-series-3);
+  --color-chart-4: var(--v2-series-4);
+  --color-chart-5: var(--v2-series-5);
+  --color-chart-6: var(--v2-series-6);
+  --color-sidebar: var(--v2-inset);
+  --color-sidebar-foreground: var(--v2-ink2);
+  --color-sidebar-primary: var(--v2-paper);
+  --color-sidebar-primary-foreground: var(--v2-ink);
+  --color-sidebar-accent: var(--v2-paper);
+  --color-sidebar-accent-foreground: var(--v2-ink);
+  --color-sidebar-border: var(--v2-inset);
+  --color-sidebar-ring: var(--v2-brand);
+  --color-ink: var(--v2-ink);
+  --color-ink-fill: var(--v2-brand-fill);
 
   --color-vc-surface: var(--v2-paper);
   --color-vc-page: var(--v2-paper);
@@ -119,7 +170,11 @@
   --color-vc-success-ink: var(--v2-ok);
   --color-vc-danger-ink: var(--v2-bad);
 
+  /* Product decision: V2 is light-only for now. */
   color: var(--v2-ink);
   background: var(--v2-paper);
+  font-size: 14px;
+  line-height: 1.5;
+  font-optical-sizing: none;
   font-family: var(--font-sans);
 }
