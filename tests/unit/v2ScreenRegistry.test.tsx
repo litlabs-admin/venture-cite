@@ -3,6 +3,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { BoardId, V2ScreenState } from "@/v2/contracts/screen";
+import type { V2ShellVariant } from "@/v2/contracts/shell";
 import { SCREENS } from "@/v2/screens/registry";
 import { StateView } from "@/v2/screens/_placeholder/StateView";
 
@@ -12,6 +13,56 @@ const BOARD_IDS: BoardId[] = Array.from(
 );
 
 const SHELL_VARIANTS = ["guided", "expert", "expert-nav", "agency", "bare"] as const;
+
+const EXPECTED_SHELLS: Record<BoardId, V2ShellVariant> = {
+  b01: "guided",
+  b02: "guided",
+  b03: "guided",
+  b04: "guided",
+  b05: "guided",
+  b06: "guided",
+  b07: "guided",
+  b08: "expert",
+  b09: "expert",
+  b10: "guided",
+  b11: "guided",
+  b12: "expert-nav",
+  b13: "expert",
+  b14: "guided",
+  b15: "guided",
+  b16: "guided",
+  b17: "guided",
+  b18: "expert",
+  b19: "guided",
+  b20: "guided",
+  b21: "guided",
+  b22: "guided",
+  b23: "agency",
+  b24: "guided",
+  b25: "guided",
+  b26: "bare",
+  b27: "bare",
+  b28: "bare",
+  b29: "bare",
+  b30: "bare",
+  b31: "bare",
+  b32: "bare",
+  b33: "guided",
+  b34: "guided",
+  b35: "expert",
+  b36: "expert",
+  b37: "expert",
+  b38: "expert",
+  b39: "guided",
+  b40: "expert",
+  b41: "expert",
+  b42: "guided",
+  b43: "guided",
+  b44: "guided",
+  b45: "guided",
+  b46: "guided",
+  b47: "guided",
+};
 
 afterEach(() => {
   cleanup();
@@ -28,6 +79,7 @@ describe("v2 screen registry", () => {
       expect(entry.fixture).toEqual(expect.any(Object));
       expect(entry.Route).toEqual(expect.any(Function));
       expect(SHELL_VARIANTS).toContain(entry.shell);
+      expect(entry.shell).toBe(EXPECTED_SHELLS[boardId]);
     }
   });
 
