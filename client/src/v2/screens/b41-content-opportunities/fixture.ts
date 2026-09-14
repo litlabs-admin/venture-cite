@@ -1,2 +1,62 @@
 import type { Board41Data } from "./Screen";
-export const board41Fixture: Board41Data = {};
+
+export const board41Fixture: Board41Data = {
+  brandId: "brand-venture-pr",
+  mode: "expert",
+  pages: [
+    {
+      id: "bofu:pricing",
+      sourceType: "bofu",
+      title: "Pricing",
+      path: "https://venturepr.test/pricing",
+      type: "pricing",
+      questionsCovered: 2,
+      visibilityGap: "High",
+      evidenceQuality: "Weak",
+      freshness: "2026-06-10T00:00:00.000Z",
+      recommendedChange: "Add clear program details, example packages, and what's included.",
+      effort: "L",
+      status: "High priority",
+    },
+    {
+      id: "faq:process",
+      sourceType: "faq",
+      title: "How does the PR process work?",
+      path: "https://venturepr.test/faq#process",
+      type: "FAQ",
+      questionsCovered: 4,
+      visibilityGap: "Medium",
+      evidenceQuality: "Good",
+      freshness: "2026-08-12T00:00:00.000Z",
+      recommendedChange: "Expand answers with examples.",
+      effort: "M",
+      status: "Needs update",
+    },
+    {
+      id: "article:guide",
+      sourceType: "article",
+      title: "Buyer's Guide to Startup PR",
+      path: "https://venturepr.test/guides/startup-pr",
+      type: "Guide",
+      questionsCovered: 3,
+      visibilityGap: "Low",
+      evidenceQuality: "Good",
+      freshness: "2026-08-25T00:00:00.000Z",
+      recommendedChange: "Add a template and checklist.",
+      effort: "M",
+      status: "Minor update",
+    },
+  ],
+  unmappedQuestions: [
+    { id: "q-onboarding", prompt: "What does onboarding with the agency look like?" },
+  ],
+  coverageGapCount: 1,
+  duplicateTopicCount: 0,
+  pagesWithoutEvidenceCount: 1,
+  prioritizedAction: {
+    pageId: "bofu:pricing",
+    pageName: "Pricing",
+    question: "What does startup PR cost and what's included?",
+    recommendedChange: "Add clear program details, example packages, and what's included.",
+  },
+};
