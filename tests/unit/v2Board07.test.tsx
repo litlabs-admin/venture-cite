@@ -10,6 +10,7 @@ import {
 } from "@/v2/screens/b07-brand-facts/Screen";
 import { board07Fixture } from "@/v2/screens/b07-brand-facts/fixture";
 import { useBoard07Data } from "@/v2/screens/b07-brand-facts/data";
+import { Board07Route } from "@/v2/screens/b07-brand-facts/Route";
 
 const brandSelection = vi.hoisted(() => ({
   selectedBrandId: "brand-live",
@@ -19,6 +20,14 @@ const brandSelection = vi.hoisted(() => ({
 
 vi.mock("@/hooks/use-brand-selection", () => ({
   useBrandSelection: () => brandSelection,
+}));
+
+const navigateMock = vi.hoisted(() => vi.fn());
+const searchStub = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
+
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => navigateMock,
+  useSearch: () => searchStub.value,
 }));
 
 function liveFact(overrides: Record<string, unknown> = {}) {
@@ -40,11 +49,13 @@ function liveFact(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function stubLiveFetch() {
+function stubLiveFetch(factOverrides: Record<string, unknown> = {}) {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/brand-facts/")) {
-      return new Response(JSON.stringify({ success: true, data: [liveFact()] }), { status: 200 });
+      return new Response(JSON.stringify({ success: true, data: [liveFact(factOverrides)] }), {
+        status: 200,
+      });
     }
     if (url.includes("/work/summary")) {
       return new Response(
@@ -267,4 +278,83 @@ describe("Board 07 live adapter", () => {
       expect(result.result.current.data).toBeUndefined();
     },
   );
+});
+
+describe("Board 07 route", () => {
+  beforeEach(() => {
+    searchStub.value = {};
+    navigateMock.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function renderRoute() {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 30_000 } },
+    });
+    return render(
+      <QueryClientProvider client={client}>
+        <Board07Route />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("carries the brand facts sub-tab strip, with setup review active", async () => {
+    vi.stubGlobal("fetch", stubLiveFetch({ acceptedAt: null }));
+    renderRoute();
+
+    // Wait for the live data (and so the real brandId) before reading the
+    // tab hrefs - the strip itself renders immediately, during loading too,
+    // with only the URL's own brandId (there is none here) to fall back on.
+    await screen.findByRole("heading", { name: "Build a reliable starting point" });
+    const nav = screen.getByRole("navigation", { name: "Brand facts" });
+    const setupTab = within(nav).getByRole("link", { name: "Setup review" });
+    const workspaceTab = within(nav).getByRole("link", { name: "Workspace" });
+    expect(setupTab).toHaveAttribute("aria-current", "page");
+    expect(workspaceTab).not.toHaveAttribute("aria-current");
+    expect(setupTab).toHaveAttribute("href", "/v2/brand-facts?brandId=brand-live&mode=guided");
+    expect(workspaceTab).toHaveAttribute(
+      "href",
+      "/v2/brand-facts/workspace?brandId=brand-live&mode=guided",
+    );
+  });
+
+  it("renders the setup screen, and never redirects, while a fact still needs review", async () => {
+    vi.stubGlobal("fetch", stubLiveFetch({ acceptedAt: null }));
+    renderRoute();
+
+    expect(
+      await screen.findByRole("heading", { name: "Build a reliable starting point" }),
+    ).toBeVisible();
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("redirects to the workspace, without rendering the review table, once every fact is decided", async () => {
+    vi.stubGlobal(
+      "fetch",
+      stubLiveFetch({ acceptedAt: "2026-09-08T00:00:00.000Z", dismissedAt: null }),
+    );
+    renderRoute();
+
+    await waitFor(() =>
+      expect(navigateMock).toHaveBeenCalledWith({
+        to: "/v2/brand-facts/workspace",
+        search: { brandId: "brand-live", mode: "guided" },
+        replace: true,
+      }),
+    );
+    expect(screen.queryByRole("heading", { name: "Build a reliable starting point" })).toBeNull();
+  });
+
+  it("also redirects a brand whose one fact was dismissed rather than approved", async () => {
+    vi.stubGlobal(
+      "fetch",
+      stubLiveFetch({ acceptedAt: null, dismissedAt: "2026-09-08T00:00:00.000Z" }),
+    );
+    renderRoute();
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalled());
+  });
 });

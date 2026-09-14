@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
-// Brand facts: the reads and the two writes the review gate is allowed to make.
+// Brand facts: the read, and every explicit write board 07 (the Level 1
+// review gate) and board 34 (the steady-state workspace) are allowed to make.
 //
 // QUERY KEYS ARE NAMESPACED `["v2", ...]`, for the reason `workSummary.ts`
 // gives: the query client is a singleton shared with the live dashboard, so a
@@ -9,12 +10,14 @@ import { apiRequest } from "@/lib/queryClient";
 // re-render the live dashboard, and the default queryFn would try to build a
 // URL out of the key.
 //
-// THREE ENVELOPES, NOT ONE. The endpoints this screen calls do not agree on a
+// FOUR ENVELOPES, NOT ONE. The endpoints this screen calls do not agree on a
 // response shape, and pretending they do would silently read `undefined`:
 //   GET   /api/brand-facts/:brandId                       -> { success, data }
-//   PATCH /api/brand-facts/:id                            -> { success, data }
+//   POST  /api/brand-facts                                -> { success, data }
+//   PATCH /api/brand-facts/:id                             -> { success, data }
 //   POST  /api/brand-fact-sheet/facts/:factId/accept      -> { success, fact }
 //   POST  /api/brand-fact-sheet/facts/:factId/dismiss     -> { success, fact }
+//   POST  /api/v2/brand-facts/:factId/recheck             -> { success, data }
 // Each reader below names the field it actually reads.
 
 /**
@@ -41,6 +44,16 @@ export type BrandFactView = {
   acceptedAt: string | null;
   dismissedAt: string | null;
   lastVerified: string | null;
+  /** Per-fact re-verification state (`server/lib/factAgent/v2/reverifyFact.ts`).
+   *  Schema default is `"never"`; the cron and the recheck action below are
+   *  the only writers. */
+  verificationStatus: string;
+  lastVerificationAt: string | null;
+  verificationAttempts: number;
+  /** True once a person has typed over the scraped value. A scrape may never
+   *  overwrite this fact again, and the workspace's recheck action refuses it
+   *  for the same reason (`reverifyFact`'s own `user_overridden` guard). */
+  userOverridden: boolean;
 };
 
 async function readData<T>(url: string): Promise<T> {
@@ -135,6 +148,96 @@ export function useAmendFact(brandId: string | undefined) {
       } catch (error) {
         throw new FactAmendError((error as Error).message, "approve");
       }
+    },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["v2", "brand-facts", brandId] });
+    },
+  });
+}
+
+/**
+ * Reject the extracted value outright.
+ *
+ * The workspace's third explicit review action, alongside approve and amend
+ * (`useApproveFact`, `useAmendFact` above): a dismissal is a decision too, and
+ * it is recorded the same way - a fact never leaves "needs confirmation" by
+ * any path other than a control the owner pressed for that fact.
+ */
+export function useDismissFact(brandId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (factId: string) => {
+      const response = await apiRequest(
+        "POST",
+        `/api/brand-fact-sheet/facts/${encodeURIComponent(factId)}/dismiss`,
+      );
+      const payload = (await response.json()) as { success: boolean; fact: BrandFactView };
+      return payload.fact;
+    },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["v2", "brand-facts", brandId] });
+    },
+  });
+}
+
+/**
+ * A person-authored fact with no scrape behind it.
+ *
+ * `POST /api/brand-facts` tags the row `source: "user_manual"` and
+ * `userOverridden: true` on the server (`routes/intelligence.ts`) - this
+ * call supplies only what the workspace's "Add fact" form actually collects.
+ */
+export function useAddFact(brandId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      domain: string;
+      subcategory: string;
+      factKey: string;
+      factValue: string;
+      sourceUrl?: string;
+    }) => {
+      const response = await apiRequest("POST", "/api/brand-facts", { brandId, ...input });
+      const payload = (await response.json()) as { success: boolean; data: BrandFactView };
+      return payload.data;
+    },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["v2", "brand-facts", brandId] });
+    },
+  });
+}
+
+/** The outcome `reverifyFact` reports (`server/lib/factAgent/v2/reverifyFact.ts`,
+ *  `VerifyOutcome`), read back over the v2 recheck route below. */
+export type FactRecheckOutcome =
+  | "verified"
+  | "drift_detected"
+  | "source_unreachable"
+  | "no_value_in_source"
+  | "user_overridden"
+  | "skipped";
+
+/**
+ * Re-fetch a fact's source and compare it against the stored value.
+ *
+ * `POST /api/admin/scrape/fact/:factId/reverify` already does this, but it is
+ * gated `isAdmin` - internal diagnostics, not a brand owner's own workspace.
+ * `server/routes/v2BrandFacts.ts` exposes the same underlying
+ * `reverifyFact()` call, scoped to the requesting user's own brand.
+ */
+export function useRecheckFact(brandId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (factId: string) => {
+      const response = await apiRequest(
+        "POST",
+        `/api/v2/brand-facts/${encodeURIComponent(factId)}/recheck`,
+      );
+      const payload = (await response.json()) as {
+        success: boolean;
+        data: { outcome: FactRecheckOutcome; fact: BrandFactView | null };
+      };
+      return payload.data;
     },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["v2", "brand-facts", brandId] });
