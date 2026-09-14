@@ -45,6 +45,20 @@ describe("database TLS policy", () => {
     });
   });
 
+  it("uses inline CA contents and unescapes single-line newlines", () => {
+    expect(
+      resolveDatabaseTlsPolicy({
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://user:secret@db.example.com/postgres",
+        DATABASE_CA_CERT: "-----BEGIN CERTIFICATE-----\\nabc\\n-----END CERTIFICATE-----",
+      }),
+    ).toEqual({
+      mode: "inline-ca",
+      ca: "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----",
+      rejectUnauthorized: true,
+    });
+  });
+
   it("disables TLS for loopback development and test databases", () => {
     const databaseUrl = "postgresql://user:secret@127.0.0.1:55322/postgres";
 

@@ -2,11 +2,13 @@ export type DatabaseTlsEnvironment = {
   NODE_ENV?: string;
   DATABASE_URL?: string;
   DATABASE_CA_CERT_PATH?: string;
+  DATABASE_CA_CERT?: string;
   DATABASE_SSL_REJECT_UNAUTHORIZED?: string;
 };
 
 export type DatabaseTlsPolicy =
   | { mode: "custom-ca"; caPath: string; rejectUnauthorized: true }
+  | { mode: "inline-ca"; ca: string; rejectUnauthorized: true }
   | { mode: "default-ca"; rejectUnauthorized: true }
   | { mode: "no-tls" }
   | { mode: "permissive"; rejectUnauthorized: false };
@@ -46,14 +48,19 @@ function isLoopbackDatabaseUrl(databaseUrl: string | undefined): boolean {
 
 export function resolveDatabaseTlsPolicy(env: DatabaseTlsEnvironment): DatabaseTlsPolicy {
   const caPath = env.DATABASE_CA_CERT_PATH?.trim();
+  // PEM contents for hosts with no certificate file on disk (Vercel). Escaped
+  // "\n" sequences are accepted so the value survives single-line env editors.
+  const inlineCa = env.DATABASE_CA_CERT?.trim().replace(/\\n/g, "\n");
   const policy: DatabaseTlsPolicy = caPath
     ? { mode: "custom-ca", caPath, rejectUnauthorized: true }
+    : inlineCa
+    ? { mode: "inline-ca", ca: inlineCa, rejectUnauthorized: true }
     : env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true"
       ? { mode: "default-ca", rejectUnauthorized: true }
       : env.NODE_ENV !== "production" && isLoopbackDatabaseUrl(env.DATABASE_URL)
         ? { mode: "no-tls" }
         : { mode: "permissive", rejectUnauthorized: false };
-  const verifiesCertificates = policy.mode === "custom-ca" || policy.mode === "default-ca";
+  const verifiesCertificates = policy.mode === "custom-ca" || policy.mode === "inline-ca" || policy.mode === "default-ca";
 
   if (env.NODE_ENV === "production" && !verifiesCertificates) {
     throw new Error(

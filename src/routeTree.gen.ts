@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as CanvasRouteImport } from './routes/canvas'
 import { Route as GlossaryRouteImport } from './routes/glossary'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as InternalPageRouteImport } from './routes/internal-page'
@@ -115,6 +116,11 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CanvasRoute = CanvasRouteImport.update({
+  id: '/canvas',
+  path: '/canvas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GlossaryRoute = GlossaryRouteImport.update({
@@ -615,6 +621,7 @@ const AppV2VisibilityQuestionsQuestionIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/canvas': typeof CanvasRoute
   '/glossary': typeof GlossaryRoute
   '/health': typeof HealthRoute
   '/internal-page': typeof InternalPageRoute
@@ -714,6 +721,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/canvas': typeof CanvasRoute
   '/glossary': typeof GlossaryRoute
   '/health': typeof HealthRoute
   '/internal-page': typeof InternalPageRoute
@@ -807,6 +815,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/canvas': typeof CanvasRoute
   '/glossary': typeof GlossaryRoute
   '/health': typeof HealthRoute
   '/internal-page': typeof InternalPageRoute
@@ -908,6 +917,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/canvas'
     | '/glossary'
     | '/health'
     | '/internal-page'
@@ -1007,6 +1017,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/canvas'
     | '/glossary'
     | '/health'
     | '/internal-page'
@@ -1099,6 +1110,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_app'
+    | '/canvas'
     | '/glossary'
     | '/health'
     | '/internal-page'
@@ -1200,6 +1212,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  CanvasRoute: typeof CanvasRoute
   GlossaryRoute: typeof GlossaryRoute
   HealthRoute: typeof HealthRoute
   InternalPageRoute: typeof InternalPageRoute
@@ -1224,6 +1237,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/canvas': {
+      id: '/canvas'
+      path: '/canvas'
+      fullPath: '/canvas'
+      preLoaderRoute: typeof CanvasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/glossary': {
@@ -2217,6 +2237,7 @@ const V2PreviewRouteWithChildren = V2PreviewRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  CanvasRoute: CanvasRoute,
   GlossaryRoute: GlossaryRoute,
   HealthRoute: HealthRoute,
   InternalPageRoute: InternalPageRoute,

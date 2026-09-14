@@ -103,6 +103,7 @@ const envSchemaBase = z.object({
 
   // Production requires one certificate verification option.
   DATABASE_CA_CERT_PATH: z.string().optional(),
+  DATABASE_CA_CERT: z.string().optional(),
   DATABASE_SSL_REJECT_UNAUTHORIZED: z.enum(["true", "false"]).optional(),
 
   // HMAC secret for email unsubscribe tokens. Falls back to

@@ -20,6 +20,7 @@ function strictSslConfig(databaseUrl: string): PoolConfig["ssl"] {
       throw new Error("The configured database certificate is unreadable");
     }
   }
+  if (policy.mode === "inline-ca") return { ca: policy.ca, rejectUnauthorized: true };
   if (policy.mode === "default-ca") return { rejectUnauthorized: true };
   throw new Error("Production database TLS requires certificate verification");
 }

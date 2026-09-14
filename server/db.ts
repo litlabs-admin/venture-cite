@@ -31,6 +31,11 @@ function buildSslConfig(): PoolConfig["ssl"] {
     }
   }
 
+  if (policy.mode === "inline-ca") {
+    logger.info("db: TLS strict - verifying chain against DATABASE_CA_CERT");
+    return { ca: policy.ca, rejectUnauthorized: true };
+  }
+
   if (policy.mode === "default-ca") {
     logger.info("db: TLS strict - verifying against Node default CA bundle");
     return { rejectUnauthorized: true };
