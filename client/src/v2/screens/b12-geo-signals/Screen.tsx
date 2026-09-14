@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import type { V2IconName } from "@/v2/contracts/icons";
+import { DiagnosticsTabStrip } from "@/v2/diagnostics/DiagnosticsTabStrip";
 import { DonutChart } from "@/v2/shared/charts/DonutChart";
 import { Sparkline } from "@/v2/shared/charts/Sparkline";
 import { TrendChart } from "@/v2/shared/charts/TrendChart";
@@ -9,7 +10,6 @@ import { Panel, PanelHeader } from "@/v2/shared/ui/Panel";
 import { PointsPill } from "@/v2/shared/ui/PointsPill";
 import { SectionHeading } from "@/v2/shared/ui/SectionHeading";
 import { StateLabel } from "@/v2/shared/ui/StateLabel";
-import { UnderlineTabs } from "@/v2/shared/ui/UnderlineTabs";
 import { V2Icon } from "@/v2/theme/V2Icon";
 import { v2Type } from "@/v2/theme/typography";
 
@@ -69,14 +69,15 @@ export type Board12EvidenceGap = {
 };
 
 export type Board12Verification = {
-  title: string;
-  detail: string;
-  why: string;
+  title: Board12Value<string>;
+  detail: Board12Value<string>;
+  why: Board12Value<string>;
   effort: Board12Value<number>;
   upside: Board12Value<"Low" | "Medium" | "High">;
 };
 
 export type Board12Data = {
+  brandId: string;
   brand: { name: Board12Value<string> };
   signalCoverage: {
     score: Board12Value<number>;
@@ -156,17 +157,19 @@ function ArrowAction({ children }: { children: ReactNode }) {
   );
 }
 
-function ChartLegend() {
+function ChartLegend({ brandName, hasMedian }: { brandName: string; hasMedian: boolean }) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1" aria-label="Chart legend">
       <span className="inline-flex items-center gap-2 text-[12px] text-[color:var(--v2-ink3)]">
         <span className="h-2 w-2 rounded-full bg-[var(--v2-series-1)]" />
-        VenturePR
+        {brandName}
       </span>
-      <span className="inline-flex items-center gap-2 text-[12px] text-[color:var(--v2-ink3)]">
-        <span className="h-2 w-2 rounded-full bg-[var(--v2-series-2)]" />
-        Industry median
-      </span>
+      {hasMedian ? (
+        <span className="inline-flex items-center gap-2 text-[12px] text-[color:var(--v2-ink3)]">
+          <span className="h-2 w-2 rounded-full bg-[var(--v2-series-2)]" />
+          Industry median
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -174,27 +177,60 @@ function ChartLegend() {
 function SignalChart({
   value,
   endpointText,
+  brandName,
 }: {
   value: Board12Value<Board12Series>;
   endpointText?: string;
+  brandName: string;
 }) {
-  return valueNode(value, (series) => (
-    <div>
-      <TrendChart
-        ariaLabel="Verified signal coverage over the last 30 days"
-        endpointBadge={endpointText ? { seriesId: "primary", text: endpointText } : undefined}
-        height={218}
-        series={[
-          { id: "primary", label: "VenturePR", points: series.primary, style: "solid", area: true },
-          { id: "median", label: "Industry median", points: series.median, style: "dashed" },
-        ]}
-        xLabels={series.xLabels}
-        yDomain={[0, 100]}
-        yTicks={[0, 25, 50, 75, 100]}
-      />
-      <ChartLegend />
-    </div>
-  ));
+  return valueNode(value, (series) => {
+    // No industry-median source exists (see data.ts) - the median series is
+    // always empty on live data. Only the fixture, which stands in for an
+    // approved render rather than a real read, carries median points, so the
+    // dashed line and its legend entry are conditional on data actually being
+    // there rather than on which mode is rendering.
+    const hasMedian = series.median.length > 0;
+    return (
+      <div>
+        <TrendChart
+          ariaLabel="Verified signal coverage over the last 30 days"
+          endpointBadge={endpointText ? { seriesId: "primary", text: endpointText } : undefined}
+          height={218}
+          series={
+            hasMedian
+              ? [
+                  {
+                    id: "primary",
+                    label: brandName,
+                    points: series.primary,
+                    style: "solid",
+                    area: true,
+                  },
+                  {
+                    id: "median",
+                    label: "Industry median",
+                    points: series.median,
+                    style: "dashed",
+                  },
+                ]
+              : [
+                  {
+                    id: "primary",
+                    label: brandName,
+                    points: series.primary,
+                    style: "solid",
+                    area: true,
+                  },
+                ]
+          }
+          xLabels={series.xLabels}
+          yDomain={[0, 100]}
+          yTicks={[0, 25, 50, 75, 100]}
+        />
+        <ChartLegend brandName={brandName} hasMedian={hasMedian} />
+      </div>
+    );
+  });
 }
 
 function SourceTable({ rows }: { rows: readonly Board12SourceSignal[] }) {
@@ -268,7 +304,13 @@ function SourceTable({ rows }: { rows: readonly Board12SourceSignal[] }) {
   return <DataTable columns={columns} rows={rows} rowKey={(row) => row.id} />;
 }
 
-function OpportunityDetails({ opportunity }: { opportunity: Board12Opportunity }) {
+function OpportunityDetails({
+  brandId,
+  opportunity,
+}: {
+  brandId: string;
+  opportunity: Board12Opportunity;
+}) {
   return (
     <div className="mt-5 grid gap-5 border-t border-[var(--v2-line)] pt-4 md:grid-cols-3">
       <div>
@@ -295,15 +337,27 @@ function OpportunityDetails({ opportunity }: { opportunity: Board12Opportunity }
             {valueNode(opportunity.uncertaintyDetail, String)}
           </p>
         </div>
-        <Button className="h-10 rounded-lg px-3 text-[13.5px]" type="button">
-          Create improvement task
+        {/* No route in this product creates a task from a GEO-signal
+            opportunity directly (see data.ts) - this links to the real work
+            queue rather than performing an action nothing on the backend
+            can fulfil yet. */}
+        <Button asChild className="h-10 rounded-lg px-3 text-[13.5px]">
+          <a href={`/v2/my-work?${new URLSearchParams({ brandId, mode: "expert" }).toString()}`}>
+            Create improvement task
+          </a>
         </Button>
       </div>
     </div>
   );
 }
 
-function OpportunityCard({ opportunity }: { opportunity: Board12Opportunity }) {
+function OpportunityCard({
+  brandId,
+  opportunity,
+}: {
+  brandId: string;
+  opportunity: Board12Opportunity;
+}) {
   return (
     <Panel className="mt-5" padding="spacious" tone="inset">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -320,7 +374,7 @@ function OpportunityCard({ opportunity }: { opportunity: Board12Opportunity }) {
           <PointsPill points={item} />
         ))}
       </div>
-      <OpportunityDetails opportunity={opportunity} />
+      <OpportunityDetails brandId={brandId} opportunity={opportunity} />
     </Panel>
   );
 }
@@ -389,6 +443,11 @@ function MissingEvidenceSection({ rows }: { rows: readonly Board12EvidenceGap[] 
 }
 
 function NextVerificationSection({ verification }: { verification: Board12Verification }) {
+  // No route in this product decides "the next best signal to confirm" - that
+  // ranking has no backend producer (see data.ts). The action buttons below
+  // only appear once a real title exists to act on; a `Not measured` panel
+  // never carries a button that has nothing behind it to do.
+  const hasVerification = verification.title.kind === "measured";
   return (
     <Panel padding="standard">
       <PanelHeader title="Next verification" />
@@ -398,13 +457,13 @@ function NextVerificationSection({ verification }: { verification: Board12Verifi
           <V2Icon name="check" size={17} />
         </span>
         <div className="min-w-0">
-          <p className={v2Type.bodyStrong}>{verification.title}</p>
-          <p className={`${v2Type.meta} mt-1`}>{verification.detail}</p>
+          <p className={v2Type.bodyStrong}>{valueNode(verification.title, String)}</p>
+          <p className={`${v2Type.meta} mt-1`}>{valueNode(verification.detail, String)}</p>
         </div>
       </div>
       <div className="mt-4 border-t border-[var(--v2-line)] pt-4">
         <p className={v2Type.caps}>Why this matters</p>
-        <p className={`${v2Type.body} mt-1`}>{verification.why}</p>
+        <p className={`${v2Type.body} mt-1`}>{valueNode(verification.why, String)}</p>
       </div>
       <div className="mt-4 grid gap-3 border-t border-[var(--v2-line)] pt-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -420,14 +479,16 @@ function NextVerificationSection({ verification }: { verification: Board12Verifi
           </span>
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button className="h-10 rounded-lg px-3 text-[13.5px]" type="button">
-          Mark as verified
-        </Button>
-        <Button className="h-10 rounded-lg px-3 text-[13.5px]" variant="outline" type="button">
-          Review source <V2Icon name="arrow" size={14} />
-        </Button>
-      </div>
+      {hasVerification ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button className="h-10 rounded-lg px-3 text-[13.5px]" type="button">
+            Mark as verified
+          </Button>
+          <Button className="h-10 rounded-lg px-3 text-[13.5px]" variant="outline" type="button">
+            Review source <V2Icon name="arrow" size={14} />
+          </Button>
+        </div>
+      ) : null}
     </Panel>
   );
 }
@@ -452,16 +513,9 @@ export function Board12Screen({ data, staleAsOf }: Board12ScreenProps) {
           </div>
           {staleAsOf ? <StateLabel state="stale" /> : null}
         </div>
-        <UnderlineTabs
-          className="mt-7"
-          defaultValue="geo-signals"
-          items={[
-            { value: "site-health", label: "Site health" },
-            { value: "geo-signals", label: "GEO signals" },
-            { value: "perception", label: "Perception" },
-            { value: "prompt-diagnosis", label: "Prompt diagnosis" },
-          ]}
-        />
+        <div className="mt-7">
+          <DiagnosticsTabStrip active="b12" brandId={data.brandId} mode="expert" />
+        </div>
       </header>
 
       <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
@@ -516,6 +570,7 @@ export function Board12Screen({ data, staleAsOf }: Board12ScreenProps) {
             </div>
             <div className="mt-5">
               <SignalChart
+                brandName={brandName}
                 endpointText={score === undefined ? undefined : String(score)}
                 value={data.signalCoverage.series}
               />
@@ -532,7 +587,7 @@ export function Board12Screen({ data, staleAsOf }: Board12ScreenProps) {
               }
             />
             <p className={`${v2Type.meta} -mt-2 mb-5`}>
-              How clearly AI systems can find and verify VenturePR across the web.
+              How clearly AI systems can find and verify {brandName} across the web.
             </p>
             <SourceTable rows={data.sourceSignals} />
           </Panel>
@@ -546,7 +601,7 @@ export function Board12Screen({ data, staleAsOf }: Board12ScreenProps) {
             </div>
             <ArrowAction>View all opportunities</ArrowAction>
           </div>
-          <OpportunityCard opportunity={data.opportunity} />
+          <OpportunityCard brandId={data.brandId} opportunity={data.opportunity} />
         </main>
 
         <aside className="flex w-full shrink-0 flex-col gap-5 border-t border-[var(--v2-line)] bg-[var(--v2-inset)] px-6 py-7 lg:w-[390px] lg:border-l lg:border-t-0 lg:px-6">

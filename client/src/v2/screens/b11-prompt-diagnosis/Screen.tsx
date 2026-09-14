@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { DiagnosticsTabStrip } from "@/v2/diagnostics/DiagnosticsTabStrip";
 import { V2Icon } from "@/v2/theme/V2Icon";
 import { v2Type } from "@/v2/theme/typography";
 import { Chip } from "@/v2/shared/ui/Chip";
@@ -28,9 +29,27 @@ export type Board11AnswerRecord = {
 
 export type Board11ExperimentAction = { kind: "create" } | { kind: "open"; taskId: string };
 
+export type Board11Question = {
+  id: string;
+  /** The full question text. The switcher truncates it visually; the value
+   *  itself is never shortened, so a screen reader still gets the whole
+   *  question. */
+  text: string;
+  /** Successful answers exist for this question and the brand is absent from
+   *  at least one of them - the same rule `defaultPromptId` uses to pick
+   *  which question opens first. Used only to badge the switcher row; it
+   *  never changes which question is selected on its own. */
+  hasFinding: boolean;
+};
+
 export type Board11Data = {
   brandId: string;
   brandName: string;
+  /** Every tracked, unpaused buyer question for this brand - what the
+   *  question switcher lists. */
+  questions: readonly Board11Question[];
+  selectedQuestionId: string;
+  onSelectQuestion: (id: string) => void;
   buyerQuestion: {
     text: string;
     state: Board11Value<string>;
@@ -78,40 +97,6 @@ function StateValue<T>({ value }: { value: Board11Unavailable<T> }) {
 function renderValue<T>(value: Board11Value<T>, renderMeasured: (item: T) => ReactNode) {
   if (value.kind === "measured") return renderMeasured(value.value);
   return <StateValue value={value} />;
-}
-
-function DiagnosticTabs({ brandId }: { brandId: string }) {
-  const params = new URLSearchParams({ brandId, mode: "guided" }).toString();
-  const tabs = [
-    { label: "Site health", path: "/v2/diagnostics/site-health" },
-    { label: "GEO signals", path: "/v2/diagnostics/geo-signals" },
-    { label: "Perception", path: "/v2/diagnostics/perception" },
-    { label: "Prompt diagnosis", path: "/v2/diagnostics/prompts", active: true },
-  ];
-
-  return (
-    <nav
-      aria-label="Diagnostics sections"
-      className="mb-5 flex gap-6 border-b border-[var(--v2-line)]"
-      role="tablist"
-    >
-      {tabs.map((tab) => (
-        <a
-          aria-selected={tab.active ?? false}
-          className={`-mb-px border-b-2 pb-2.5 ${v2Type.body} font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--v2-brand)] ${
-            tab.active
-              ? "border-[var(--v2-brand)] text-[color:var(--v2-brand)]"
-              : "border-transparent text-[color:var(--v2-ink3)] hover:text-[color:var(--v2-ink)]"
-          }`}
-          href={`${tab.path}?${params}`}
-          key={tab.path}
-          role="tab"
-        >
-          {tab.label}
-        </a>
-      ))}
-    </nav>
-  );
 }
 
 function ObservationRow({
@@ -330,6 +315,34 @@ function EvidenceRail({ data }: { data: Board11Data }) {
   );
 }
 
+/** Switches which tracked buyer question this board diagnoses. A `<select>`
+ *  rather than a tab strip: the number of tracked questions is unbounded (the
+ *  tab-strip pattern above is reserved for the fixed five Diagnostics areas),
+ *  and a native select keeps keyboard and screen-reader behaviour free. */
+function QuestionSwitcher({ data }: { data: Board11Data }) {
+  if (data.questions.length === 0) return null;
+  return (
+    <div className="mt-4" data-testid="v2-board11-question-switcher">
+      <label className={`${v2Type.label} block`} htmlFor="v2-board11-question-select">
+        Buyer question
+      </label>
+      <select
+        className="mt-1.5 w-full max-w-xl rounded-[var(--v2-radius)] border border-[var(--v2-line)] bg-[var(--v2-paper)] px-3 py-2 text-[13.5px] text-[color:var(--v2-ink)]"
+        id="v2-board11-question-select"
+        onChange={(event) => data.onSelectQuestion(event.target.value)}
+        value={data.selectedQuestionId}
+      >
+        {data.questions.map((question) => (
+          <option key={question.id} value={question.id}>
+            {question.text}
+            {question.hasFinding ? " · brand absent" : ""}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function sourceUrlItems(rows: readonly Board11AnswerRecord[]) {
   return rows.flatMap((row) =>
     row.sourceUrls.kind === "measured"
@@ -359,7 +372,10 @@ export function Board11Screen({ data, staleAsOf }: V2ScreenProps<Board11Data>) {
                 Stale · repeat the same question set. As of {staleAsOf}.
               </p>
             ) : null}
-            <DiagnosticTabs brandId={data.brandId} />
+            <div className="mb-5">
+              <DiagnosticsTabStrip active="b11" brandId={data.brandId} mode="guided" />
+            </div>
+            <QuestionSwitcher data={data} />
             <section aria-labelledby="v2-board11-question-title">
               <h2 id="v2-board11-question-title" className={`${v2Type.cardTitle} text-[17px]`}>
                 {data.buyerQuestion.text}
@@ -468,7 +484,9 @@ export function Board11Screen({ data, staleAsOf }: V2ScreenProps<Board11Data>) {
                     action.kind === "open" ? (
                       <Button asChild className="mt-3 h-10 rounded-lg px-4 text-[13.5px]">
                         <a
-                          href={`/v2/my-work?${new URLSearchParams({ brandId: data.brandId, mode: "guided", task: action.taskId }).toString()}`}
+                          href={`/v2/my-work/tasks/${encodeURIComponent(action.taskId)}?${new URLSearchParams(
+                            { brandId: data.brandId, mode: "guided" },
+                          ).toString()}`}
                         >
                           Open this task
                         </a>
