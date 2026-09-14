@@ -1,6 +1,7 @@
 // Live: tracked prompts, stored answer rows, cited URLs, source excerpts, and existing work tasks.
 // Pending backend work: diagnosis page evidence, persisted hypothesis linkage, and task creation.
 
+import { useState } from "react";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useBrandFacts, type BrandFactView } from "@/v2/data/brandFacts";
 import { useBrandPrompts, usePromptResults, type PromptResultView } from "@/v2/data/promptResults";
@@ -15,7 +16,7 @@ import {
 } from "@/v2/diagnostics/answerRows";
 import { isFailedCheck } from "@shared/citationFailure";
 import type { V2LiveResult } from "@/v2/contracts/screen";
-import type { Board11AnswerRecord, Board11Data } from "./Screen";
+import type { Board11AnswerRecord, Board11Data, Board11Question } from "./Screen";
 
 function measured<T>(value: T): { kind: "measured"; value: T } {
   return { kind: "measured", value };
@@ -76,6 +77,11 @@ export function useBoard11Data(): V2LiveResult<Board11Data> {
   const resultsQuery = usePromptResults(selectedBrandId || undefined);
   const factsQuery = useBrandFacts(selectedBrandId || undefined);
   const tasksQuery = useWorkTasks(selectedBrandId);
+  // Which tracked question the switcher has selected. `undefined` means "use
+  // the default" - the question with a real diagnostic finding, same rule
+  // `defaultPromptId` always used. Held here (not in the Route) so the hook
+  // stays the one place that owns "which question is this board showing".
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | undefined>(undefined);
 
   if (brandsLoading) return { state: { kind: "loading" } };
   if (!selectedBrandId || !selectedBrand) {
@@ -114,9 +120,25 @@ export function useBoard11Data(): V2LiveResult<Board11Data> {
   }
 
   const byPrompt = resultsQuery.data?.byPrompt ?? [];
-  const activeId = defaultPromptId(prompts, byPrompt);
+  // A selection that no longer exists (the brand changed under the page, or
+  // the question was un-tracked) falls back to the default rather than
+  // pointing at a question that is no longer in `prompts`.
+  const requestedId =
+    selectedQuestionId && prompts.some((row) => row.id === selectedQuestionId)
+      ? selectedQuestionId
+      : undefined;
+  const activeId = requestedId ?? defaultPromptId(prompts, byPrompt);
   const prompt = prompts.find((item) => item.id === activeId) ?? prompts[0];
   const result = byPrompt.find((item) => item.promptId === prompt.id);
+  const resultById = new Map(byPrompt.map((row) => [row.promptId, row]));
+  const questions: Board11Question[] = prompts.map((row) => {
+    const rowObservation = observe(toAnswerRows(resultById.get(row.id)));
+    return {
+      id: row.id,
+      text: row.prompt,
+      hasFinding: rowObservation.successful > 0 && rowObservation.absent > 0,
+    };
+  });
   const rows = toAnswerRows(result);
   const observation = observe(rows);
   const retrieval = retrievalOf(rows, resultsQuery.data?.brandDomain);
@@ -137,6 +159,9 @@ export function useBoard11Data(): V2LiveResult<Board11Data> {
   const data: Board11Data = {
     brandId: selectedBrand.id,
     brandName: selectedBrand.name,
+    questions,
+    selectedQuestionId: prompt.id,
+    onSelectQuestion: setSelectedQuestionId,
     buyerQuestion: {
       text: prompt.prompt,
       state: measured("Approved buyer question"),

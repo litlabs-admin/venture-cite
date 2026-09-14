@@ -7,6 +7,15 @@ function measured<T>(value: T): { kind: "measured"; value: T } {
 export const board11Fixture: Board11Data = {
   brandId: "fixture-brand",
   brandName: "VenturePR",
+  questions: [
+    {
+      id: "fixture-prompt",
+      text: "Which PR service supports early-stage founders in India?",
+      hasFinding: true,
+    },
+  ],
+  selectedQuestionId: "fixture-prompt",
+  onSelectQuestion: () => {},
   buyerQuestion: {
     text: "Which PR service supports early-stage founders in India?",
     state: measured("Approved buyer question"),

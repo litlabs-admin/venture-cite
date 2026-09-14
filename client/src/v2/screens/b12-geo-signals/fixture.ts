@@ -89,6 +89,7 @@ const missingEvidence: readonly Board12EvidenceGap[] = [
 ];
 
 export const board12Fixture: Board12Data = {
+  brandId: "fixture-brand",
   brand: { name: measured("VenturePR") },
   signalCoverage: {
     score: measured(64),
@@ -173,9 +174,9 @@ export const board12Fixture: Board12Data = {
   },
   missingEvidence,
   nextVerification: {
-    title: "Verify Crunchbase founder profile",
-    detail: "Confirm current role, bio, and recent activity.",
-    why: "Helps AI engines link founder expertise to VenturePR across sources.",
+    title: measured("Verify Crunchbase founder profile"),
+    detail: measured("Confirm current role, bio, and recent activity."),
+    why: measured("Helps AI engines link founder expertise to VenturePR across sources."),
     effort: measured(10),
     upside: measured("Medium"),
   },

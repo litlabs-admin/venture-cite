@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import type { V2IconName } from "@/v2/contracts/icons";
 import type { V2ScreenProps } from "@/v2/contracts/screen";
+import { DiagnosticsTabStrip } from "@/v2/diagnostics/DiagnosticsTabStrip";
 import { V2Icon } from "@/v2/theme/V2Icon";
 import { v2Type } from "@/v2/theme/typography";
 import { TrendChart } from "@/v2/shared/charts/TrendChart";
@@ -81,13 +82,6 @@ const RANGE_ITEMS = [
   { value: "7D", label: "7D" },
   { value: "14D", label: "14D" },
   { value: "30D", label: "30D" },
-] as const;
-
-const DIAGNOSTIC_TABS = [
-  { label: "Site health", to: "/v2/diagnostics/site-health" },
-  { label: "GEO signals", to: "/v2/diagnostics/geo-signals" },
-  { label: "Perception", to: "/v2/diagnostics/perception" },
-  { label: "Prompt diagnosis", to: "/v2/diagnostics/prompts" },
 ] as const;
 
 const STATUS_LABEL_BY_VALUE_KIND: Record<
@@ -223,31 +217,6 @@ function StateCount({
     <Chip className="whitespace-nowrap" leadingDot tone={tone}>
       {renderValue(value, (number) => `${number} ${label}`)}
     </Chip>
-  );
-}
-
-function DiagnosticTabs({ navigation }: { navigation: Board18Data["navigation"] }) {
-  return (
-    <div
-      aria-label="Diagnostics tabs"
-      className="flex flex-wrap gap-x-6 border-b border-[var(--v2-line)]"
-      role="tablist"
-    >
-      {DIAGNOSTIC_TABS.map((tab, index) => (
-        <a
-          aria-selected={index === 0}
-          className={cn(
-            "border-b-2 border-transparent pb-2.5 text-[13.5px] font-medium text-[color:var(--v2-ink3)] hover:text-[color:var(--v2-ink)]",
-            index === 0 && "border-[var(--v2-brand)] font-semibold text-[color:var(--v2-brand)]",
-          )}
-          href={buildInternalHref(tab.to, navigation)}
-          key={tab.to}
-          role="tab"
-        >
-          <span className={v2Type.body}>{tab.label}</span>
-        </a>
-      ))}
-    </div>
   );
 }
 
@@ -633,7 +602,11 @@ export function Board18Screen({ data, staleAsOf }: V2ScreenProps<Board18Data>) {
           over time.
         </p>
         <div className="mt-3">
-          <DiagnosticTabs navigation={data.navigation} />
+          <DiagnosticsTabStrip
+            active="b18"
+            brandId={data.navigation.brandId}
+            mode={data.navigation.mode}
+          />
         </div>
         <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_300px] items-start gap-5 max-[1050px]:grid-cols-1">
           <main className="min-w-0 space-y-2">

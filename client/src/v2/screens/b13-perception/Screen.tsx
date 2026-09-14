@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import type { V2ScreenProps } from "@/v2/contracts/screen";
+import { DiagnosticsTabStrip } from "@/v2/diagnostics/DiagnosticsTabStrip";
 import { V2Icon } from "@/v2/theme/V2Icon";
 import { v2Type } from "@/v2/theme/typography";
 import { DataTable, type DataColumn } from "@/v2/shared/ui/DataTable";
@@ -211,37 +212,6 @@ function modelName(value: Board13Value<string>): ReactNode {
         </span>
       )}
     />
-  );
-}
-
-const diagnosticTabs = [
-  { label: "Site health", path: "/v2/diagnostics/site-health" },
-  { label: "GEO signals", path: "/v2/diagnostics/geo-signals" },
-  { label: "Perception", path: "/v2/diagnostics/perception" },
-  { label: "Prompt diagnosis", path: "/v2/diagnostics/prompts" },
-] as const;
-
-function diagnosticHref(path: string, brandId: Board13Value<string>): string {
-  const mode = "mode=expert";
-  if (brandId.kind !== "measured") return `${path}?${mode}`;
-  return `${path}?brandId=${encodeURIComponent(brandId.value)}&${mode}`;
-}
-
-function DiagnosticTabs({ brandId }: { brandId: Board13Value<string> }) {
-  return (
-    <nav aria-label="Diagnostics tabs" className="b13-diagnostic-tabs" role="tablist">
-      {diagnosticTabs.map((tab) => (
-        <a
-          aria-current={tab.label === "Perception" ? "page" : undefined}
-          className={`${v2Type.body} b13-diagnostic-tab ${tab.label === "Perception" ? "is-active" : ""}`}
-          href={diagnosticHref(tab.path, brandId)}
-          key={tab.label}
-          role="tab"
-        >
-          {tab.label}
-        </a>
-      ))}
-    </nav>
   );
 }
 
@@ -513,17 +483,21 @@ function EvidenceRail({ data }: { data: Board13Data }) {
 }
 
 export function Board13Screen({ data, staleAsOf }: V2ScreenProps<Board13Data>) {
+  const brandIdForNav = data.brandId.kind === "measured" ? data.brandId.value : undefined;
   return (
     <div className="b13-screen" data-testid="v2-board13">
       <header className="b13-header">
         <h1 className={v2Type.pageTitle}>Find the cause. Choose a useful fix.</h1>
         <div className={`${v2Type.meta} b13-header-meta`}>
-          <span className={`${v2Type.bodyStrong} b13-header-context`}>Prototype · Sample data</span>
-          <span className={`${v2Type.num} b13-header-date`}>9 Sep 2026</span>
+          <span className={`${v2Type.bodyStrong} b13-header-context`}>
+            <ValueState render={(value) => `Last measured ${value}`} state={data.measuredAt} />
+          </span>
           {staleAsOf ? <StateLabel state="stale" className="b13-stale-label" /> : null}
         </div>
       </header>
-      <DiagnosticTabs brandId={data.brandId} />
+      <div className="b13-diagnostic-tabs">
+        <DiagnosticsTabStrip active="b13" brandId={brandIdForNav} mode="expert" />
+      </div>
       <TwoColumn
         className="b13-columns"
         main={

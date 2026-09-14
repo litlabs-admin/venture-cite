@@ -27,7 +27,13 @@ vi.mock("@/hooks/use-brand-selection", () => ({
 vi.mock("@/lib/queryClient", () => ({
   apiRequest: async (_method: string, url: string) => {
     if (apiState.error) throw apiState.error;
-    const key = url.includes("/probes/") ? "probes" : "perception";
+    const key = url.includes("/probes/")
+      ? "probes"
+      : url.includes("/api/hallucinations")
+        ? "hallucinations"
+        : url.includes("/api/brand-facts/")
+          ? "facts"
+          : "perception";
     const payload = apiState.responses[key];
     if (payload === undefined) throw new Error(`Missing mocked response for ${key}`);
     return { json: async () => payload };
@@ -54,6 +60,21 @@ function renderAdapter() {
           <>
             <output data-testid="adapter-brand">{result.data.brandName.kind}</output>
             <output data-testid="adapter-summary">{result.data.summary.kind}</output>
+            <output data-testid="adapter-accurate">
+              {result.data.accurateThemes.kind === "measured"
+                ? result.data.accurateThemes.value
+                : result.data.accurateThemes.kind}
+            </output>
+            <output data-testid="adapter-unverified">
+              {result.data.unverifiedImpressions.kind === "measured"
+                ? result.data.unverifiedImpressions.value
+                : result.data.unverifiedImpressions.kind}
+            </output>
+            <output data-testid="adapter-conflicting">
+              {result.data.conflictingClaims.kind === "measured"
+                ? result.data.conflictingClaims.value
+                : result.data.conflictingClaims.kind}
+            </output>
             {firstAnswer?.snippet.kind === "measured" ? (
               <output data-testid="adapter-answer">{firstAnswer.snippet.value}</output>
             ) : null}
@@ -221,7 +242,12 @@ describe("Board 13 perception screen", () => {
 describe("Board 13 live adapter", () => {
   beforeEach(() => {
     apiState.error = undefined;
-    apiState.responses = { perception: perceptionPayload, probes: probesPayload };
+    apiState.responses = {
+      perception: perceptionPayload,
+      probes: probesPayload,
+      hallucinations: { success: true, data: [] },
+      facts: { success: true, data: [] },
+    };
   });
 
   it("maps the real perception and probe response envelopes", async () => {
@@ -230,17 +256,51 @@ describe("Board 13 live adapter", () => {
     expect(screen.getByTestId("adapter-state")).toHaveTextContent("loading");
     await waitFor(() => expect(screen.getByTestId("adapter-state")).toHaveTextContent("ready"));
     expect(screen.getByTestId("adapter-brand")).toHaveTextContent("measured");
-    expect(screen.getByTestId("adapter-summary")).toHaveTextContent("not-measured");
+    // The summary is now a real, computed sentence (built from praised/
+    // questioned/hallucination/fact counts) rather than a permanent
+    // "pending backend support" state - this is the fixture the "Prototype ·
+    // Sample data" bug used to mask.
+    expect(screen.getByTestId("adapter-summary")).toHaveTextContent("measured");
     expect(screen.getByTestId("adapter-answer")).toHaveTextContent(
       "VenturePR helps startups with media relations.",
     );
     expect(screen.getByTestId("adapter-source")).toHaveTextContent("https://chat.openai.com/…");
   });
 
+  it("builds accurate and unverified theme rows from the run's own praised/questioned evidence", async () => {
+    renderAdapter();
+
+    await waitFor(() => expect(screen.getByTestId("adapter-state")).toHaveTextContent("ready"));
+    expect(screen.getByTestId("adapter-accurate")).toHaveTextContent("1");
+    expect(screen.getByTestId("adapter-unverified")).toHaveTextContent("1");
+  });
+
+  it("counts unresolved hallucinations as conflicting claims", async () => {
+    apiState.responses.hallucinations = {
+      success: true,
+      data: [
+        {
+          id: "h1",
+          claimedStatement: "VenturePR was founded in 2010.",
+          actualFact: "VenturePR was founded in 2018.",
+          hallucinationType: "factual",
+          category: "Founding date",
+          severity: "medium",
+        },
+      ],
+    };
+    renderAdapter();
+
+    await waitFor(() => expect(screen.getByTestId("adapter-state")).toHaveTextContent("ready"));
+    expect(screen.getByTestId("adapter-conflicting")).toHaveTextContent("1");
+  });
+
   it("returns an honest not-measured state when both endpoints have no run", async () => {
     apiState.responses = {
       perception: { success: true, data: null },
       probes: { success: true, data: null },
+      hallucinations: { success: true, data: [] },
+      facts: { success: true, data: [] },
     };
     renderAdapter();
 
