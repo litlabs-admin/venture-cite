@@ -11,4 +11,5 @@ export * from "./schema/platform";
 export * from "./schema/prompts";
 export * from "./schema/siteHealth";
 export * from "./schema/signals";
+export * from "./schema/v2Team";
 export * from "./schema/work";
