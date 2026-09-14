@@ -24,7 +24,12 @@ import type { WorkTaskSummaryView } from "./workSummary";
 //     "Check failed:" status line, which is what
 //     `GET /api/v2/visibility/mention-rate/:brandId` counts and excludes from
 //     its denominator. None of the endpoints below report it.
-//   - No business-results source anywhere in the API.
+//   - No business-results READ anywhere in the API. There is now a write
+//     (`useRecordBusinessResults`, `POST /api/brands/:brandId/business-
+//     results`), which is what the outcome-review screen's manual-entry form
+//     saves to - `business_result_events` (migration 0131) had no writer
+//     before it. There is still no read, so a screen cannot show a business
+//     result back once saved; it can only confirm the write succeeded.
 //
 // THE APPROVED-QUESTION COUNT IS NOT ON A VISIBILITY READ, and for a while
 // that was taken to mean it did not exist. It does. Approval in this product
@@ -356,6 +361,45 @@ export function useRecordResultsReview(brandId: string) {
     onSuccess: () => {
       // Only this tree's keys. The live dashboard shares the query client and
       // must not be re-rendered by a write made here.
+      void queryClient.invalidateQueries({ queryKey: ["v2"] });
+    },
+  });
+}
+
+/** The four kinds `business_result_events` accepts (migration 0131's check
+ *  constraint). There is no fifth for "demo request" - the outcome-review
+ *  form maps that count onto `inquiry`, and a qualified-inquiry count onto
+ *  `qualified_lead`, rather than inventing a kind the table would reject. */
+export type BusinessResultEventKind =
+  "referral_visit" | "inquiry" | "qualified_lead" | "retained_customer";
+
+export type BusinessResultEventInput = {
+  eventKind: BusinessResultEventKind;
+  value: number | null;
+  valueUnit: string | null;
+  occurredAt: string;
+  notes: string | null;
+};
+
+/**
+ * Record manually entered business results.
+ *
+ * `POST /api/brands/:brandId/business-results`. Every event this writes is
+ * `confirmation_state: "confirmed"` and `attribution_method: "manual"` -
+ * a person typed the number in, so nothing here is inferred.
+ */
+export function useRecordBusinessResults(brandId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (events: BusinessResultEventInput[]) => {
+      const response = await apiRequest(
+        "POST",
+        `/api/brands/${encodeURIComponent(brandId)}/business-results`,
+        { events },
+      );
+      return (await response.json()) as { success: boolean };
+    },
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["v2"] });
     },
   });

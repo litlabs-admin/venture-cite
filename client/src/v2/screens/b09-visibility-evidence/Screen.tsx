@@ -17,6 +17,7 @@ import { ProgressBar } from "@/v2/shared/ui/ProgressBar";
 import { StateLabel } from "@/v2/shared/ui/StateLabel";
 import { V2Icon } from "@/v2/theme/V2Icon";
 import { v2Type } from "@/v2/theme/typography";
+import { VisibilityTabStrip } from "@/v2/visibility/VisibilityTabStrip";
 
 export type Board09Value<T> =
   | { kind: "measured"; value: T }
@@ -95,7 +96,8 @@ export type Board09Data = {
   observedEngines: Board09Value<readonly Board09EngineRow[]>;
 };
 
-type Board09RoutePath = "/v2/today" | "/v2/visibility/evidence" | "/v2/visibility/results";
+type Board09RoutePath =
+  "/v2/today" | "/v2/my-work" | "/v2/visibility/evidence" | "/v2/visibility/results";
 
 const TABS = ["Mentions", "Recommendations", "Citations"] as const;
 type Board09Tab = (typeof TABS)[number];
@@ -436,7 +438,7 @@ function VerifiedWork({ data }: { data: Board09Data }) {
           ))}
         </div>
       ))}
-      <LinkWithArrow className="mt-2 text-[13px]" href={buildV2Href("/v2/today", data.context)}>
+      <LinkWithArrow className="mt-2 text-[13px]" href={buildV2Href("/v2/my-work", data.context)}>
         View all verified work
       </LinkWithArrow>
     </section>
@@ -522,6 +524,9 @@ export function Board09Screen({ data, staleAsOf }: V2ScreenProps<Board09Data>) {
       <div className="grid min-w-0 grid-cols-1 min-[1100px]:grid-cols-[minmax(0,1fr)_322px]">
         <main className="min-w-0 px-7 py-7">
           <h1 className={v2Type.pageTitle}>Visibility and evidence</h1>
+          <div className="mb-[18px] mt-4">
+            <VisibilityTabStrip active="b09" context={data.context} />
+          </div>
           {staleAsOf ? (
             <p className="mt-1 flex items-center gap-2">
               <StateLabel state="stale" />

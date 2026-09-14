@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Board21Route } from "@/v2/screens/b21-outcome-review/Route";
 import { Board21Screen } from "@/v2/screens/b21-outcome-review/Screen";
@@ -34,9 +35,21 @@ function renderRoute() {
   );
 }
 
+// The screen now saves through `useRecordBusinessResults`, a query hook, so
+// even a props-only render needs a query client - the real app supplies one
+// from its root layout, and this stands in for it here.
+function renderScreen(data = board21Fixture) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <Board21Screen data={data} />
+    </QueryClientProvider>,
+  );
+}
+
 describe("Board 21 outcome review", () => {
   it("renders the outcome evidence, form, and progress regions", () => {
-    render(<Board21Screen data={board21Fixture} />);
+    renderScreen();
 
     expect(
       screen.getByRole("heading", { name: "Connect visibility work to business results" }),
@@ -79,7 +92,7 @@ describe("Board 21 outcome review", () => {
       crmOpportunityCount: { kind: "not-measured" },
     };
 
-    render(<Board21Screen data={data} />);
+    renderScreen(data);
 
     expect(screen.getAllByText("Not measured").length).toBeGreaterThanOrEqual(4);
     expect(screen.queryByDisplayValue("1")).not.toBeInTheDocument();
@@ -141,5 +154,84 @@ describe("Board 21 outcome review", () => {
     renderRoute();
     expect(await screen.findByTestId("v2-state-error")).toBeInTheDocument();
     vi.unstubAllGlobals();
+  });
+
+  it("shows every visibility tab, linking Outcome review as the active one", () => {
+    renderScreen();
+
+    for (const label of [
+      "Overview",
+      "Answers",
+      "Citations",
+      "Buyer questions",
+      "Competitors",
+      "Results",
+      "Report",
+      "Outcome review",
+    ]) {
+      expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("link", { name: "Outcome review" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("links CRM connect buttons to Settings, never faking a connection locally", () => {
+    renderScreen();
+
+    const connectButtons = screen.getAllByRole("link", { name: "Connect" });
+    expect(connectButtons.length).toBeGreaterThanOrEqual(2);
+    for (const link of connectButtons) {
+      expect(link.getAttribute("href")).toContain("/v2/settings/integrations");
+    }
+    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+  });
+
+  it("really saves the outcome, posting the manual business-results endpoint", async () => {
+    const posted: unknown[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "POST" && url.includes("/business-results")) {
+        posted.push({ url, body: JSON.parse(String(init.body)) });
+        return new Response(JSON.stringify({ success: true, data: { items: [] } }), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify({ success: true, data: {} }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Save outcome review" }));
+
+    expect(
+      await screen.findByText("Your outcome review is recorded for this period."),
+    ).toBeInTheDocument();
+    expect(posted).toHaveLength(1);
+    const [call] = posted as { url: string; body: { events: Record<string, unknown>[] } }[];
+    expect(call.url).toContain(`/api/brands/${board21Fixture.context.brandId}/business-results`);
+    // The fixture pre-fills qualified inquiries (1), demo requests (0) and two
+    // referral URLs - three real rows, not a lone empty submission.
+    expect(call.body.events.length).toBeGreaterThanOrEqual(2);
+    expect(call.body.events.map((event) => event.eventKind)).toEqual(
+      expect.arrayContaining(["qualified_lead", "inquiry"]),
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("cannot save an outcome with nothing entered", async () => {
+    const data = {
+      ...board21Fixture,
+      qualifiedInquiries: { kind: "not-measured" as const },
+      demoRequests: { kind: "not-measured" as const },
+      attributedReferralUrls: { kind: "not-measured" as const },
+      crmOpportunityIds: "",
+      outcomeNotes: "",
+    };
+    renderScreen(data);
+
+    expect(screen.getByText("Enter at least one outcome before saving.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save outcome review" })).toBeDisabled();
   });
 });

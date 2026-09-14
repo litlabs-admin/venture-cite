@@ -66,6 +66,31 @@ describe("Board 09 visibility evidence", () => {
     expect(screen.getByText(label)).toBeTruthy();
     expect(screen.queryByTestId("board09-rate-value")).toBeNull();
   });
+
+  it("shows every visibility tab, linking Answers as the active one", () => {
+    render(<Board09Screen data={board09Fixture} />);
+
+    for (const label of [
+      "Overview",
+      "Answers",
+      "Citations",
+      "Buyer questions",
+      "Competitors",
+      "Results",
+      "Report",
+      "Outcome review",
+    ]) {
+      expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("link", { name: "Answers" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("sends verified work to the work queue, not the page-changes feed", () => {
+    render(<Board09Screen data={board09Fixture} />);
+
+    const href = screen.getByRole("link", { name: /View all verified work/i }).getAttribute("href");
+    expect(href).toContain("/v2/my-work");
+  });
 });
 
 const snapshot: Board09QuerySnapshot = {

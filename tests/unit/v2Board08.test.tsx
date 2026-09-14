@@ -27,8 +27,12 @@ describe("Board 08 visibility overview", () => {
     );
     expect(screen.getByText("Answers")).toBeInTheDocument();
     expect(screen.getByText("Citations")).toBeInTheDocument();
+    expect(screen.getByText("Buyer questions")).toBeInTheDocument();
     expect(screen.getByText("Competitors")).toBeInTheDocument();
     expect(screen.getByText("Results")).toBeInTheDocument();
+    expect(screen.getByText("Report")).toBeInTheDocument();
+    expect(screen.getByText("Outcome review")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("Mention rate")).toBeInTheDocument();
     expect(screen.getAllByText("45%").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("18 of 40 successful test answers")).toBeInTheDocument();

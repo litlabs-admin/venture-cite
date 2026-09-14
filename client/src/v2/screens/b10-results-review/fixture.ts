@@ -13,6 +13,8 @@ export const board10Fixture: Board10Data = {
     notes:
       "Keep the updated services page. Review another comparable answer set before making further changes.",
     awardPoints: { kind: "measured", value: 10 },
+    taskId: { kind: "measured", value: "task-review-fixture" },
+    taskRevision: { kind: "measured", value: 2 },
   },
   progress: {
     level: { kind: "measured", value: 3 },

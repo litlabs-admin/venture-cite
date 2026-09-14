@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Board10Route } from "@/v2/screens/b10-results-review/Route";
 import { Board10Screen } from "@/v2/screens/b10-results-review/Screen";
@@ -34,9 +35,21 @@ function renderRoute() {
   );
 }
 
+// The screen now saves through `useRecordResultsReview`, a query hook, so
+// even a props-only render needs a query client - the real app supplies one
+// from its root layout, and this stands in for it here.
+function renderScreen(data = board10Fixture, staleAsOf?: string) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <Board10Screen data={data} staleAsOf={staleAsOf} />
+    </QueryClientProvider>,
+  );
+}
+
 describe("Board 10 results review", () => {
   it("renders every major region from the approved review", () => {
-    render(<Board10Screen data={board10Fixture} />);
+    renderScreen();
 
     expect(
       screen.getByRole("heading", { name: "Review the work and the result" }),
@@ -78,7 +91,7 @@ describe("Board 10 results review", () => {
       },
     };
 
-    render(<Board10Screen data={data} />);
+    renderScreen(data);
 
     expect(screen.getAllByText("Not measured").length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText("18 / 40 mentions")).not.toBeInTheDocument();
@@ -146,5 +159,83 @@ describe("Board 10 results review", () => {
     renderRoute();
     expect(await screen.findByTestId("v2-state-error")).toBeInTheDocument();
     vi.unstubAllGlobals();
+  });
+
+  it("shows every visibility tab, linking Results as the active one", () => {
+    renderScreen();
+
+    for (const label of [
+      "Overview",
+      "Answers",
+      "Citations",
+      "Buyer questions",
+      "Competitors",
+      "Results",
+      "Report",
+      "Outcome review",
+    ]) {
+      expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("link", { name: "Results" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("really saves the decision, posting the task's review endpoint", async () => {
+    const taskId =
+      board10Fixture.review.taskId.kind === "measured" ? board10Fixture.review.taskId.value : "";
+    const taskRevision =
+      board10Fixture.review.taskRevision.kind === "measured"
+        ? board10Fixture.review.taskRevision.value
+        : -1;
+    const cycleKey =
+      board10Fixture.review.periodStart.kind === "measured"
+        ? board10Fixture.review.periodStart.value
+        : "";
+
+    const posted: unknown[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "POST" && url.includes("/review")) {
+        posted.push({ url, body: JSON.parse(String(init.body)) });
+      }
+      return new Response(JSON.stringify({ success: true, data: {} }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderScreen();
+    await userEvent.click(screen.getByRole("radio", { name: "Continue the change" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save results review" }));
+
+    expect(
+      await screen.findByText("Your decision is recorded for this period."),
+    ).toBeInTheDocument();
+    expect(posted).toHaveLength(1);
+    const [call] = posted as { url: string; body: Record<string, unknown> }[];
+    expect(call.url).toContain(
+      `/api/brands/${board10Fixture.context.brandId}/work/tasks/${taskId}/review`,
+    );
+    expect(call.body).toMatchObject({
+      expectedRevision: taskRevision,
+      cycleKey,
+      measurementScope: { kind: "period", period: cycleKey },
+      decision: "improvement",
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it("cannot save without a review task in the queue, and says why", () => {
+    const data = {
+      ...board10Fixture,
+      review: {
+        ...board10Fixture.review,
+        taskId: { kind: "not-measured" as const },
+        taskRevision: { kind: "not-measured" as const },
+      },
+    };
+    renderScreen(data);
+
+    expect(
+      screen.getByText("No results review is in the queue for this brand yet."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save results review" })).toBeDisabled();
   });
 });
