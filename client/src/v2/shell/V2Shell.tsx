@@ -1,84 +1,91 @@
-import type { ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useMatches, useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { BrandLogo } from "@/components/BrandLogo";
 import BrandSelector from "@/components/BrandSelector";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import type { V2Mode, V2ShellVariant } from "@/v2/contracts/shell";
+import { V2Icon } from "@/v2/theme/V2Icon";
+import "@/v2/theme/v2-mono.css";
+import { V2ModeToggle } from "./V2ModeToggle";
+import { getActiveNavItemId, getNavItems, V2_NAV_MAP } from "./navMap";
 import { V2Nav } from "./V2Nav";
+import { V2TopBar } from "./V2TopBar";
+import { useV2Mode } from "./useV2Mode";
 
-// The gamified shell's chrome.
-//
-// Geometry is the SHIPPED shell's, not the artboards'. The approved artboards
-// draw a 244px rail; the app ships 200px, and the content column reflows to
-// 200px rather than being rescaled to fit a wider one. Every number below is
-// copied from the live shell - never imported from it, because AppShell.tsx
-// and Sidebar.tsx are out of scope for this tree and must keep rendering the
-// live dashboard exactly as they do now.
-//
-// The 56px brand row and the 56px context bar are the same height on purpose:
-// their bottom hairlines then meet as one unbroken line across the viewport.
-// Changing either without the other visibly breaks that seam.
-//
-// `vc-app` on the root is load-bearing. It sets the authenticated app's
-// default type to the product scale (12px/1.5). Without it every element that
-// does not carry its own `text-*` class inherits the browser's 16px, and
-// nothing on this tree matches its artboard.
-export function V2Shell({ children }: { children: ReactNode }) {
-  const { brands, isLoading } = useBrandSelection();
+const EXPERT_EQUIVALENTS: ReadonlyArray<{ from: string; to: string }> = [
+  { from: "/v2/visibility", to: "/v2/visibility" },
+  { from: "/v2/diagnostics", to: "/v2/diagnostics" },
+];
+
+type ShellUser = ReturnType<typeof useAuth>["user"];
+
+function resolveShellVariant(matches: ReturnType<typeof useMatches>): V2ShellVariant {
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const shell = matches[index]?.staticData?.v2Shell;
+    if (shell) return shell;
+  }
+  return "guided";
+}
+
+function getExpertEquivalent(pathname: string): string | undefined {
+  return EXPERT_EQUIVALENTS.find(({ from }) => pathname === from || pathname.startsWith(`${from}/`))
+    ?.to;
+}
+
+function getUserInitials(user: ShellUser): string {
+  if (user?.firstName && user.lastName) {
+    return `${user.firstName.slice(0, 1)}${user.lastName.slice(0, 1)}`.toUpperCase();
+  }
+  if (user?.firstName) return user.firstName.slice(0, 2).toUpperCase();
+  if (user?.email) return user.email.slice(0, 1).toUpperCase();
+  return "U";
+}
+
+function V2UserAvatar({ user }: { user: ShellUser }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--v2-brand-soft)] text-[11px] font-semibold text-[color:var(--v2-brand)]"
+    >
+      {getUserInitials(user)}
+    </span>
+  );
+}
+
+function V2UserRow({ user }: { user: ShellUser }) {
+  const name = user?.firstName
+    ? `${user.firstName} ${user.lastName ?? ""}`.trim()
+    : (user?.email ?? "Account");
 
   return (
-    <div className="vc-app flex min-h-screen bg-vc-page">
-      <a
-        href="#v2-main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg"
+    <div className="shrink-0 border-t border-[var(--v2-line)] px-3 py-3">
+      <button
+        type="button"
+        aria-label={`${name} account`}
+        className="flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-[13px] font-medium text-[color:var(--v2-ink2)] transition-colors hover:bg-[var(--v2-inset)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--v2-brand)]"
       >
-        Skip to main content
-      </a>
-
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[200px] flex-col border-r border-vc-default bg-vc-surface lg:flex">
-        <div className="relative flex h-[56px] shrink-0 items-center border-b border-vc-default px-2.5">
-          <Link to="/v2/today" className="flex items-center gap-2 rounded-md px-1.5 py-1.5">
-            <BrandLogo />
-          </Link>
-        </div>
-
-        <V2Nav />
-
-        <div className="shrink-0 space-y-1 border-t border-vc-default px-2 py-3">
-          {/* The way back to the live dashboard. Without it this tree is a
-              one-way door for anyone who lands on it from a bookmark. */}
-          <Link
-            to="/dashboard"
-            className="block rounded-sm px-2 py-2 text-caption text-vc-secondary transition-colors duration-150 hover:bg-vc-muted/50 hover:text-vc-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-vc-accent/40"
-          >
-            Back to dashboard
-          </Link>
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col lg:ml-[200px] print:ml-0">
-        <div className="sticky top-0 z-20 hidden h-[56px] items-center border-b border-vc-default bg-vc-surface px-8 lg:flex print:hidden">
-          <V2BrandControl brands={brands} isLoading={isLoading} />
-        </div>
-
-        <main id="v2-main-content" className="min-w-0 flex-1">
-          {children}
-        </main>
-      </div>
+        <V2UserAvatar user={user} />
+        <span className="min-w-0 flex-1 truncate">{name}</span>
+        <V2Icon name="cdown" size={14} className="shrink-0 text-[color:var(--v2-ink3)]" />
+      </button>
     </div>
   );
 }
 
-// BrandSelector.tsx:41 returns `null` when the user has no brands - it renders
-// nothing at all, not an empty control. The live app never sees that, because
-// FirstRunGate sends a brand-less user to /welcome before any shell mounts.
-// This tree is gated by AuthenticatedBareRoute, which does not redirect, so
-// the zero-brand case is reachable here and has to be a real, named state:
-// an unexplained hole in the context bar would read as a broken control.
-function V2BrandControl({ brands, isLoading }: { brands: { id: string }[]; isLoading: boolean }) {
+function V2BrandControl({
+  brands,
+  isLoading,
+  selectedBrand,
+}: {
+  brands: { id: string }[];
+  isLoading: boolean;
+  selectedBrand?: { name: string };
+}) {
   if (isLoading) {
     return (
-      <span className="text-caption text-vc-tertiary" data-testid="v2-brand-loading">
+      <span className="text-[12px] text-[color:var(--v2-ink3)]" data-testid="v2-brand-loading">
         Loading brands…
       </span>
     );
@@ -86,13 +93,8 @@ function V2BrandControl({ brands, isLoading }: { brands: { id: string }[]; isLoa
 
   if (brands.length === 0) {
     return (
-      <div className="flex items-center gap-3" data-testid="v2-brand-empty">
-        <span className="text-caption text-vc-secondary">
-          No brands yet — add one to start measuring.
-        </span>
-        {/* The shipped `default` variant already rests as a tint and fills on
-            hover. It is used unmodified: no bg-* through className, per the
-            prohibition in ui/button.tsx. */}
+      <div className="flex min-w-0 flex-col gap-1" data-testid="v2-brand-empty">
+        <span className="text-[12px] text-[color:var(--v2-ink3)]">No brands yet.</span>
         <Button asChild size="sm">
           <Link to="/welcome">Add a brand</Link>
         </Button>
@@ -101,11 +103,204 @@ function V2BrandControl({ brands, isLoading }: { brands: { id: string }[]; isLoa
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-caption text-vc-secondary" id="v2-brand-label">
-        Brand
+    <div className="flex min-w-0 items-center gap-2" data-testid="v2-brand-switcher">
+      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--v2-brand-soft)] text-[10px] font-semibold text-[color:var(--v2-brand)]">
+        {(selectedBrand?.name.slice(0, 2) ?? "BR").toUpperCase()}
       </span>
-      <BrandSelector />
+      <BrandSelector className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-[13.5px] font-semibold text-[color:var(--v2-ink)] shadow-none focus:ring-0" />
+    </div>
+  );
+}
+
+function V2ExpertTopBar({ user }: { user: ShellUser }) {
+  const [searchValue, setSearchValue] = useState("");
+  const date = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
+
+  return (
+    <header className="flex h-[52px] shrink-0 items-center gap-5 border-b border-[var(--v2-line)] bg-[var(--v2-paper)] px-6">
+      <label
+        className="flex h-8 w-full max-w-[520px] items-center gap-2 rounded-[7px] border border-[var(--v2-line)] bg-[var(--v2-inset)] px-3 text-[12px] text-[color:var(--v2-ink3)] focus-within:border-[var(--v2-brand)] focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-[var(--v2-brand)]"
+        htmlFor="v2-expert-search"
+      >
+        <V2Icon name="srch" size={15} className="shrink-0" />
+        <input
+          id="v2-expert-search"
+          aria-label="Search"
+          className="min-w-0 flex-1 bg-transparent text-[color:var(--v2-ink)] outline-none placeholder:text-[color:var(--v2-ink3)]"
+          placeholder="Search companies, topics, or prompts…"
+          type="search"
+          value={searchValue}
+          onChange={(event) => setSearchValue(event.target.value)}
+        />
+      </label>
+      <div className="ml-auto flex shrink-0 items-center gap-4 text-[12px] text-[color:var(--v2-ink3)]">
+        <span className="hidden items-center gap-1.5 md:flex">
+          <V2Icon name="cal" size={15} />
+          {date}
+        </span>
+        <button
+          type="button"
+          aria-label="Help"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--v2-line)] text-[12px] font-semibold text-[color:var(--v2-ink2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--v2-brand)]"
+        >
+          ?
+        </button>
+        <button
+          type="button"
+          aria-label="Account"
+          className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--v2-brand)]"
+        >
+          <V2UserAvatar user={user} />
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function V2DateMeta() {
+  const date = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
+
+  return (
+    <span className="flex items-center gap-1.5 text-[12px] text-[color:var(--v2-ink3)]">
+      <V2Icon name="cal" size={15} />
+      {date}
+    </span>
+  );
+}
+
+function V2AgencyWorkspace({ selectedBrand }: { selectedBrand?: { name: string } }) {
+  return (
+    <button
+      type="button"
+      className="mx-3 flex items-center justify-between gap-2 rounded-[7px] border border-[var(--v2-line)] px-2.5 py-2"
+      data-testid="v2-workspace-switcher"
+    >
+      <span className="min-w-0 truncate text-[12.5px] font-semibold text-[color:var(--v2-ink)]">
+        {selectedBrand?.name ?? "All brands"}
+      </span>
+      <V2Icon name="cdown" size={14} className="shrink-0 text-[color:var(--v2-ink3)]" />
+    </button>
+  );
+}
+
+function V2AppChrome({
+  variant,
+  children,
+}: {
+  variant: Exclude<V2ShellVariant, "bare">;
+  children: ReactNode;
+}) {
+  const { brands, isLoading, selectedBrand, selectedBrandId } = useBrandSelection();
+  const { user } = useAuth();
+  const { mode, setMode } = useV2Mode();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const search = useSearch({ strict: false });
+  const [modeOverride, setModeOverride] = useState<V2Mode>();
+  const modeFromVariant = variant === "expert" || variant === "expert-nav" ? "expert" : mode;
+  const activeMode = modeOverride ?? modeFromVariant;
+  const sections = V2_NAV_MAP[variant];
+  const activeItemId = getActiveNavItemId(sections, pathname);
+  const activeItem = getNavItems(sections).find((item) => item.id === activeItemId);
+
+  useEffect(() => {
+    setModeOverride(undefined);
+  }, [pathname, variant]);
+
+  function handleModeChange(nextMode: V2Mode) {
+    setModeOverride(nextMode);
+    setMode(nextMode);
+    if (nextMode !== "expert") return;
+
+    const target = getExpertEquivalent(pathname);
+    if (!target) return;
+
+    navigate({
+      to: target,
+      search: { ...search, brandId: selectedBrandId || undefined, mode: nextMode },
+    });
+  }
+
+  const linkSearch = { ...search, brandId: selectedBrandId || undefined, mode: activeMode };
+  const standardRail = variant === "guided" || variant === "expert";
+  const railWidth = variant === "expert-nav" ? "w-[190px]" : "w-[200px]";
+  const contentOffset = variant === "expert-nav" ? "lg:ml-[190px]" : "lg:ml-[200px]";
+
+  return (
+    <div className="flex min-h-screen bg-[var(--v2-paper)]">
+      <aside
+        aria-label={`${variant} shell`}
+        className={`fixed inset-y-0 left-0 z-40 hidden ${railWidth} flex-col border-r border-[var(--v2-line)] bg-[var(--v2-paper)] lg:flex`}
+        data-testid={`v2-${variant}-rail`}
+      >
+        <div className="flex h-[56px] shrink-0 items-center border-b border-[var(--v2-line)] px-3">
+          <Link
+            to="/v2/today"
+            search={linkSearch}
+            className="flex items-center gap-2 rounded-[7px] px-1 py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--v2-brand)]"
+          >
+            <BrandLogo />
+          </Link>
+        </div>
+
+        {standardRail ? (
+          <div className="shrink-0 space-y-3 px-3 py-3">
+            <V2BrandControl brands={brands} isLoading={isLoading} selectedBrand={selectedBrand} />
+            <V2ModeToggle mode={activeMode} onChange={handleModeChange} />
+          </div>
+        ) : null}
+        {variant === "agency" ? <V2AgencyWorkspace selectedBrand={selectedBrand} /> : null}
+
+        <V2Nav
+          variant={variant}
+          pathname={pathname}
+          brandId={selectedBrandId}
+          mode={activeMode}
+          search={search}
+        />
+        <V2UserRow user={user} />
+      </aside>
+
+      <div className={`flex min-w-0 flex-1 flex-col ${contentOffset}`}>
+        {variant === "expert-nav" ? (
+          <V2ExpertTopBar user={user} />
+        ) : (
+          <V2TopBar left={activeItem?.label} right={<V2DateMeta />} />
+        )}
+        <main id="v2-main-content" className="min-w-0 flex-1">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export function V2Shell({ children }: { children: ReactNode }) {
+  const variant = resolveShellVariant(useMatches());
+
+  return (
+    <div className="v2-mono vc-app min-h-screen bg-[var(--v2-paper)] text-[color:var(--v2-ink)]">
+      <a
+        href="#v2-main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-[7px] focus:bg-[var(--v2-brand)] focus:px-4 focus:py-2 focus:text-[color:var(--v2-paper)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--v2-brand)]"
+      >
+        Skip to main content
+      </a>
+      {variant === "bare" ? (
+        <main id="v2-main-content" className="min-h-screen">
+          {children}
+        </main>
+      ) : (
+        <V2AppChrome variant={variant}>{children}</V2AppChrome>
+      )}
     </div>
   );
 }
