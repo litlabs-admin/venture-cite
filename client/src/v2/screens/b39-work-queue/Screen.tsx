@@ -166,8 +166,9 @@ function Board39Table({
       render: (task) => (
         <Link
           className="inline-flex min-w-0 hover:underline"
-          search={{ brandId, mode, task: task.id }}
-          to="/v2/my-work"
+          params={{ taskId: task.id }}
+          search={{ brandId, mode }}
+          to="/v2/my-work/tasks/$taskId"
         >
           <WorkTaskIdentity compact icon={task.icon} title={task.title} />
         </Link>
@@ -415,20 +416,21 @@ export function Board39Screen({ data }: V2ScreenProps<Board39Data>) {
                   )}
                 </div>
               </div>
-              <Button asChild className="h-10 shrink-0 rounded-lg text-[13.5px]">
-                <Link
-                  search={{
-                    brandId: data.brandId,
-                    mode: data.mode,
-                    ...(data.priority.id.kind === "measured"
-                      ? { task: data.priority.id.value }
-                      : {}),
-                  }}
-                  to="/v2/my-work"
-                >
+              {data.priority.id.kind === "measured" ? (
+                <Button asChild className="h-10 shrink-0 rounded-lg text-[13.5px]">
+                  <Link
+                    params={{ taskId: data.priority.id.value }}
+                    search={{ brandId: data.brandId, mode: data.mode }}
+                    to="/v2/my-work/tasks/$taskId"
+                  >
+                    Open task
+                  </Link>
+                </Button>
+              ) : (
+                <Button className="h-10 shrink-0 rounded-lg text-[13.5px]" disabled>
                   Open task
-                </Link>
-              </Button>
+                </Button>
+              )}
             </Panel>
             <Board39Table brandId={data.brandId} mode={data.mode} tasks={visibleTasks} />
           </div>

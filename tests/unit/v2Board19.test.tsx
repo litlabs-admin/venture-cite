@@ -45,7 +45,9 @@ describe("Board 19 content task editor", () => {
       screen.getByText("Approved brand facts about services, results, and outcomes."),
     ).toBeInTheDocument();
     expect(screen.getByText("40 work points after verification")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Continue to publication check" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Continue to publication check" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Draft saved. Publication is not yet verified.")).toBeInTheDocument();
   });
 

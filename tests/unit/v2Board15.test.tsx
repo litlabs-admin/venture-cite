@@ -61,7 +61,10 @@ describe("Board 15 revision review", () => {
     const rewardHeading = screen.getByRole("heading", { name: "Completion reward" });
     expect(rewardHeading.nextElementSibling).toHaveTextContent("20 work points after verified approval");
     expect(screen.getByRole("button", { name: "Approve revision" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Request edits" })).toBeEnabled();
+    // No backend capability exists yet to send a task back for edits from
+    // this screen, so the control is honestly disabled rather than a click
+    // that would silently do nothing.
+    expect(screen.getByRole("button", { name: "Request edits" })).toBeDisabled();
   });
 
   it("renders unavailable values as state labels instead of fixture numbers", () => {

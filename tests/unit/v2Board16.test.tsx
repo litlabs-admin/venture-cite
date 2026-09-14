@@ -11,6 +11,11 @@ import {
   type Board16ApiResponse,
 } from "@/v2/screens/b16-publication-check/data";
 
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  return { ...actual, useParams: () => ({}) };
+});
+
 vi.mock("@/hooks/use-brand-selection", () => ({
   useBrandSelection: () => ({
     selectedBrandId: "brand-1",

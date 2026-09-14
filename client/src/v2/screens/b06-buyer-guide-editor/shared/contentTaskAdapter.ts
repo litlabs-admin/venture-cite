@@ -1,7 +1,14 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import type { V2LiveResult, V2ScreenState } from "@/v2/contracts/screen";
-import type { ContentTaskData, ContentValue, DraftSection, EditorStep } from "./ContentTaskEditor";
+import type {
+  ContentTaskActions,
+  ContentTaskData,
+  ContentValue,
+  DraftSection,
+  EditorStep,
+} from "./ContentTaskEditor";
 
 const workTaskSchema = z
   .object({
@@ -10,6 +17,7 @@ const workTaskSchema = z
     taskKey: z.string(),
     type: z.string(),
     state: z.string(),
+    revision: z.number().int(),
     title: z.string(),
     buyerNeed: z.string().nullable(),
     points: z.number().int().nullable(),
@@ -266,6 +274,7 @@ export function mapContentTaskResponse<TBoard extends "buyer-guide" | "services"
     brandId,
     task: {
       id: task.id,
+      revision: task.revision,
       title: measured(task.title),
       state: editorState,
       steps: steps.steps,
@@ -275,6 +284,7 @@ export function mapContentTaskResponse<TBoard extends "buyer-guide" | "services"
       pointsAfterVerification: points,
     },
     draft: {
+      articleId: article ? measured(article.id) : unavailable("No draft article is linked yet."),
       status: article
         ? measured(draftStatus(article.status))
         : unavailable("The draft status is not available."),
@@ -323,4 +333,137 @@ export function resolveContentTaskResult<TData>(
     return { state: staleState, data: input.data };
   }
   return { state: { kind: "ready" }, data: input.data };
+}
+
+/**
+ * "Draft saved" - persists the edited body through the real article
+ * endpoint (`PUT /api/articles/:id`, `server/routes/articles.ts`), not just
+ * a local status label. No optimistic locking here: this editor has no
+ * concept of `expectedVersion` from a concurrent editor today, so a write
+ * simply replaces the content, the same way the plain textarea it is
+ * standing in for would.
+ */
+export function useSaveArticleDraft() {
+  const queryClient = useQueryClient();
+  return useMutation<unknown, Error, { articleId: string; content: string }>({
+    mutationFn: async ({ articleId, content }) => {
+      const response = await apiRequest("PUT", `/api/articles/${encodeURIComponent(articleId)}`, {
+        content,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["v2", "my-work", "content-task"],
+      });
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "v2" });
+      void queryClient.invalidateQueries({ queryKey: [`/api/articles`] });
+    },
+  });
+}
+
+export type SubmitContentTaskInput = {
+  taskId: string;
+  expectedRevision: number;
+  changeId: string;
+  pageUrl: string;
+  buyerNeed: string;
+};
+
+/**
+ * "Continue to publication check" - moves the task from editing to
+ * `submitted` through the real `submit` command
+ * (`POST .../work/tasks/:taskId/commands`, `server/routes/work.ts`), with a
+ * `content_change` evidence reference built from the draft actually being
+ * edited (the article id, its published URL, the task's own buyer need) -
+ * never a placeholder. The command endpoint enforces the transition; this
+ * function only assembles the one evidence kind this screen can vouch for.
+ */
+export function useSubmitContentTask(brandId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<unknown, Error, SubmitContentTaskInput>({
+    mutationFn: async ({ taskId, expectedRevision, changeId, pageUrl, buyerNeed }) => {
+      const response = await apiRequest(
+        "POST",
+        `/api/brands/${encodeURIComponent(brandId)}/work/tasks/${encodeURIComponent(taskId)}/commands`,
+        {
+          expectedRevision,
+          command: {
+            kind: "submit",
+            evidence: [
+              {
+                kind: "content_change",
+                label: "Published page change",
+                changeId,
+                pageUrl,
+                buyerNeed,
+                publishedAt: new Date().toISOString(),
+              },
+            ],
+          },
+        },
+      );
+      return response.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "v2" });
+    },
+  });
+}
+
+function contentValue(value: ContentValue<string>): string | undefined {
+  return value.kind === "measured" ? value.value : undefined;
+}
+
+/**
+ * The `saveDraft`/`submit` pair `ContentTaskEditor` renders, built from
+ * whichever board (`b06` or `b19`) is currently mounted. Shared here so the
+ * two boards - two Screens over the one editor - do not each reinvent what
+ * "blocked" means: the submit control is closed until there is a linked
+ * article with a real, http(s) published URL, because that is exactly what
+ * `content_change` evidence requires (`server/routes/work.ts`
+ * `evidenceReferenceSchema`) and a call missing it is one the server would
+ * reject.
+ */
+export function useContentTaskActions(
+  brandId: string,
+  data: ContentTaskData<"buyer-guide"> | ContentTaskData<"services"> | undefined,
+): ContentTaskActions {
+  const saveDraft = useSaveArticleDraft();
+  const submit = useSubmitContentTask(brandId);
+
+  const articleId = data ? contentValue(data.draft.articleId) : undefined;
+  const pageUrl = data ? contentValue(data.publication.url) : undefined;
+  const buyerNeed = data ? (contentValue(data.task.buyerNeed) ?? data.board) : undefined;
+  const blocked = !data || !articleId || !pageUrl || !buyerNeed;
+
+  return {
+    saveDraft: {
+      pending: saveDraft.isPending,
+      error: saveDraft.isError ? saveDraft.error.message : undefined,
+      run: (content: string) => {
+        if (!articleId) return;
+        saveDraft.mutate({ articleId, content });
+      },
+    },
+    submit: {
+      pending: submit.isPending,
+      blocked,
+      reason: blocked
+        ? "This draft has no published URL yet, so it cannot be submitted for a publication check."
+        : submit.isError
+          ? `That submission was not saved: ${submit.error.message}`
+          : undefined,
+      run: () => {
+        if (!data || !articleId || !pageUrl || !buyerNeed) return;
+        submit.mutate({
+          taskId: data.task.id,
+          expectedRevision: data.task.revision,
+          changeId: articleId,
+          pageUrl,
+          buyerNeed,
+        });
+      },
+    },
+  };
 }

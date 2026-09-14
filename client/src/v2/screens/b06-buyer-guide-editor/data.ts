@@ -25,13 +25,13 @@ export function resolveBoard06Result(
   return resolveContentTaskResult(input, "Unable to load the buyer guide task.");
 }
 
-export function useBoard06Data(): V2LiveResult<Board06Data> {
+export function useBoard06Data(taskId?: string): V2LiveResult<Board06Data> {
   const { selectedBrandId, isLoading: brandsLoading } = useBrandSelection();
   const query = useQuery({
-    queryKey: ["v2", "my-work", "content-task", "b06", selectedBrandId],
+    queryKey: ["v2", "my-work", "content-task", "b06", selectedBrandId, taskId ?? ""],
     enabled: Boolean(selectedBrandId),
     meta: { suppressErrorToast: true },
-    queryFn: ({ signal }) => fetchContentTaskApi({ brandId: selectedBrandId, signal }),
+    queryFn: ({ signal }) => fetchContentTaskApi({ brandId: selectedBrandId, taskId, signal }),
   });
 
   if (!selectedBrandId) return resolveBoard06Result({ status: "not-measured" });

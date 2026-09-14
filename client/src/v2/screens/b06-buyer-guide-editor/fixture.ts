@@ -7,6 +7,7 @@ export const board06Fixture: Board06Data = {
   brandId: "brand-venture-pr",
   task: {
     id: "improve-buyer-guide",
+    revision: 0,
     title: measured("Improve your startup PR guide"),
     state: "edit",
     steps: [
@@ -24,6 +25,7 @@ export const board06Fixture: Board06Data = {
     pointsAfterVerification: measured(40),
   },
   draft: {
+    articleId: measured("article-buyer-guide-1"),
     status: measured("Draft saved"),
     title: measured("How to choose PR support for an early-stage startup"),
     body: measured(

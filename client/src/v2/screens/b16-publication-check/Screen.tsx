@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import type { EvidenceReference } from "@shared/work";
 import type { V2ScreenProps } from "@/v2/contracts/screen";
 import { DiffHighlight } from "@/v2/shared/ui/DiffHighlight";
 import { Panel } from "@/v2/shared/ui/Panel";
@@ -46,8 +47,35 @@ export type Board16Data = {
     indexability: Board16Value<Board16CheckResult>;
   };
   task: {
+    id: string;
+    revision: number;
     buyerNeed: Board16Value<string>;
     evidence: Board16Value<string>;
+    /** The evidence a "verify" call resends, read out of what the task
+     *  already carries - see `verificationEvidenceFor` in `data.ts`. */
+    verificationEvidence: readonly EvidenceReference[];
+  };
+};
+
+export type Board16FetchResult = {
+  status: number | null;
+  canonical: string | null;
+  textPresent: boolean;
+  error?: string;
+};
+
+export type Board16Actions = {
+  fetchLatest: {
+    run: (url: string) => void;
+    pending: boolean;
+    result?: Board16FetchResult;
+    error?: string;
+  };
+  verify: {
+    run: () => void;
+    pending: boolean;
+    blocked: boolean;
+    error?: string;
   };
 };
 
@@ -301,7 +329,38 @@ function PublicationSteps() {
   );
 }
 
-function FetchState({ data }: { data: Board16Data }) {
+function FetchState({ data, fetchLatest }: { data: Board16Data; fetchLatest?: Board16Actions["fetchLatest"] }) {
+  if (fetchLatest?.result) {
+    const { result } = fetchLatest;
+    const ok = result.status !== null && result.status < 400 && result.textPresent;
+    return (
+      <div
+        className={ok ? "board16-fetch-state" : "board16-fetch-state board16-fetch-state-unavailable"}
+        data-testid="board16-fetch-result"
+      >
+        <span className={ok ? "board16-ok-mark" : undefined}>
+          {ok ? <CheckMark size={12} strokeWidth={2.5} /> : null}
+        </span>
+        <span className="board16-fetch-copy">
+          <span className={cn(v2Type.body, ok ? "board16-ok-text" : undefined)}>
+            {result.error
+              ? `The page could not be fetched: ${result.error}`
+              : result.status === null
+                ? "The page could not be fetched."
+                : `Fetched just now: ${result.status}${result.textPresent ? "" : " - no readable text was returned"}`}
+          </span>
+          <span className={v2Type.meta}>{`Just now${result.canonical ? ` · Canonical: ${result.canonical}` : ""}`}</span>
+        </span>
+      </div>
+    );
+  }
+  if (fetchLatest?.error) {
+    return (
+      <div className="board16-fetch-state board16-fetch-state-unavailable" data-testid="board16-fetch-error">
+        <span className={v2Type.body}>{fetchLatest.error}</span>
+      </div>
+    );
+  }
   if (data.publication.fetchState.kind !== "measured") {
     return (
       <div className="board16-fetch-state board16-fetch-state-unavailable">
@@ -394,7 +453,7 @@ function Requirement({ children }: { children: ReactNode }) {
   );
 }
 
-function Board16Main({ data }: { data: Board16Data }) {
+function Board16Main({ data, actions }: { data: Board16Data; actions?: Board16Actions }) {
   const [url, setUrl] = useState(inputValue(data.publication.url));
   const statusCodeDescription =
     data.checks.urlStatusCode.kind === "measured" ? (
@@ -421,11 +480,20 @@ function Board16Main({ data }: { data: Board16Data }) {
               readOnly={data.publication.url.kind !== "measured"}
               value={url}
             />
-            <Button className="board16-fetch-button rounded-lg" type="button" variant="outline">
-              <span className={v2Type.bodyStrong}>Fetch latest</span>
+            <Button
+              className="board16-fetch-button rounded-lg"
+              data-testid="board16-fetch-button"
+              disabled={!url || actions?.fetchLatest.pending}
+              onClick={() => actions?.fetchLatest.run(url)}
+              type="button"
+              variant="outline"
+            >
+              <span className={v2Type.bodyStrong}>
+                {actions?.fetchLatest.pending ? "Fetching…" : "Fetch latest"}
+              </span>
             </Button>
           </div>
-          <FetchState data={data} />
+          <FetchState data={data} fetchLatest={actions?.fetchLatest} />
         </div>
 
         <div className="board16-divider" />
@@ -562,7 +630,7 @@ function Board16Main({ data }: { data: Board16Data }) {
   );
 }
 
-function Board16Aside({ data }: { data: Board16Data }) {
+function Board16Aside({ data, actions }: { data: Board16Data; actions?: Board16Actions }) {
   const urlRequirement =
     data.checks.urlStatusCode.kind === "measured"
       ? `URL is reachable (${data.checks.urlStatusCode.value} status code)`
@@ -627,8 +695,16 @@ function Board16Aside({ data }: { data: Board16Data }) {
           </span>
         </div>
         <div className="board16-actions">
-          <Button className="board16-action-button rounded-lg" type="button">
-            <span className={v2Type.bodyStrong}>Verify publication</span>
+          <Button
+            className="board16-action-button rounded-lg"
+            data-testid="board16-verify-button"
+            disabled={!actions || actions.verify.blocked || actions.verify.pending}
+            onClick={actions?.verify.run}
+            type="button"
+          >
+            <span className={v2Type.bodyStrong}>
+              {actions?.verify.pending ? "Verifying…" : "Verify publication"}
+            </span>
           </Button>
           <Button
             asChild
@@ -642,6 +718,11 @@ function Board16Aside({ data }: { data: Board16Data }) {
             </a>
           </Button>
         </div>
+        {actions?.verify.error ? (
+          <p className={cn(v2Type.meta, "board16-brief-copy")} data-testid="board16-verify-error">
+            {actions.verify.error}
+          </p>
+        ) : null}
       </Panel>
     </aside>
   );
@@ -659,12 +740,15 @@ function Board16Breadcrumb() {
   );
 }
 
-export function Board16Screen({ data, staleAsOf }: V2ScreenProps<Board16Data>) {
+export function Board16Screen({
+  data,
+  staleAsOf,
+  actions,
+}: V2ScreenProps<Board16Data> & { actions?: Board16Actions }) {
   return (
     <div className="board16-screen">
       <div className="board16-top" data-v2-region="top">
         <Board16Breadcrumb />
-        <span className={v2Type.meta}>Prototype · Sample data</span>
       </div>
       {staleAsOf ? (
         <div className="board16-stale-banner" data-testid="b16-stale-banner">
@@ -675,8 +759,8 @@ export function Board16Screen({ data, staleAsOf }: V2ScreenProps<Board16Data>) {
         </div>
       ) : null}
       <div className="board16-grid">
-        <Board16Main data={data} />
-        <Board16Aside data={data} />
+        <Board16Main actions={actions} data={data} />
+        <Board16Aside actions={actions} data={data} />
       </div>
     </div>
   );

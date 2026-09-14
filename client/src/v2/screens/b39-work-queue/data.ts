@@ -34,6 +34,55 @@ function mapQueueTask(task: WorkTaskSummaryView): Board39Task {
   };
 }
 
+/** The current Mon-Sun week, in the reader's own timezone. A real date
+ *  computation, not stored data - the backend has no week-boundary concept
+ *  for work tasks, so this is the one part of "weekly capacity" this screen
+ *  can state honestly without one. */
+function currentWeekRange(now = new Date()): string {
+  const day = now.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + mondayOffset);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${fmt(monday)} – ${fmt(sunday)}`;
+}
+
+/** Weekly capacity, derived from the effort minutes real tasks already
+ *  carry: "planned" is every not-yet-closed task with a known effort,
+ *  "used" is the closed ones. Where no task in the relevant bucket has a
+ *  measured effort, the number stays honestly not-measured rather than
+ *  reporting a false zero. */
+function weeklyCapacityFrom(tasks: readonly Board39Task[]): Board39Data["weeklyCapacity"] {
+  const openStatuses = new Set<Board39Task["status"]>(["ready", "in-progress", "waiting"]);
+  const sumEffort = (predicate: (task: Board39Task) => boolean) => {
+    const known = tasks.filter(
+      (task) => predicate(task) && task.estimatedMinutes.kind === "measured",
+    );
+    if (known.length === 0) return undefined;
+    return known.reduce(
+      (total, task) =>
+        total + (task.estimatedMinutes.kind === "measured" ? task.estimatedMinutes.value : 0),
+      0,
+    );
+  };
+  const used = sumEffort((task) => task.status === "completed");
+  const open = sumEffort((task) => openStatuses.has(task.status));
+  const planned = used === undefined && open === undefined ? undefined : (used ?? 0) + (open ?? 0);
+  return {
+    range: measured(currentWeekRange()),
+    plannedMinutes:
+      planned === undefined
+        ? notMeasured("No task on the board has a recorded effort estimate.")
+        : measured(planned),
+    usedMinutes:
+      used === undefined
+        ? notMeasured("No completed task on the board has a recorded effort estimate.")
+        : measured(used),
+  };
+}
+
 export function mapBoard39Data(
   summary: WorkSummaryView,
   taskPage: { items: WorkTaskSummaryView[] },
@@ -67,11 +116,7 @@ export function mapBoard39Data(
           points: notMeasured("No priority reward is available."),
         },
     tasks,
-    weeklyCapacity: {
-      range: notMeasured("No weekly capacity range is stored."),
-      plannedMinutes: notMeasured("No weekly capacity ledger is stored."),
-      usedMinutes: notMeasured("No weekly capacity ledger is stored."),
-    },
+    weeklyCapacity: weeklyCapacityFrom(tasks),
     progress: {
       level: measured(summary.currentLevel.level),
       levelName: measured(summary.currentLevel.name),

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import type { TaskState } from "@shared/work";
 import type { V2ScreenProps } from "@/v2/contracts/screen";
 import { DataTable, type DataColumn } from "@/v2/shared/ui/DataTable";
 import { PageHeader } from "@/v2/shared/ui/PageHeader";
@@ -20,6 +21,7 @@ export type Board03TaskDetail = {
   oldValue: WorkValue<string>;
   approvedValue: WorkValue<string>;
   sourcePath: WorkValue<string>;
+  sourceUrl: WorkValue<string>;
   completionRule: WorkValue<string>;
 };
 
@@ -28,6 +30,10 @@ export type Board03Task = {
   title: string;
   icon: "doc" | "map" | "chart" | "globe" | "facts";
   state: Board03TaskState;
+  /** The task's real server state, not the four-bucket UI state above -
+   *  `TaskActions`-style commands are only offered when it permits them. */
+  rawState: TaskState;
+  revision: number;
   evidenceLabel: WorkValue<string>;
   effortMinutes: WorkValue<number>;
   points: WorkValue<number>;
@@ -36,6 +42,17 @@ export type Board03Task = {
   action: { kind: "open-draft"; label: string } | { kind: "chevron" } | { kind: "none" };
   detail: Board03TaskDetail;
 };
+
+/** The task states `mark_not_applicable` still accepts - mirrors
+ *  `TRANSITIONS` in `server/domains/work/policy.ts`. A control the server
+ *  would reject is not drawn, so this list has to keep pace with that one,
+ *  not invent its own. */
+const CAN_MARK_NOT_APPLICABLE = new Set<TaskState>([
+  "suggested",
+  "accepted",
+  "in_progress",
+  "reopened",
+]);
 
 export type Board03CompletedRow = {
   id: string;
@@ -217,8 +234,9 @@ function SummaryRow({
           <Link
             className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-[color:var(--v2-brand)] hover:underline"
             onClick={(event) => event.stopPropagation()}
-            search={{ brandId: data.brandId, mode: data.mode, task: task.id }}
-            to="/v2/my-work"
+            params={{ taskId: task.id }}
+            search={{ brandId: data.brandId, mode: data.mode }}
+            to="/v2/my-work/tasks/$taskId"
           >
             {task.action.label}
             <V2Icon name="chev" size={14} />
@@ -256,7 +274,89 @@ function CompletedRow({ row, onSelect }: { row: Board03CompletedRow; onSelect: (
   );
 }
 
-function TaskRail({ task, data }: { task: Board03Task; data: Board03Data }) {
+export type Board03NotApplicableAction = {
+  pendingTaskId: string | undefined;
+  error: string | undefined;
+  run: (task: Board03Task, reason: string) => void;
+};
+
+function NotApplicableControl({
+  task,
+  action,
+}: {
+  task: Board03Task;
+  action: Board03NotApplicableAction;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const pending = action.pendingTaskId === task.id;
+
+  if (!CAN_MARK_NOT_APPLICABLE.has(task.rawState)) return null;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="text-[12.5px] text-[color:var(--v2-ink3)] hover:text-[color:var(--v2-ink)]"
+        onClick={() => setOpen(true)}
+      >
+        Not applicable
+      </button>
+    );
+  }
+
+  return (
+    <div className="w-full" data-testid="board03-not-applicable">
+      <label className={`${v2Type.meta} block`} htmlFor="board03-not-applicable-reason">
+        Why doesn&apos;t this apply? Recorded with the task.
+      </label>
+      <textarea
+        id="board03-not-applicable-reason"
+        className="mt-1 w-full rounded-[7px] border border-[var(--v2-line)] bg-[var(--v2-paper)] px-2 py-1.5 text-[13px] text-[color:var(--v2-ink)]"
+        onChange={(event) => setReason(event.target.value)}
+        rows={2}
+        value={reason}
+      />
+      <div className="mt-2 flex items-center gap-3">
+        <button
+          type="button"
+          className="text-[12.5px] font-semibold text-[color:var(--v2-brand)] disabled:opacity-50"
+          disabled={reason.trim().length === 0 || pending}
+          onClick={() => {
+            action.run(task, reason.trim());
+            setOpen(false);
+            setReason("");
+          }}
+        >
+          {pending ? "Saving…" : "Confirm"}
+        </button>
+        <button
+          type="button"
+          className="text-[12.5px] text-[color:var(--v2-ink3)]"
+          onClick={() => {
+            setOpen(false);
+            setReason("");
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+      {action.error ? (
+        <p className="mt-1 text-[12px] text-[color:var(--v2-bad)]">{action.error}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function TaskRail({
+  task,
+  data,
+  notApplicable,
+}: {
+  task: Board03Task;
+  data: Board03Data;
+  notApplicable: Board03NotApplicableAction;
+}) {
   const [showRationale, setShowRationale] = useState(true);
   const detail = task.detail;
   return (
@@ -284,14 +384,15 @@ function TaskRail({ task, data }: { task: Board03Task; data: Board03Data }) {
           <span className={`${v2Type.caps} text-[color:var(--v2-brand)]`}>Approved</span>
           <WorkValueText value={detail.approvedValue} className={`${v2Type.body} font-semibold`} />
           <span className={v2Type.caps}>Source</span>
-          {detail.sourcePath.kind === "measured" ? (
-            <Link
+          {detail.sourcePath.kind === "measured" && detail.sourceUrl.kind === "measured" ? (
+            <a
               className="text-[12.5px] font-semibold text-[color:var(--v2-brand)] hover:underline"
-              search={{ brandId: data.brandId, mode: data.mode }}
-              to="/v2/my-work"
+              href={detail.sourceUrl.value}
+              rel="noreferrer"
+              target="_blank"
             >
               {detail.sourcePath.value}
-            </Link>
+            </a>
           ) : (
             <WorkValueText value={detail.sourcePath} />
           )}
@@ -306,21 +407,16 @@ function TaskRail({ task, data }: { task: Board03Task; data: Board03Data }) {
       </section>
 
       <Button asChild className="mt-5 h-10 w-full rounded-lg text-[13.5px]">
-        <Link search={{ brandId: data.brandId, mode: data.mode, task: task.id }} to="/v2/my-work">
+        <Link
+          params={{ taskId: task.id }}
+          search={{ brandId: data.brandId, mode: data.mode }}
+          to="/v2/my-work/tasks/$taskId"
+        >
           Open task
         </Link>
       </Button>
-      <div className="mt-4 flex gap-5">
-        <Link
-          className="text-[12.5px] font-semibold text-[color:var(--v2-brand)] hover:underline"
-          search={{ brandId: data.brandId, mode: data.mode, task: task.id }}
-          to="/v2/my-work"
-        >
-          Assign task
-        </Link>
-        <button type="button" className="text-[12.5px] text-[color:var(--v2-ink3)]">
-          Not applicable
-        </button>
+      <div className="mt-4 flex flex-wrap gap-5">
+        <NotApplicableControl action={notApplicable} task={task} />
       </div>
       <div className="mt-6 border-t border-[var(--v2-line)] pt-4">
         <p className="flex items-start gap-2 text-[12.5px] font-semibold text-[color:var(--v2-brand)]">
@@ -358,7 +454,16 @@ function ProgressLine({ progress }: { progress: Board03Data["progress"] }) {
   return <StateLabel state="not-measured" />;
 }
 
-export function Board03Screen({ data }: V2ScreenProps<Board03Data>) {
+const NOOP_NOT_APPLICABLE: Board03NotApplicableAction = {
+  pendingTaskId: undefined,
+  error: undefined,
+  run: () => {},
+};
+
+export function Board03Screen({
+  data,
+  notApplicable = NOOP_NOT_APPLICABLE,
+}: V2ScreenProps<Board03Data> & { notApplicable?: Board03NotApplicableAction }) {
   const [tab, setTab] = useState<Board03Tab>("todo");
   const [selectedId, setSelectedId] = useState(data.selectedTaskId);
   const visibleTasks = data.tasks.filter((task) => task.state === tab);
@@ -442,13 +547,17 @@ export function Board03Screen({ data }: V2ScreenProps<Board03Data>) {
                 {data.completedPreview.map((row) => (
                   <CompletedRow key={row.id} onSelect={() => setSelectedId(row.id)} row={row} />
                 ))}
-                <Link
+                <button
+                  type="button"
                   className="mt-2 inline-flex text-[12.5px] font-semibold text-[color:var(--v2-brand)] hover:underline"
-                  search={{ brandId: data.brandId, mode: data.mode }}
-                  to="/v2/my-work"
+                  onClick={() => {
+                    setTab("completed");
+                    const first = data.tasks.find((task) => task.state === "completed");
+                    if (first) setSelectedId(first.id);
+                  }}
                 >
                   View all completed ›
-                </Link>
+                </button>
               </div>
             ) : null}
 
@@ -459,7 +568,7 @@ export function Board03Screen({ data }: V2ScreenProps<Board03Data>) {
         }
         rightRail={
           <div className="border-t border-[var(--v2-line)] px-6 py-6 md:border-t-0 md:border-l">
-            <TaskRail data={data} task={selectedTask} />
+            <TaskRail data={data} notApplicable={notApplicable} task={selectedTask} />
           </div>
         }
         rightRailWidth={322}

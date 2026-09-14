@@ -3,12 +3,14 @@
 // Pending backend work: the versioned publication check, approved revision,
 // live page content, canonical expectation, fact preservation, and indexability.
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useParams } from "@tanstack/react-router";
 import { z } from "zod";
+import type { EvidenceReference } from "@shared/work";
 import { apiRequest } from "@/lib/queryClient";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import type { V2LiveResult } from "@/v2/contracts/screen";
-import type { Board16CheckResult, Board16Data, Board16Value } from "./Screen";
+import type { Board16CheckResult, Board16Data, Board16FetchResult, Board16Value } from "./Screen";
 
 const taskState = z.enum([
   "suggested",
@@ -135,6 +137,25 @@ function readContentChange(task: Board16ApiTask): z.infer<typeof contentChangeSc
   return undefined;
 }
 
+function isEvidenceReference(value: unknown): value is EvidenceReference {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { kind?: unknown }).kind === "string"
+  );
+}
+
+/** The evidence a "verify" call resends, read out of what the task already
+ *  carries - never invented, and the human-confirmation reference is
+ *  appended the same way the verify call itself does. */
+function verificationEvidenceFor(task: Board16ApiTask) {
+  return (task.evidence ?? [])
+    .filter((item) => item.role === "submission" || item.role === "verification")
+    .map((item) => item.structuredFinding)
+    .filter(isEvidenceReference)
+    .filter((reference) => reference.kind !== "confirmation");
+}
+
 function readFetchedAt(task: Board16ApiTask): string | undefined {
   return task.evidence?.find((evidence) => evidence.retrievedAt)?.retrievedAt ?? undefined;
 }
@@ -203,12 +224,15 @@ export function mapBoard16ApiResponse(response: Board16ApiResponse): Board16Data
       indexability: notMeasured("The publication check service is not available."),
     },
     task: {
+      id: response.task.id,
+      revision: response.task.revision,
       buyerNeed: response.task.buyerNeed
         ? measured(response.task.buyerNeed)
         : contentChange?.buyerNeed
           ? measured(contentChange.buyerNeed)
           : notMeasured("The task has no buyer need."),
       evidence: notMeasured("The work projection does not return the evidence label."),
+      verificationEvidence: verificationEvidenceFor(response.task),
     },
   };
 }
@@ -233,16 +257,24 @@ async function readData<T>(
   return parsed.data.data;
 }
 
-async function readBoard16ApiResponse(brandId: string): Promise<Board16Data | null> {
+async function resolveTaskId(brandId: string, routeTaskId: string | undefined): Promise<string | undefined> {
+  if (routeTaskId) return routeTaskId;
   const taskPage = await readData<TaskPage>(
     `/api/brands/${encodeURIComponent(brandId)}/work/tasks?taskType=improve_page_for_buyer_need&limit=1`,
     taskPageEnvelope,
   );
-  const taskSummary = taskPage.items[0];
-  if (!taskSummary) return null;
+  return taskPage.items[0]?.id;
+}
+
+async function readBoard16ApiResponse(
+  brandId: string,
+  routeTaskId: string | undefined,
+): Promise<Board16Data | null> {
+  const taskId = await resolveTaskId(brandId, routeTaskId);
+  if (!taskId) return null;
 
   const task = await readData<Board16ApiTask>(
-    `/api/brands/${encodeURIComponent(brandId)}/work/tasks/${encodeURIComponent(taskSummary.id)}`,
+    `/api/brands/${encodeURIComponent(brandId)}/work/tasks/${encodeURIComponent(taskId)}`,
     taskDetailEnvelope,
   );
   const [articles, pages] = await Promise.all([
@@ -290,11 +322,12 @@ function staleAsOf(data: Board16Data): string {
 
 export function useBoard16Data(): V2LiveResult<Board16Data> {
   const { selectedBrandId, isLoading: brandsLoading } = useBrandSelection();
+  const routeTaskId = (useParams({ strict: false }) as { taskId?: string }).taskId;
   const query = useQuery<Board16Data | null>({
-    queryKey: ["v2", "my-work", "publication-check", selectedBrandId],
+    queryKey: ["v2", "my-work", "publication-check", selectedBrandId, routeTaskId ?? ""],
     enabled: Boolean(selectedBrandId),
     meta: { suppressErrorToast: true },
-    queryFn: () => readBoard16ApiResponse(selectedBrandId),
+    queryFn: () => readBoard16ApiResponse(selectedBrandId, routeTaskId),
     staleTime: 30_000,
   });
 
@@ -324,4 +357,44 @@ export function useBoard16Data(): V2LiveResult<Board16Data> {
     };
   }
   return { state: { kind: "ready" }, data: query.data };
+}
+
+const publicationCheckResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    status: z.number().int().nullable(),
+    canonical: z.string().nullable(),
+    textPresent: z.boolean(),
+    error: z.string().optional(),
+  }),
+});
+
+/**
+ * "Fetch latest" - the one control on this board that reaches past the
+ * work-task API to read the actual published page right now, through the
+ * new `POST .../publication-check` route (`server/routes/v2PublicationCheck.ts`).
+ * It never touches the cached `useBoard16Data` read: a fresh fetch answers
+ * "what does the page look like this second", which is a different question
+ * from "what did the last crawl record", and conflating the two would make a
+ * stale server-side read look like it just changed.
+ */
+export function usePublicationCheck(brandId: string, taskId: string | undefined) {
+  return useMutation<Board16FetchResult, Error, string>({
+    mutationFn: async (url: string) => {
+      const response = await apiRequest(
+        "POST",
+        `/api/brands/${encodeURIComponent(brandId)}/work/tasks/${encodeURIComponent(taskId ?? "")}/publication-check`,
+        { url },
+      );
+      const payload: unknown = await response.json();
+      const parsed = publicationCheckResponseSchema.safeParse(payload);
+      if (!parsed.success) throw new Error("The publication check response has an invalid shape.");
+      return {
+        status: parsed.data.data.status,
+        canonical: parsed.data.data.canonical,
+        textPresent: parsed.data.data.textPresent,
+        error: parsed.data.data.error,
+      };
+    },
+  });
 }

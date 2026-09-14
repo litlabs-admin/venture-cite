@@ -261,14 +261,7 @@ function ExperimentDetails({ data }: { data: Board17Data }) {
   ];
   return (
     <Panel className="b17-panel" padding="compact">
-      <PanelHeader
-        title="Experiment details"
-        action={
-          <InternalLink data={data} path="/v2/my-work/experiment/edit">
-            Edit
-          </InternalLink>
-        }
-      />
+      <PanelHeader title="Experiment details" />
       <div className="b17-detail-list">
         {labels.map((label, index) => (
           <div className="b17-detail-row" key={label}>
@@ -276,7 +269,7 @@ function ExperimentDetails({ data }: { data: Board17Data }) {
             <div className={v2Type.body}>{rows[index]}</div>
             <div className="b17-detail-action">
               {label === "Approved question set" ? (
-                <InternalLink data={data} path="/v2/my-work/questions">
+                <InternalLink data={data} path="/v2/visibility/questions">
                   View questions
                 </InternalLink>
               ) : null}
@@ -477,14 +470,7 @@ function ControlsRail({ data }: { data: Board17Data }) {
   ];
   return (
     <Panel className="b17-panel" padding="compact">
-      <PanelHeader
-        title="Experiment controls"
-        action={
-          <InternalLink data={data} path="/v2/my-work/experiment/edit">
-            Edit
-          </InternalLink>
-        }
-      />
+      <PanelHeader title="Experiment controls" />
       <KeyValueList items={controlItems} className="b17-kv" />
     </Panel>
   );
@@ -591,11 +577,8 @@ export function Board17Screen({ data, staleAsOf }: V2ScreenProps<Board17Data>) {
             My work
           </a>
           <span aria-hidden="true">/</span>
-          <a href={queryHref(data, "/v2/my-work/experiment")} className="b17-breadcrumb-link">
-            Experiment
-          </a>
+          <span className="b17-breadcrumb-current">Experiment</span>
         </div>
-        <div className={`${v2Type.meta} b17-prototype-status`}>Prototype · Sample data</div>
       </div>
       <main className="b17-main-column">
         <span className="sr-only" data-testid="b17-brand-name">

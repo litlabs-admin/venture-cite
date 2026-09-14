@@ -20,14 +20,24 @@ import {
   notMeasured,
 } from "./shared/workMapping";
 
+function triggerSourceUrl(detail: WorkTaskDetailView | undefined): string | undefined {
+  return detail?.evidence?.find((item) => item.role === "trigger" && item.sourceUrl)?.sourceUrl ??
+    undefined;
+}
+
 function sourcePath(detail: WorkTaskDetailView | undefined) {
-  const source = detail?.evidence?.find((item) => item.role === "trigger" && item.sourceUrl);
-  if (!source?.sourceUrl) return notMeasured<string>("No trigger source path is available.");
+  const sourceUrl = triggerSourceUrl(detail);
+  if (!sourceUrl) return notMeasured<string>("No trigger source path is available.");
   try {
-    return measured(new URL(source.sourceUrl).pathname || "/");
+    return measured(new URL(sourceUrl).pathname || "/");
   } catch {
-    return notMeasured<string>("The trigger source path is invalid.");
+    return notMeasured<string>("The trigger source URL is invalid.");
   }
+}
+
+function sourceUrlValue(detail: WorkTaskDetailView | undefined) {
+  const sourceUrl = triggerSourceUrl(detail);
+  return sourceUrl ? measured(sourceUrl) : notMeasured<string>("No trigger source URL is available.");
 }
 
 function detailForTask(
@@ -42,6 +52,7 @@ function detailForTask(
     oldValue: notMeasured("No observation value is available."),
     approvedValue: notMeasured("No approved value is available."),
     sourcePath: sourcePath(detail),
+    sourceUrl: sourceUrlValue(detail),
     completionRule: completionRuleText(task.type, detail?.completionRule?.required),
   };
 }
@@ -76,6 +87,8 @@ function mapTask(task: WorkTaskSummaryView, detail?: WorkTaskDetailView): Board0
     title: task.title,
     icon: iconForTaskType(task.type),
     state,
+    rawState: task.state,
+    revision: task.revision,
     evidenceLabel: fromNullable<string>(
       task.reason ?? task.recommendedChange,
       "No evidence summary is available.",

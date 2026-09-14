@@ -32,6 +32,8 @@ export type Board05Progress = {
 
 export type Board05Data = {
   task: {
+    id: string;
+    revision: number;
     brandId: string;
     title: string;
     points: number;
@@ -48,6 +50,12 @@ export type Board05Data = {
   };
   confirmation: { accepted: boolean; value: SharedTextValue };
   progress: Board05Progress;
+};
+
+export type Board05Confirm = {
+  run: () => void;
+  pending: boolean;
+  error?: string;
 };
 
 function SourcePath({ value }: { value: SharedTextValue }) {
@@ -97,12 +105,19 @@ function BottomStepStrip() {
   );
 }
 
-export function Board05Screen({ data, staleAsOf }: V2ScreenProps<Board05Data>) {
+const NOOP_CONFIRM: Board05Confirm = { run: () => {}, pending: false };
+
+export function Board05Screen({
+  data,
+  staleAsOf,
+  confirm = NOOP_CONFIRM,
+}: V2ScreenProps<Board05Data> & { confirm?: Board05Confirm }) {
   const { task, checks, progress } = data;
   const [accepted, setAccepted] = useState(data.confirmation.accepted);
   const automaticChecksPassed =
     checks.urlReachable.kind === "passed" && checks.textPresent.kind === "passed";
-  const canConfirm = accepted && automaticChecksPassed && staleAsOf === undefined;
+  const canConfirm =
+    accepted && automaticChecksPassed && staleAsOf === undefined && !confirm.pending;
 
   return (
     <div className="flex min-h-full flex-col lg:flex-row" data-testid="v2-board-05">
@@ -170,10 +185,12 @@ export function Board05Screen({ data, staleAsOf }: V2ScreenProps<Board05Data>) {
         <div className="mt-5 flex flex-wrap items-center gap-[22px]">
           <Button
             className="h-10 rounded-lg px-4 py-2 text-[13.5px] font-semibold"
+            data-testid="v2-board05-confirm"
             disabled={!canConfirm}
+            onClick={confirm.run}
             type="button"
           >
-            Confirm and complete
+            {confirm.pending ? "Confirming…" : "Confirm and complete"}
           </Button>
           <Link
             className="text-[13.5px] font-semibold text-[color:var(--v2-brand)] hover:text-[color:var(--v2-brand-fill)] hover:underline"
@@ -183,6 +200,11 @@ export function Board05Screen({ data, staleAsOf }: V2ScreenProps<Board05Data>) {
             Save for later
           </Link>
         </div>
+        {confirm.error ? (
+          <p className="mt-2 text-[12.5px] text-[color:var(--v2-bad)]" data-testid="v2-board05-error">
+            {confirm.error}
+          </p>
+        ) : null}
 
         <BottomStepStrip />
       </section>

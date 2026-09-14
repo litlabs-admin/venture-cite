@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import type { EvidenceReference, TaskState } from "@shared/work";
 import type { V2ScreenProps } from "@/v2/contracts/screen";
 import { V2Icon } from "@/v2/theme/V2Icon";
 import { v2Type } from "@/v2/theme/typography";
@@ -31,6 +32,14 @@ export type Board04Progress = {
 
 export type Board04Data = {
   task: {
+    id: string;
+    revision: number;
+    state: TaskState;
+    /** The evidence a "verify" call sends back, verbatim - see
+     *  `evidenceForVerification` in `data.ts`. Empty when the task carries no
+     *  reusable evidence yet, which the primary control's `blocked` reason
+     *  says plainly rather than sending a call the server would reject. */
+    verificationEvidence: readonly EvidenceReference[];
     brandId: string;
     title: string;
     points: number;
@@ -49,6 +58,17 @@ export type Board04Data = {
   };
   progress: Board04Progress;
 };
+
+/** The one control this screen offers for moving the task forward. Its shape
+ *  tracks the task's own state: an available server command
+ *  (`accept`/`start`, matching `TRANSITIONS` in `server/domains/work/policy.ts`)
+ *  for the states before "submitted", and the human-confirmation flow for
+ *  "submitted" itself - a control the server would reject is not offered. */
+export type Board04Primary =
+  | { kind: "accept"; run: () => void; pending: boolean }
+  | { kind: "start"; run: () => void; pending: boolean }
+  | { kind: "confirm"; run: () => void; pending: boolean; blocked: boolean; reason?: string }
+  | { kind: "closed"; reason: string };
 
 function SourcePath({ value }: { value: SharedTextValue }) {
   if (value.kind === "not-measured") return <DisplayValue value={value} />;
@@ -114,9 +134,88 @@ function WhatHappensNext({ checkedAt }: { checkedAt: SharedTextValue }) {
   );
 }
 
-export function Board04Screen({ data, staleAsOf }: V2ScreenProps<Board04Data>) {
+/** The primary control shown when no live `primary` is supplied - the canvas
+ *  preview and any caller that only wants to render the approved layout, not
+ *  wire a real mutation. Permissive by design (never `blocked`): the guard
+ *  that matters is the live one `Route.tsx` builds from real evidence. */
+function defaultPrimaryFor(task: Board04Data["task"]): Board04Primary {
+  switch (task.state) {
+    case "suggested":
+      return { kind: "accept", pending: false, run: () => {} };
+    case "accepted":
+    case "reopened":
+      return { kind: "start", pending: false, run: () => {} };
+    case "submitted":
+      return { kind: "confirm", pending: false, blocked: false, run: () => {} };
+    case "in_progress":
+      return { kind: "closed", reason: "Waiting for the automated recheck." };
+    case "verified":
+      return { kind: "closed", reason: "This task is already verified." };
+    case "waiting_for_observation":
+      return { kind: "closed", reason: "Waiting for the next observation." };
+    case "dismissed":
+      return { kind: "closed", reason: "This task was dismissed." };
+    case "not_applicable":
+      return { kind: "closed", reason: "This task was marked not applicable." };
+    default: {
+      const _exhaustive: never = task.state;
+      return _exhaustive;
+    }
+  }
+}
+
+function PrimaryControl({ primary, isStale }: { primary: Board04Primary; isStale: boolean }) {
+  if (primary.kind === "accept" || primary.kind === "start") {
+    return (
+      <Button
+        className="h-10 rounded-lg px-4 py-2 text-[13.5px] font-semibold"
+        disabled={primary.pending}
+        onClick={primary.run}
+        type="button"
+      >
+        {primary.pending
+          ? "Saving…"
+          : primary.kind === "accept"
+            ? "Accept task"
+            : "Start task"}
+      </Button>
+    );
+  }
+  if (primary.kind === "confirm") {
+    return (
+      <>
+        <Button
+          className="h-10 rounded-lg px-4 py-2 text-[13.5px] font-semibold"
+          data-testid="v2-board04-confirm"
+          disabled={primary.blocked || isStale || primary.pending}
+          onClick={primary.run}
+          type="button"
+        >
+          {primary.pending ? "Confirming…" : "Confirm facts and complete task"}
+        </Button>
+        {primary.reason ? (
+          <p className={`${v2Type.meta} basis-full`} data-testid="v2-board04-blocked">
+            {primary.reason}
+          </p>
+        ) : null}
+      </>
+    );
+  }
+  return (
+    <Button className="h-10 rounded-lg px-4 py-2 text-[13.5px] font-semibold" disabled type="button">
+      {primary.reason}
+    </Button>
+  );
+}
+
+export function Board04Screen({
+  data,
+  staleAsOf,
+  primary,
+}: V2ScreenProps<Board04Data> & { primary?: Board04Primary }) {
   const { task, checks, progress } = data;
   const isStale = staleAsOf !== undefined;
+  const resolvedPrimary = primary ?? defaultPrimaryFor(task);
 
   return (
     <div className="flex min-h-full flex-col lg:flex-row" data-testid="v2-board-04">
@@ -184,13 +283,7 @@ export function Board04Screen({ data, staleAsOf }: V2ScreenProps<Board04Data>) {
         />
 
         <div className="mt-5 flex flex-wrap items-center gap-[22px]">
-          <Button
-            className="h-10 rounded-lg px-4 py-2 text-[13.5px] font-semibold"
-            disabled={isStale}
-            type="button"
-          >
-            Confirm facts and complete task
-          </Button>
+          <PrimaryControl isStale={isStale} primary={resolvedPrimary} />
           <Link
             className="text-[13.5px] font-semibold text-[color:var(--v2-brand)] hover:text-[color:var(--v2-brand-fill)] hover:underline"
             search={{ brandId: task.brandId, mode: "guided" }}

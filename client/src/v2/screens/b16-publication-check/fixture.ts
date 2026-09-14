@@ -33,8 +33,11 @@ export const board16Fixture: Board16Data = {
     indexability: measured("Verified"),
   },
   task: {
+    id: "task-publication-1",
+    revision: 3,
     buyerNeed: measured("Compare PR services before contacting a provider."),
     evidence: measured("Approved buyer question set"),
+    verificationEvidence: [],
   },
 };
 
