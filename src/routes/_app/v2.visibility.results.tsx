@@ -5,4 +5,5 @@ import ResultsReviewPage from "@/v2/visibility/ResultsReviewPage";
 // against the period the evidence covers.
 export const Route = createFileRoute("/_app/v2/visibility/results")({
   component: ResultsReviewPage,
+  staticData: { v2Shell: "guided", v2Board: "b10" },
 });

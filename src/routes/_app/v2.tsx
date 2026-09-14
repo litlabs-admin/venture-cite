@@ -29,4 +29,5 @@ function V2Layout() {
 export const Route = createFileRoute("/_app/v2")({
   validateSearch: v2SearchSchema,
   component: () => <AuthenticatedBareRoute component={V2Layout} />,
+  staticData: { v2Shell: "guided" },
 });

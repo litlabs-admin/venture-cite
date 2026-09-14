@@ -1,5 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
-import DiagnosticsPage from "@/v2/diagnostics/DiagnosticsPage";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
 
 // `/v2/diagnostics`.
 //
@@ -13,5 +12,6 @@ import DiagnosticsPage from "@/v2/diagnostics/DiagnosticsPage";
 // two more keys into a URL contract shared with the live dashboard for no
 // behaviour this screen needs.
 export const Route = createFileRoute("/_app/v2/diagnostics")({
-  component: DiagnosticsPage,
+  component: Outlet,
+  staticData: { v2Shell: "expert" },
 });
