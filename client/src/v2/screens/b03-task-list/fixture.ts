@@ -1,3 +1,135 @@
-import type { Board03Data } from "./Screen";
+import type { Board03Data, Board03Task } from "./Screen";
+import type { WorkValue } from "./shared/WorkRowParts";
 
-export const board03Fixture: Board03Data = {};
+const measured = <T>(value: T): WorkValue<T> => ({ kind: "measured", value });
+const notMeasured = <T>(reason: string): WorkValue<T> => ({ kind: "not-measured", reason });
+
+const unavailableDetail = {
+  rationale: notMeasured<string>("The task rationale is not available."),
+  oldValue: notMeasured<string>("No observation is available."),
+  approvedValue: notMeasured<string>("No approved value is available."),
+  sourcePath: notMeasured<string>("No source path is available."),
+  completionRule: notMeasured<string>("The completion rule is not available."),
+};
+
+const firstTask: Board03Task = {
+  id: "task-1",
+  title: "Correct service region",
+  icon: "doc",
+  state: "todo",
+  evidenceLabel: measured("Confirmed conflict"),
+  effortMinutes: measured(15),
+  points: measured(40),
+  owner: measured("You"),
+  rowNote: notMeasured("No row note is required."),
+  action: { kind: "none" },
+  detail: {
+    rationale: measured("The published page conflicts with your approved region."),
+    oldValue: measured("Worldwide"),
+    approvedValue: measured("India"),
+    sourcePath: measured("/services"),
+    completionRule: measured("We check the page update. You confirm business accuracy."),
+  },
+};
+
+export const board03Fixture = {
+  brandId: "brand-venture-pr",
+  mode: "guided",
+  taskCounts: {
+    todo: measured(3),
+    inProgress: measured(1),
+    waiting: measured(1),
+    completed: measured(4),
+  },
+  tasks: [
+    firstTask,
+    {
+      id: "task-2",
+      title: "Improve your buyer guide",
+      icon: "map",
+      state: "todo",
+      evidenceLabel: measured("Documented question gap"),
+      effortMinutes: measured(45),
+      points: measured(40),
+      owner: measured("You"),
+      rowNote: notMeasured("No row note is required."),
+      action: { kind: "none" },
+      detail: unavailableDetail,
+    },
+    {
+      id: "task-3",
+      title: "Review recent results",
+      icon: "chart",
+      state: "todo",
+      evidenceLabel: measured("Comparable sample ready"),
+      effortMinutes: measured(10),
+      points: measured(10),
+      owner: measured("You"),
+      rowNote: notMeasured("No row note is required."),
+      action: { kind: "none" },
+      detail: unavailableDetail,
+    },
+    {
+      id: "task-4",
+      title: "Update pricing page",
+      icon: "doc",
+      state: "in-progress",
+      evidenceLabel: measured("Draft ready · Publication not verified"),
+      effortMinutes: notMeasured("Effort is not available for this summary row."),
+      points: notMeasured("Points are awarded after verification."),
+      owner: measured("You"),
+      rowNote: notMeasured("No row note is required."),
+      action: { kind: "open-draft", label: "Open draft" },
+      detail: unavailableDetail,
+    },
+    {
+      id: "task-5",
+      title: "Crawler access repaired",
+      icon: "globe",
+      state: "waiting",
+      evidenceLabel: measured("Work verified · 40 points awarded"),
+      effortMinutes: notMeasured("Effort is not available for this summary row."),
+      points: measured(40),
+      owner: notMeasured("No owner is available for this summary row."),
+      rowNote: measured("Next measurement pending"),
+      action: { kind: "chevron" },
+      detail: unavailableDetail,
+    },
+    {
+      id: "task-6",
+      title: "Baseline reviewed",
+      icon: "chart",
+      state: "completed",
+      evidenceLabel: notMeasured("Completed task evidence is not shown here."),
+      effortMinutes: notMeasured("Completed task effort is not shown here."),
+      points: measured(20),
+      owner: notMeasured("Completed task owner is not shown here."),
+      rowNote: notMeasured("No row note is required."),
+      action: { kind: "none" },
+      detail: unavailableDetail,
+    },
+    {
+      id: "task-7",
+      title: "Essential facts approved",
+      icon: "facts",
+      state: "completed",
+      evidenceLabel: notMeasured("Completed task evidence is not shown here."),
+      effortMinutes: notMeasured("Completed task effort is not shown here."),
+      points: measured(20),
+      owner: notMeasured("Completed task owner is not shown here."),
+      rowNote: notMeasured("No row note is required."),
+      action: { kind: "none" },
+      detail: unavailableDetail,
+    },
+  ],
+  completedPreview: [
+    { id: "task-6", title: "Baseline reviewed", icon: "chart", points: measured(20) },
+    { id: "task-7", title: "Essential facts approved", icon: "facts", points: measured(20) },
+  ],
+  progress: {
+    level: measured(2),
+    levelName: measured("Ready"),
+    workPoints: measured(120),
+  },
+  selectedTaskId: "task-1",
+} satisfies Board03Data;
