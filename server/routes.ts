@@ -49,6 +49,8 @@ import { setupV2TeamRoutes } from "./routes/v2Team";
 import { setupV2BillingRoutes } from "./routes/v2Billing";
 import { setupV2LearnRoutes } from "./routes/v2Learn";
 import { setupV2NotificationsRoutes } from "./routes/v2Notifications";
+import { setupV2ReportsRoutes } from "./routes/v2Reports";
+import { setupV2QuestionsRoutes } from "./routes/v2Questions";
 import { setupContentTypesRoutes } from "./routes/contentTypes";
 import { setupIntelligenceRoutes } from "./routes/intelligence";
 import { setupGeoSignalsRoutes } from "./routes/geoSignals";
@@ -553,6 +555,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupV2LearnRoutes(app);
   setupV2BrandFactsRoutes(app);
   setupV2NotificationsRoutes(app);
+  setupV2ReportsRoutes(app);
+  setupV2QuestionsRoutes(app);
   app.use("/api/brand-mentions", mentionsRouter);
 
   const httpServer = createServer(app);
