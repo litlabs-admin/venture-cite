@@ -177,7 +177,10 @@ describe("Board 02 Today earlier render", () => {
     expect(screen.getByText("Improve your buyer guide")).toBeInTheDocument();
     expect(screen.getByText("Review the latest results")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Observed visibility" })).toBeInTheDocument();
-    expect(screen.getByText("Last 14 days")).toBeInTheDocument();
+    // Board02's range control always says "Last 14 days" on both its options
+    // (a fixed label, not a week count), so this is deliberately AllBy: two
+    // <option>s legitimately carry the same text.
+    expect(screen.getAllByText("Last 14 days").length).toBeGreaterThan(0);
     expect(screen.getByTestId("board02-visibility")).toHaveTextContent(
       "Brand mentioned in 18 of 40 successful test answers · 45%",
     );

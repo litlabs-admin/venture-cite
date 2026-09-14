@@ -1,6 +1,6 @@
 import type { TaskType } from "@shared/work";
 import type { WorkSummaryView, WorkTaskSummaryView } from "@/v2/data/workSummary";
-import type { VisibilityMentionRate } from "@/v2/data/visibilityTrend";
+import type { VisibilityMentionRate, VisibilityWeek } from "@/v2/data/visibilityTrend";
 import type { V2IconName } from "@/v2/contracts/icons";
 import type {
   TodayData,
@@ -75,17 +75,26 @@ function formatDay(date: string): string {
   }).format(new Date(`${date}T00:00:00Z`));
 }
 
-function measuredVisibility(
-  trend: VisibilityMentionRate,
+/**
+ * The measured-visibility projection for one window of weeks.
+ *
+ * Exported so a screen can re-derive the same shape for a shorter window
+ * when the user changes the visibility date range - the window is always
+ * re-sliced from the full week list the adapter attaches to the result
+ * (`TodayVisibility.weeks`), never re-fetched, because
+ * `/api/v2/visibility/mention-rate` already returns the brand's full
+ * 8-week trend in one call.
+ */
+export function measuredVisibility(
+  weeks: readonly VisibilityWeek[],
   variant: "board01" | "board02",
 ): TodayVisibility {
-  const latest = [...trend.weeks].reverse().find((week) => week.measured > 0);
+  const latest = [...weeks].reverse().find((week) => week.measured > 0);
   if (!latest) return { kind: "not-measured", reason: "No valid observation exists yet." };
 
-  const first = trend.weeks[0]?.weekStart ?? latest.weekStart;
-  const last = trend.weeks[trend.weeks.length - 1]?.weekStart ?? latest.weekStart;
-  const midpoint =
-    trend.weeks[Math.floor(Math.max(0, trend.weeks.length - 1) / 2)]?.weekStart ?? last;
+  const first = weeks[0]?.weekStart ?? latest.weekStart;
+  const last = weeks[weeks.length - 1]?.weekStart ?? latest.weekStart;
+  const midpoint = weeks[Math.floor(Math.max(0, weeks.length - 1) / 2)]?.weekStart ?? last;
   const year = new Date(`${last}T00:00:00Z`).getUTCFullYear();
   const note =
     variant === "board01"
@@ -100,15 +109,31 @@ function measuredVisibility(
     mentioned: latest.cited,
     failed: latest.failed,
     mentionRate: latest.mentionRate,
+    // Board02's fixed design language always says "Last 14 days" - it names
+    // a fixed observation window, not the count of weeks in this slice - so
+    // unlike board01's dated range, it does not vary with the selected
+    // range-control size.
     rangeLabel:
       variant === "board01" ? `${formatDay(first)} – ${formatDay(last)}, ${year}` : "Last 14 days",
-    chartPoints: trend.weeks.map((week) => ({
+    chartPoints: weeks.map((week) => ({
       x: week.weekStart,
       y: week.measured > 0 ? week.mentionRate : null,
     })),
     xLabels: [formatDay(first), formatDay(midpoint), formatDay(last)],
     note,
+    weeks,
   };
+}
+
+/** Re-slices `weeks` to its trailing `size` entries and re-derives the same
+ *  projection - the client-side "range" a viewer can pick, since the read
+ *  already carries every week the server will return for this brand. */
+export function windowedVisibility(
+  weeks: readonly VisibilityWeek[],
+  variant: "board01" | "board02",
+  size: number,
+): TodayVisibility {
+  return measuredVisibility(weeks.slice(Math.max(0, weeks.length - size)), variant);
 }
 
 function visibilityFromResponse(
@@ -118,7 +143,7 @@ function visibilityFromResponse(
 ): TodayVisibility {
   if (state === "failed") return { kind: "failed", reason: "Visibility could not be loaded." };
   if (!trend) return { kind: "loading" };
-  return measuredVisibility(trend, variant);
+  return measuredVisibility(trend.weeks, variant);
 }
 
 function progressFromSummary(summary: WorkSummaryView): TodayData["progress"] {

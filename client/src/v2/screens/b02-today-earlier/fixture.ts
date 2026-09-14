@@ -3,9 +3,27 @@ import type { TodayValue } from "../b01-today/shared/TodayLayout";
 
 const measured = <T>(value: T): TodayValue<T> => ({ kind: "measured", value });
 
-const chartPoints = [29, 30, 36, 37, 37, 45, 46, 44, 46, 42, 38, 36, 40, 45].map((y, index) => ({
+// Same real-calendar-date note as b01-today/fixture.ts: `chartPoints.x` is a
+// categorical label, `fixtureWeeks.weekStart` is what the range control
+// parses, so it needs a real date.
+const RATES = [29, 30, 36, 37, 37, 45, 46, 44, 46, 42, 38, 36, 40, 45];
+const chartPoints = RATES.map((y, index) => ({
   x: `2026-08-${String(index + 26).padStart(2, "0")}`,
   y,
+}));
+
+function isoDate(daysAfterAug26: number): string {
+  const date = new Date(Date.UTC(2026, 7, 26));
+  date.setUTCDate(date.getUTCDate() + daysAfterAug26);
+  return date.toISOString().slice(0, 10);
+}
+
+const fixtureWeeks = RATES.map((y, index) => ({
+  weekStart: isoDate(index),
+  measured: 40,
+  cited: Math.round((y / 100) * 40),
+  failed: index === RATES.length - 1 ? 2 : 0,
+  mentionRate: y,
 }));
 
 export const board02Fixture: Board02Data = {
@@ -38,6 +56,7 @@ export const board02Fixture: Board02Data = {
     chartPoints,
     xLabels: ["Aug 26", "Sep 1", "Sep 8"],
     note: measured("4 engines · 10 questions · 2 failed answers excluded"),
+    weeks: fixtureWeeks,
   },
   progress: {
     level: measured(2),
