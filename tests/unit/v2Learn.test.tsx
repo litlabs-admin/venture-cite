@@ -26,19 +26,61 @@ const brandStub = vi.hoisted(() => ({
   },
 }));
 
-const routerStub = vi.hoisted(() => ({ pathname: "/v2/learn" }));
+const routerStub = vi.hoisted(() => ({
+  pathname: "/v2/learn",
+  search: {} as Record<string, unknown>,
+  matches: [{ staticData: { v2Shell: "guided" } }],
+  navigate: vi.fn(),
+}));
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, ...rest }: { children?: React.ReactNode; to?: string }) => (
-    <a href={to} {...rest}>
-      {children}
-    </a>
-  ),
-  useRouterState: () => routerStub.pathname,
+  Link: ({
+    children,
+    to,
+    search,
+    ...rest
+  }: {
+    children?: React.ReactNode;
+    to?: string;
+    search?:
+      | Record<string, unknown>
+      | ((previous: Record<string, unknown>) => Record<string, unknown>);
+  }) => {
+    const resolvedSearch = typeof search === "function" ? search(routerStub.search) : search;
+    return (
+      <a href={to} data-search={JSON.stringify(resolvedSearch)} {...rest}>
+        {children}
+      </a>
+    );
+  },
+  useMatches: () => routerStub.matches,
+  useNavigate: () => routerStub.navigate,
+  useRouterState: (options?: { select?: (state: unknown) => unknown }) =>
+    options?.select
+      ? options.select({ location: { pathname: routerStub.pathname } })
+      : { location: { pathname: routerStub.pathname } },
+  useSearch: () => routerStub.search,
 }));
 
 vi.mock("@/hooks/use-brand-selection", () => ({
   useBrandSelection: () => brandStub.value,
+}));
+
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => ({
+    user: {
+      id: "u1",
+      email: "founder@example.com",
+      firstName: "Jamie",
+      lastName: "Doyle",
+      accessTier: "pro",
+      profileImageUrl: null,
+    },
+    isLoading: false,
+    isAuthenticated: true,
+    logout: vi.fn(),
+    isLoggingOut: false,
+  }),
 }));
 
 // The wordmark imports an svg through the `@assets` alias, which the vitest
@@ -74,7 +116,15 @@ beforeEach(() => {
 
 describe("Learn navigation", () => {
   it("is a real nav destination, not a Soon row", () => {
-    render(<V2Nav />);
+    render(
+      <V2Nav
+        variant="guided"
+        pathname={routerStub.pathname}
+        brandId="brand-venture-pr"
+        mode="guided"
+        search={routerStub.search}
+      />,
+    );
     const row = screen.getByText("Learn").closest("[data-v2-nav]");
     expect(row).toBeTruthy();
     expect(row?.getAttribute("aria-disabled")).toBeNull();
@@ -84,9 +134,18 @@ describe("Learn navigation", () => {
   });
 
   it("marks itself active when the router is on /v2/learn", () => {
-    render(<V2Nav />);
+    render(
+      <V2Nav
+        variant="guided"
+        pathname={routerStub.pathname}
+        brandId="brand-venture-pr"
+        mode="guided"
+        search={routerStub.search}
+      />,
+    );
     const label = screen.getByText("Learn");
-    expect(label.parentElement?.className).toContain("text-vc-accent");
+    expect(label.parentElement?.className).toContain("text-[color:var(--v2-brand)]");
+    expect(label.closest("[data-v2-nav]")).toHaveAttribute("aria-current", "page");
   });
 
   // The nav href is only a promise. This is the half that proves the promise is
@@ -196,8 +255,9 @@ describe("Learn states that nothing has been written", () => {
     expect(standaloneStatus).toHaveLength(0);
 
     // No lesson-shaped affordance: nothing on this page opens a lesson.
-    expect(screen.queryByRole("button")).toBeNull();
-    for (const link of screen.getAllByRole("link")) {
+    const main = container.querySelector("#v2-main-content") as HTMLElement;
+    expect(within(main).queryByRole("button")).toBeNull();
+    for (const link of within(main).getAllByRole("link")) {
       expect(link.getAttribute("href")).not.toMatch(/lesson/i);
     }
 

@@ -223,7 +223,15 @@ describe("isFailedCheck, ported from feat/v2-ui-vis", () => {
 
 describe("Diagnostics navigation", () => {
   it("is a real nav destination in the board's position", () => {
-    render(<V2Nav />);
+    render(
+      <V2Nav
+        variant="guided"
+        pathname="/v2/diagnostics"
+        brandId="brand-venture-pr"
+        mode="guided"
+        search={{}}
+      />,
+    );
     const row = screen.getByText("Diagnostics").closest("[data-v2-nav]");
     expect(row?.tagName.toLowerCase()).toBe("a");
     expect(row?.getAttribute("href")).toBe("/v2/diagnostics");
@@ -233,12 +241,15 @@ describe("Diagnostics navigation", () => {
       node.getAttribute("data-v2-nav"),
     );
     expect(labels).toEqual([
-      "Today",
-      "Visibility",
-      "Diagnostics",
-      "My work",
-      "Brand facts",
-      "Learn",
+      "today",
+      "visibility",
+      "diagnostics",
+      "my-work",
+      "brand-facts",
+      "learn",
+      "geo-assistant",
+      "notifications",
+      "settings",
     ]);
   });
 });
