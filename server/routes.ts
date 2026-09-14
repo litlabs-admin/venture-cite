@@ -52,6 +52,7 @@ import { setupFactSheetV2Routes } from "./routes/factSheetV2";
 import { setupAdminScrapeInspectorRoutes } from "./routes/adminScrapeInspector";
 import { setupLlmJobsRoutes } from "./routes/llmJobs";
 import { setupWorkRoutes } from "./routes/work";
+import { setupV2BrandFactsRoutes } from "./routes/v2BrandFacts";
 import { mentionsRouter } from "./routes/mentions";
 import { asyncHandler } from "./lib/asyncHandler";
 
@@ -531,6 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupLlmJobsRoutes(app);
   setupWorkRoutes(app);
   setupV2Routes(app);
+  setupV2BrandFactsRoutes(app);
   app.use("/api/brand-mentions", mentionsRouter);
 
   const httpServer = createServer(app);
