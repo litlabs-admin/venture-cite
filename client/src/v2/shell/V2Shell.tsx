@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { Link, useMatches, useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link, useMatches, useNavigate, useRouterState } from "@tanstack/react-router";
 import { BrandLogo } from "@/components/BrandLogo";
 import BrandSelector from "@/components/BrandSelector";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { getActiveNavItemId, getNavItems, V2_NAV_MAP } from "./navMap";
 import { V2Nav } from "./V2Nav";
 import { V2TopBar } from "./V2TopBar";
 import { useV2Mode } from "./useV2Mode";
+import { useV2NotificationsBadge } from "./useV2NotificationsBadge";
 
 const EXPERT_EQUIVALENTS: ReadonlyArray<{ from: string; to: string }> = [
   { from: "/v2/visibility", to: "/v2/visibility" },
@@ -54,22 +55,110 @@ function V2UserAvatar({ user }: { user: ShellUser }) {
   );
 }
 
-function V2UserRow({ user }: { user: ShellUser }) {
+const MENU_ITEM =
+  "block w-full px-3 py-1.5 text-left text-[13px] text-[color:var(--v2-ink2)] transition-colors hover:bg-[var(--v2-inset)] hover:text-[color:var(--v2-ink)]";
+
+/**
+ * The rail's account control. A real menu, not a static row: "Settings"
+ * and "Back to classic dashboard" are `Link`s to their canonical routes,
+ * "Sign out" calls the app's own `useAuth().logout` (the same session
+ * teardown Sidebar.tsx's account menu uses) so this menu never invents a
+ * second sign-out path.
+ */
+function V2UserMenu({
+  user,
+  brandId,
+  mode,
+  onSignOut,
+}: {
+  user: ShellUser;
+  brandId: string;
+  mode: V2Mode;
+  onSignOut: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const name = user?.firstName
     ? `${user.firstName} ${user.lastName ?? ""}`.trim()
     : (user?.email ?? "Account");
+  const v2Search = { brandId: brandId || undefined, mode };
+  const classicSearch = { brandId: brandId || undefined };
+
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(event: MouseEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   return (
-    <div className="shrink-0 border-t border-[var(--v2-line)] px-3 py-3">
+    <div
+      ref={containerRef}
+      className="relative shrink-0 border-t border-[var(--v2-line)] px-3 py-3"
+    >
       <button
         type="button"
-        aria-label={`${name} account`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`${name} account menu`}
+        onClick={() => setOpen((value) => !value)}
         className="flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-[13px] font-medium text-[color:var(--v2-ink2)] transition-colors hover:bg-[var(--v2-inset)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--v2-brand)]"
       >
         <V2UserAvatar user={user} />
         <span className="min-w-0 flex-1 truncate">{name}</span>
         <V2Icon name="cdown" size={14} className="shrink-0 text-[color:var(--v2-ink3)]" />
       </button>
+      {open ? (
+        <div
+          role="menu"
+          aria-label={`${name} account`}
+          className="absolute inset-x-3 bottom-full z-50 mb-1 overflow-hidden rounded-[7px] border border-[var(--v2-line)] bg-[var(--v2-paper)] py-1 shadow-lg"
+        >
+          <div className="truncate px-3 py-1.5 text-[12px] text-[color:var(--v2-ink3)]">
+            {user?.email ?? "Account"}
+          </div>
+          <div className="border-t border-[var(--v2-line)]" />
+          <Link
+            to="/v2/settings"
+            search={v2Search}
+            role="menuitem"
+            className={MENU_ITEM}
+            onClick={() => setOpen(false)}
+          >
+            Settings
+          </Link>
+          <Link
+            to="/dashboard"
+            search={classicSearch}
+            role="menuitem"
+            className={MENU_ITEM}
+            onClick={() => setOpen(false)}
+          >
+            Back to classic dashboard
+          </Link>
+          <div className="border-t border-[var(--v2-line)]" />
+          <button
+            type="button"
+            role="menuitem"
+            className={MENU_ITEM}
+            onClick={() => {
+              setOpen(false);
+              onSignOut();
+            }}
+          >
+            Sign out
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -199,38 +288,44 @@ function V2AppChrome({
   children: ReactNode;
 }) {
   const { brands, isLoading, selectedBrand, selectedBrandId } = useBrandSelection();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { mode, setMode } = useV2Mode();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const search = useSearch({ strict: false });
   const [modeOverride, setModeOverride] = useState<V2Mode>();
   const modeFromVariant = variant === "expert" || variant === "expert-nav" ? "expert" : mode;
   const activeMode = modeOverride ?? modeFromVariant;
   const sections = V2_NAV_MAP[variant];
   const activeItemId = getActiveNavItemId(sections, pathname);
   const activeItem = getNavItems(sections).find((item) => item.id === activeItemId);
+  const standardRail = variant === "guided" || variant === "expert";
+  const unreadNotifications = useV2NotificationsBadge(selectedBrandId, pathname, standardRail);
 
   useEffect(() => {
     setModeOverride(undefined);
   }, [pathname, variant]);
 
+  // Every mode switch updates the URL's `mode` param - on every page, not
+  // only Visibility/Diagnostics - so a page that reads `mode` off search
+  // sees the change immediately and a reload/share keeps it. The two
+  // consolidated areas (Visibility, Diagnostics) bounce a guided sub-route
+  // to their expert overview via `getExpertEquivalent`; everywhere else
+  // stays on the current route (`to: "."`) with only `mode` changed.
   function handleModeChange(nextMode: V2Mode) {
     setModeOverride(nextMode);
     setMode(nextMode);
-    if (nextMode !== "expert") return;
 
-    const target = getExpertEquivalent(pathname);
-    if (!target) return;
-
+    const target = nextMode === "expert" ? (getExpertEquivalent(pathname) ?? ".") : ".";
     navigate({
       to: target,
-      search: { ...search, brandId: selectedBrandId || undefined, mode: nextMode },
+      search: { brandId: selectedBrandId || undefined, mode: nextMode },
     });
   }
 
-  const linkSearch = { ...search, brandId: selectedBrandId || undefined, mode: activeMode };
-  const standardRail = variant === "guided" || variant === "expert";
+  // Nav links carry ONLY brandId and mode - never whatever else happens to
+  // be on the current URL (a `?task=` from My work, a `?tab=` from
+  // Visibility). See V2Nav.tsx's V2NavSearch comment for why.
+  const navSearch = { brandId: selectedBrandId || undefined, mode: activeMode };
   const railWidth = variant === "expert-nav" ? "w-[190px]" : "w-[200px]";
   const contentOffset = variant === "expert-nav" ? "lg:ml-[190px]" : "lg:ml-[200px]";
 
@@ -244,7 +339,7 @@ function V2AppChrome({
         <div className="flex h-[56px] shrink-0 items-center border-b border-[var(--v2-line)] px-3">
           <Link
             to="/v2/today"
-            search={linkSearch}
+            search={navSearch}
             className="flex items-center gap-2 rounded-[7px] px-1 py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--v2-brand)]"
           >
             <BrandLogo />
@@ -262,11 +357,10 @@ function V2AppChrome({
         <V2Nav
           variant={variant}
           pathname={pathname}
-          brandId={selectedBrandId}
-          mode={activeMode}
-          search={search}
+          navSearch={navSearch}
+          unreadNotifications={unreadNotifications}
         />
-        <V2UserRow user={user} />
+        <V2UserMenu user={user} brandId={selectedBrandId} mode={activeMode} onSignOut={logout} />
       </aside>
 
       <div className={`flex min-w-0 flex-1 flex-col ${contentOffset}`}>
