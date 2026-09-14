@@ -1,6 +1,11 @@
 import type { V2ScreenProps } from "@/v2/contracts/screen";
-import { NotBuilt } from "../_placeholder/NotBuilt";
-export type Board19Data = Record<string, never>;
-export function Board19Screen(_props: V2ScreenProps<Board19Data>) {
-  return <NotBuilt board="b19" title="My work - content task (Guided)" />;
+import {
+  ContentTaskEditor,
+  type ContentTaskData,
+} from "../b06-buyer-guide-editor/shared/ContentTaskEditor";
+
+export type Board19Data = ContentTaskData<"services">;
+
+export function Board19Screen({ data, staleAsOf }: V2ScreenProps<Board19Data>) {
+  return <ContentTaskEditor data={data} staleAsOf={staleAsOf} />;
 }
