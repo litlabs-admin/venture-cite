@@ -4,4 +4,5 @@ import VisibilityPage from "@/v2/visibility/VisibilityPage";
 // `/v2/visibility` - the overview.
 export const Route = createFileRoute("/_app/v2/visibility/")({
   component: VisibilityPage,
+  staticData: { v2Shell: "expert", v2Board: "b08" },
 });

@@ -16,6 +16,7 @@ import { Route as HealthRouteImport } from './routes/health'
 import { Route as InternalPageRouteImport } from './routes/internal-page'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as V2PreviewRouteImport } from './routes/v2-preview'
 import { Route as AppSplatRouteImport } from './routes/_app/$'
 import { Route as AppActRouteImport } from './routes/_app/act'
 import { Route as AppAiIntelligenceRouteImport } from './routes/_app/ai-intelligence'
@@ -52,23 +53,59 @@ import { Route as AppV2RouteImport } from './routes/_app/v2'
 import { Route as AppVerifyEmailRouteImport } from './routes/_app/verify-email'
 import { Route as AppWelcomeRouteImport } from './routes/_app/welcome'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
+import { Route as V2PreviewIndexRouteImport } from './routes/v2-preview.index'
+import { Route as V2PreviewBoardRouteImport } from './routes/v2-preview.$board'
 import { Route as WebhooksSplatRouteImport } from './routes/webhooks/$'
 import { Route as AppAdminScrapeRouteImport } from './routes/_app/admin.scrape'
 import { Route as AppContentArticleIdRouteImport } from './routes/_app/content.$articleId'
 import { Route as AppPromptsIndexRouteImport } from './routes/_app/prompts.index'
 import { Route as AppPromptsPromptIdRouteImport } from './routes/_app/prompts.$promptId'
+import { Route as AppV2AgencyRouteImport } from './routes/_app/v2.agency'
 import { Route as AppV2BrandFactsRouteImport } from './routes/_app/v2.brand-facts'
 import { Route as AppV2DiagnosticsRouteImport } from './routes/_app/v2.diagnostics'
+import { Route as AppV2GeoAssistantRouteImport } from './routes/_app/v2.geo-assistant'
 import { Route as AppV2LearnRouteImport } from './routes/_app/v2.learn'
 import { Route as AppV2MyWorkRouteImport } from './routes/_app/v2.my-work'
+import { Route as AppV2NotificationsRouteImport } from './routes/_app/v2.notifications'
+import { Route as AppV2OnboardingRouteImport } from './routes/_app/v2.onboarding'
+import { Route as AppV2PlansRouteImport } from './routes/_app/v2.plans'
+import { Route as AppV2SettingsRouteImport } from './routes/_app/v2.settings'
+import { Route as AppV2SignInRouteImport } from './routes/_app/v2.sign-in'
 import { Route as AppV2TodayRouteImport } from './routes/_app/v2.today'
 import { Route as AppV2VisibilityRouteImport } from './routes/_app/v2.visibility'
 import { Route as AppAdminScrapeRunIdRouteImport } from './routes/_app/admin.scrape.$runId'
 import { Route as AppPromptsPromptIdIndexRouteImport } from './routes/_app/prompts.$promptId.index'
 import { Route as AppPromptsPromptIdDiagnoseRouteImport } from './routes/_app/prompts.$promptId.diagnose'
+import { Route as AppV2BrandFactsIndexRouteImport } from './routes/_app/v2.brand-facts.index'
+import { Route as AppV2BrandFactsWorkspaceRouteImport } from './routes/_app/v2.brand-facts.workspace'
+import { Route as AppV2DiagnosticsIndexRouteImport } from './routes/_app/v2.diagnostics.index'
+import { Route as AppV2DiagnosticsCompetitorGapRouteImport } from './routes/_app/v2.diagnostics.competitor-gap'
+import { Route as AppV2DiagnosticsGeoSignalsRouteImport } from './routes/_app/v2.diagnostics.geo-signals'
+import { Route as AppV2DiagnosticsPerceptionRouteImport } from './routes/_app/v2.diagnostics.perception'
+import { Route as AppV2DiagnosticsPromptsRouteImport } from './routes/_app/v2.diagnostics.prompts'
+import { Route as AppV2DiagnosticsQuestionsRouteImport } from './routes/_app/v2.diagnostics.questions'
+import { Route as AppV2DiagnosticsSiteHealthRouteImport } from './routes/_app/v2.diagnostics.site-health'
+import { Route as AppV2MyWorkIndexRouteImport } from './routes/_app/v2.my-work.index'
+import { Route as AppV2MyWorkContentOpportunitiesRouteImport } from './routes/_app/v2.my-work.content-opportunities'
+import { Route as AppV2MyWorkEarnedMediaRouteImport } from './routes/_app/v2.my-work.earned-media'
+import { Route as AppV2OnboardingBaselineRouteImport } from './routes/_app/v2.onboarding.baseline'
+import { Route as AppV2OnboardingBaselineReviewRouteImport } from './routes/_app/v2.onboarding.baseline-review'
+import { Route as AppV2OnboardingFactsRouteImport } from './routes/_app/v2.onboarding.facts'
+import { Route as AppV2OnboardingInspectionRouteImport } from './routes/_app/v2.onboarding.inspection'
+import { Route as AppV2OnboardingQuestionsRouteImport } from './routes/_app/v2.onboarding.questions'
+import { Route as AppV2OnboardingStartRouteImport } from './routes/_app/v2.onboarding.start'
+import { Route as AppV2SettingsIndexRouteImport } from './routes/_app/v2.settings.index'
+import { Route as AppV2SettingsBillingRouteImport } from './routes/_app/v2.settings.billing'
+import { Route as AppV2SettingsIntegrationsRouteImport } from './routes/_app/v2.settings.integrations'
+import { Route as AppV2SettingsTeamRouteImport } from './routes/_app/v2.settings.team'
 import { Route as AppV2VisibilityIndexRouteImport } from './routes/_app/v2.visibility.index'
+import { Route as AppV2VisibilityCitationsRouteImport } from './routes/_app/v2.visibility.citations'
 import { Route as AppV2VisibilityEvidenceRouteImport } from './routes/_app/v2.visibility.evidence'
+import { Route as AppV2VisibilityOutcomeReviewRouteImport } from './routes/_app/v2.visibility.outcome-review'
+import { Route as AppV2VisibilityReportRouteImport } from './routes/_app/v2.visibility.report'
 import { Route as AppV2VisibilityResultsRouteImport } from './routes/_app/v2.visibility.results'
+import { Route as AppV2DiagnosticsQuestionsQuestionIdRouteImport } from './routes/_app/v2.diagnostics.questions.$questionId'
+import { Route as AppV2MyWorkTasksTaskIdRouteImport } from './routes/_app/v2.my-work.tasks.$taskId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -102,6 +139,11 @@ const PricingRoute = PricingRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V2PreviewRoute = V2PreviewRouteImport.update({
+  id: '/v2-preview',
+  path: '/v2-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppSplatRoute = AppSplatRouteImport.update({
@@ -284,6 +326,16 @@ const ApiSplatRoute = ApiSplatRouteImport.update({
   path: '/api/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V2PreviewIndexRoute = V2PreviewIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => V2PreviewRoute,
+} as any)
+const V2PreviewBoardRoute = V2PreviewBoardRouteImport.update({
+  id: '/$board',
+  path: '/$board',
+  getParentRoute: () => V2PreviewRoute,
+} as any)
 const WebhooksSplatRoute = WebhooksSplatRouteImport.update({
   id: '/webhooks/$',
   path: '/webhooks/$',
@@ -309,6 +361,11 @@ const AppPromptsPromptIdRoute = AppPromptsPromptIdRouteImport.update({
   path: '/$promptId',
   getParentRoute: () => AppPromptsRoute,
 } as any)
+const AppV2AgencyRoute = AppV2AgencyRouteImport.update({
+  id: '/agency',
+  path: '/agency',
+  getParentRoute: () => AppV2Route,
+} as any)
 const AppV2BrandFactsRoute = AppV2BrandFactsRouteImport.update({
   id: '/brand-facts',
   path: '/brand-facts',
@@ -319,6 +376,11 @@ const AppV2DiagnosticsRoute = AppV2DiagnosticsRouteImport.update({
   path: '/diagnostics',
   getParentRoute: () => AppV2Route,
 } as any)
+const AppV2GeoAssistantRoute = AppV2GeoAssistantRouteImport.update({
+  id: '/geo-assistant',
+  path: '/geo-assistant',
+  getParentRoute: () => AppV2Route,
+} as any)
 const AppV2LearnRoute = AppV2LearnRouteImport.update({
   id: '/learn',
   path: '/learn',
@@ -327,6 +389,31 @@ const AppV2LearnRoute = AppV2LearnRouteImport.update({
 const AppV2MyWorkRoute = AppV2MyWorkRouteImport.update({
   id: '/my-work',
   path: '/my-work',
+  getParentRoute: () => AppV2Route,
+} as any)
+const AppV2NotificationsRoute = AppV2NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => AppV2Route,
+} as any)
+const AppV2OnboardingRoute = AppV2OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AppV2Route,
+} as any)
+const AppV2PlansRoute = AppV2PlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
+  getParentRoute: () => AppV2Route,
+} as any)
+const AppV2SettingsRoute = AppV2SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppV2Route,
+} as any)
+const AppV2SignInRoute = AppV2SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
   getParentRoute: () => AppV2Route,
 } as any)
 const AppV2TodayRoute = AppV2TodayRouteImport.update({
@@ -355,20 +442,169 @@ const AppPromptsPromptIdDiagnoseRoute =
     path: '/diagnose',
     getParentRoute: () => AppPromptsPromptIdRoute,
   } as any)
+const AppV2BrandFactsIndexRoute = AppV2BrandFactsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppV2BrandFactsRoute,
+} as any)
+const AppV2BrandFactsWorkspaceRoute =
+  AppV2BrandFactsWorkspaceRouteImport.update({
+    id: '/workspace',
+    path: '/workspace',
+    getParentRoute: () => AppV2BrandFactsRoute,
+  } as any)
+const AppV2DiagnosticsIndexRoute = AppV2DiagnosticsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppV2DiagnosticsRoute,
+} as any)
+const AppV2DiagnosticsCompetitorGapRoute =
+  AppV2DiagnosticsCompetitorGapRouteImport.update({
+    id: '/competitor-gap',
+    path: '/competitor-gap',
+    getParentRoute: () => AppV2DiagnosticsRoute,
+  } as any)
+const AppV2DiagnosticsGeoSignalsRoute =
+  AppV2DiagnosticsGeoSignalsRouteImport.update({
+    id: '/geo-signals',
+    path: '/geo-signals',
+    getParentRoute: () => AppV2DiagnosticsRoute,
+  } as any)
+const AppV2DiagnosticsPerceptionRoute =
+  AppV2DiagnosticsPerceptionRouteImport.update({
+    id: '/perception',
+    path: '/perception',
+    getParentRoute: () => AppV2DiagnosticsRoute,
+  } as any)
+const AppV2DiagnosticsPromptsRoute = AppV2DiagnosticsPromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => AppV2DiagnosticsRoute,
+} as any)
+const AppV2DiagnosticsQuestionsRoute =
+  AppV2DiagnosticsQuestionsRouteImport.update({
+    id: '/questions',
+    path: '/questions',
+    getParentRoute: () => AppV2DiagnosticsRoute,
+  } as any)
+const AppV2DiagnosticsSiteHealthRoute =
+  AppV2DiagnosticsSiteHealthRouteImport.update({
+    id: '/site-health',
+    path: '/site-health',
+    getParentRoute: () => AppV2DiagnosticsRoute,
+  } as any)
+const AppV2MyWorkIndexRoute = AppV2MyWorkIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppV2MyWorkRoute,
+} as any)
+const AppV2MyWorkContentOpportunitiesRoute =
+  AppV2MyWorkContentOpportunitiesRouteImport.update({
+    id: '/content-opportunities',
+    path: '/content-opportunities',
+    getParentRoute: () => AppV2MyWorkRoute,
+  } as any)
+const AppV2MyWorkEarnedMediaRoute = AppV2MyWorkEarnedMediaRouteImport.update({
+  id: '/earned-media',
+  path: '/earned-media',
+  getParentRoute: () => AppV2MyWorkRoute,
+} as any)
+const AppV2OnboardingBaselineRoute = AppV2OnboardingBaselineRouteImport.update({
+  id: '/baseline',
+  path: '/baseline',
+  getParentRoute: () => AppV2OnboardingRoute,
+} as any)
+const AppV2OnboardingBaselineReviewRoute =
+  AppV2OnboardingBaselineReviewRouteImport.update({
+    id: '/baseline-review',
+    path: '/baseline-review',
+    getParentRoute: () => AppV2OnboardingRoute,
+  } as any)
+const AppV2OnboardingFactsRoute = AppV2OnboardingFactsRouteImport.update({
+  id: '/facts',
+  path: '/facts',
+  getParentRoute: () => AppV2OnboardingRoute,
+} as any)
+const AppV2OnboardingInspectionRoute =
+  AppV2OnboardingInspectionRouteImport.update({
+    id: '/inspection',
+    path: '/inspection',
+    getParentRoute: () => AppV2OnboardingRoute,
+  } as any)
+const AppV2OnboardingQuestionsRoute =
+  AppV2OnboardingQuestionsRouteImport.update({
+    id: '/questions',
+    path: '/questions',
+    getParentRoute: () => AppV2OnboardingRoute,
+  } as any)
+const AppV2OnboardingStartRoute = AppV2OnboardingStartRouteImport.update({
+  id: '/start',
+  path: '/start',
+  getParentRoute: () => AppV2OnboardingRoute,
+} as any)
+const AppV2SettingsIndexRoute = AppV2SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppV2SettingsRoute,
+} as any)
+const AppV2SettingsBillingRoute = AppV2SettingsBillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
+  getParentRoute: () => AppV2SettingsRoute,
+} as any)
+const AppV2SettingsIntegrationsRoute =
+  AppV2SettingsIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => AppV2SettingsRoute,
+  } as any)
+const AppV2SettingsTeamRoute = AppV2SettingsTeamRouteImport.update({
+  id: '/team',
+  path: '/team',
+  getParentRoute: () => AppV2SettingsRoute,
+} as any)
 const AppV2VisibilityIndexRoute = AppV2VisibilityIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppV2VisibilityRoute,
 } as any)
+const AppV2VisibilityCitationsRoute =
+  AppV2VisibilityCitationsRouteImport.update({
+    id: '/citations',
+    path: '/citations',
+    getParentRoute: () => AppV2VisibilityRoute,
+  } as any)
 const AppV2VisibilityEvidenceRoute = AppV2VisibilityEvidenceRouteImport.update({
   id: '/evidence',
   path: '/evidence',
+  getParentRoute: () => AppV2VisibilityRoute,
+} as any)
+const AppV2VisibilityOutcomeReviewRoute =
+  AppV2VisibilityOutcomeReviewRouteImport.update({
+    id: '/outcome-review',
+    path: '/outcome-review',
+    getParentRoute: () => AppV2VisibilityRoute,
+  } as any)
+const AppV2VisibilityReportRoute = AppV2VisibilityReportRouteImport.update({
+  id: '/report',
+  path: '/report',
   getParentRoute: () => AppV2VisibilityRoute,
 } as any)
 const AppV2VisibilityResultsRoute = AppV2VisibilityResultsRouteImport.update({
   id: '/results',
   path: '/results',
   getParentRoute: () => AppV2VisibilityRoute,
+} as any)
+const AppV2DiagnosticsQuestionsQuestionIdRoute =
+  AppV2DiagnosticsQuestionsQuestionIdRouteImport.update({
+    id: '/$questionId',
+    path: '/$questionId',
+    getParentRoute: () => AppV2DiagnosticsQuestionsRoute,
+  } as any)
+const AppV2MyWorkTasksTaskIdRoute = AppV2MyWorkTasksTaskIdRouteImport.update({
+  id: '/tasks/$taskId',
+  path: '/tasks/$taskId',
+  getParentRoute: () => AppV2MyWorkRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -378,6 +614,7 @@ export interface FileRoutesByFullPath {
   '/internal-page': typeof InternalPageRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/v2-preview': typeof V2PreviewRouteWithChildren
   '/$': typeof AppSplatRoute
   '/act': typeof AppActRoute
   '/ai-intelligence': typeof AppAiIntelligenceRoute
@@ -414,23 +651,59 @@ export interface FileRoutesByFullPath {
   '/verify-email': typeof AppVerifyEmailRoute
   '/welcome': typeof AppWelcomeRoute
   '/api/$': typeof ApiSplatRoute
+  '/v2-preview/$board': typeof V2PreviewBoardRoute
   '/webhooks/$': typeof WebhooksSplatRoute
+  '/v2-preview/': typeof V2PreviewIndexRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
   '/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
-  '/v2/brand-facts': typeof AppV2BrandFactsRoute
-  '/v2/diagnostics': typeof AppV2DiagnosticsRoute
+  '/v2/agency': typeof AppV2AgencyRoute
+  '/v2/brand-facts': typeof AppV2BrandFactsRouteWithChildren
+  '/v2/diagnostics': typeof AppV2DiagnosticsRouteWithChildren
+  '/v2/geo-assistant': typeof AppV2GeoAssistantRoute
   '/v2/learn': typeof AppV2LearnRoute
-  '/v2/my-work': typeof AppV2MyWorkRoute
+  '/v2/my-work': typeof AppV2MyWorkRouteWithChildren
+  '/v2/notifications': typeof AppV2NotificationsRoute
+  '/v2/onboarding': typeof AppV2OnboardingRouteWithChildren
+  '/v2/plans': typeof AppV2PlansRoute
+  '/v2/settings': typeof AppV2SettingsRouteWithChildren
+  '/v2/sign-in': typeof AppV2SignInRoute
   '/v2/today': typeof AppV2TodayRoute
   '/v2/visibility': typeof AppV2VisibilityRouteWithChildren
   '/prompts/': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
   '/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
+  '/v2/brand-facts/workspace': typeof AppV2BrandFactsWorkspaceRoute
+  '/v2/diagnostics/competitor-gap': typeof AppV2DiagnosticsCompetitorGapRoute
+  '/v2/diagnostics/geo-signals': typeof AppV2DiagnosticsGeoSignalsRoute
+  '/v2/diagnostics/perception': typeof AppV2DiagnosticsPerceptionRoute
+  '/v2/diagnostics/prompts': typeof AppV2DiagnosticsPromptsRoute
+  '/v2/diagnostics/questions': typeof AppV2DiagnosticsQuestionsRouteWithChildren
+  '/v2/diagnostics/site-health': typeof AppV2DiagnosticsSiteHealthRoute
+  '/v2/my-work/content-opportunities': typeof AppV2MyWorkContentOpportunitiesRoute
+  '/v2/my-work/earned-media': typeof AppV2MyWorkEarnedMediaRoute
+  '/v2/onboarding/baseline': typeof AppV2OnboardingBaselineRoute
+  '/v2/onboarding/baseline-review': typeof AppV2OnboardingBaselineReviewRoute
+  '/v2/onboarding/facts': typeof AppV2OnboardingFactsRoute
+  '/v2/onboarding/inspection': typeof AppV2OnboardingInspectionRoute
+  '/v2/onboarding/questions': typeof AppV2OnboardingQuestionsRoute
+  '/v2/onboarding/start': typeof AppV2OnboardingStartRoute
+  '/v2/settings/billing': typeof AppV2SettingsBillingRoute
+  '/v2/settings/integrations': typeof AppV2SettingsIntegrationsRoute
+  '/v2/settings/team': typeof AppV2SettingsTeamRoute
+  '/v2/visibility/citations': typeof AppV2VisibilityCitationsRoute
   '/v2/visibility/evidence': typeof AppV2VisibilityEvidenceRoute
+  '/v2/visibility/outcome-review': typeof AppV2VisibilityOutcomeReviewRoute
+  '/v2/visibility/report': typeof AppV2VisibilityReportRoute
   '/v2/visibility/results': typeof AppV2VisibilityResultsRoute
   '/prompts/$promptId/': typeof AppPromptsPromptIdIndexRoute
+  '/v2/brand-facts/': typeof AppV2BrandFactsIndexRoute
+  '/v2/diagnostics/': typeof AppV2DiagnosticsIndexRoute
+  '/v2/my-work/': typeof AppV2MyWorkIndexRoute
+  '/v2/settings/': typeof AppV2SettingsIndexRoute
   '/v2/visibility/': typeof AppV2VisibilityIndexRoute
+  '/v2/diagnostics/questions/$questionId': typeof AppV2DiagnosticsQuestionsQuestionIdRoute
+  '/v2/my-work/tasks/$taskId': typeof AppV2MyWorkTasksTaskIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -474,21 +747,53 @@ export interface FileRoutesByTo {
   '/verify-email': typeof AppVerifyEmailRoute
   '/welcome': typeof AppWelcomeRoute
   '/api/$': typeof ApiSplatRoute
+  '/v2-preview/$board': typeof V2PreviewBoardRoute
   '/webhooks/$': typeof WebhooksSplatRoute
+  '/v2-preview': typeof V2PreviewIndexRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
-  '/v2/brand-facts': typeof AppV2BrandFactsRoute
-  '/v2/diagnostics': typeof AppV2DiagnosticsRoute
+  '/v2/agency': typeof AppV2AgencyRoute
+  '/v2/geo-assistant': typeof AppV2GeoAssistantRoute
   '/v2/learn': typeof AppV2LearnRoute
-  '/v2/my-work': typeof AppV2MyWorkRoute
+  '/v2/notifications': typeof AppV2NotificationsRoute
+  '/v2/onboarding': typeof AppV2OnboardingRouteWithChildren
+  '/v2/plans': typeof AppV2PlansRoute
+  '/v2/sign-in': typeof AppV2SignInRoute
   '/v2/today': typeof AppV2TodayRoute
   '/prompts': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
   '/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
+  '/v2/brand-facts/workspace': typeof AppV2BrandFactsWorkspaceRoute
+  '/v2/diagnostics/competitor-gap': typeof AppV2DiagnosticsCompetitorGapRoute
+  '/v2/diagnostics/geo-signals': typeof AppV2DiagnosticsGeoSignalsRoute
+  '/v2/diagnostics/perception': typeof AppV2DiagnosticsPerceptionRoute
+  '/v2/diagnostics/prompts': typeof AppV2DiagnosticsPromptsRoute
+  '/v2/diagnostics/questions': typeof AppV2DiagnosticsQuestionsRouteWithChildren
+  '/v2/diagnostics/site-health': typeof AppV2DiagnosticsSiteHealthRoute
+  '/v2/my-work/content-opportunities': typeof AppV2MyWorkContentOpportunitiesRoute
+  '/v2/my-work/earned-media': typeof AppV2MyWorkEarnedMediaRoute
+  '/v2/onboarding/baseline': typeof AppV2OnboardingBaselineRoute
+  '/v2/onboarding/baseline-review': typeof AppV2OnboardingBaselineReviewRoute
+  '/v2/onboarding/facts': typeof AppV2OnboardingFactsRoute
+  '/v2/onboarding/inspection': typeof AppV2OnboardingInspectionRoute
+  '/v2/onboarding/questions': typeof AppV2OnboardingQuestionsRoute
+  '/v2/onboarding/start': typeof AppV2OnboardingStartRoute
+  '/v2/settings/billing': typeof AppV2SettingsBillingRoute
+  '/v2/settings/integrations': typeof AppV2SettingsIntegrationsRoute
+  '/v2/settings/team': typeof AppV2SettingsTeamRoute
+  '/v2/visibility/citations': typeof AppV2VisibilityCitationsRoute
   '/v2/visibility/evidence': typeof AppV2VisibilityEvidenceRoute
+  '/v2/visibility/outcome-review': typeof AppV2VisibilityOutcomeReviewRoute
+  '/v2/visibility/report': typeof AppV2VisibilityReportRoute
   '/v2/visibility/results': typeof AppV2VisibilityResultsRoute
   '/prompts/$promptId': typeof AppPromptsPromptIdIndexRoute
+  '/v2/brand-facts': typeof AppV2BrandFactsIndexRoute
+  '/v2/diagnostics': typeof AppV2DiagnosticsIndexRoute
+  '/v2/my-work': typeof AppV2MyWorkIndexRoute
+  '/v2/settings': typeof AppV2SettingsIndexRoute
   '/v2/visibility': typeof AppV2VisibilityIndexRoute
+  '/v2/diagnostics/questions/$questionId': typeof AppV2DiagnosticsQuestionsQuestionIdRoute
+  '/v2/my-work/tasks/$taskId': typeof AppV2MyWorkTasksTaskIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -499,6 +804,7 @@ export interface FileRoutesById {
   '/internal-page': typeof InternalPageRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/v2-preview': typeof V2PreviewRouteWithChildren
   '/_app/$': typeof AppSplatRoute
   '/_app/act': typeof AppActRoute
   '/_app/ai-intelligence': typeof AppAiIntelligenceRoute
@@ -535,23 +841,59 @@ export interface FileRoutesById {
   '/_app/verify-email': typeof AppVerifyEmailRoute
   '/_app/welcome': typeof AppWelcomeRoute
   '/api/$': typeof ApiSplatRoute
+  '/v2-preview/$board': typeof V2PreviewBoardRoute
   '/webhooks/$': typeof WebhooksSplatRoute
+  '/v2-preview/': typeof V2PreviewIndexRoute
   '/_app/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/_app/content/$articleId': typeof AppContentArticleIdRoute
   '/_app/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
-  '/_app/v2/brand-facts': typeof AppV2BrandFactsRoute
-  '/_app/v2/diagnostics': typeof AppV2DiagnosticsRoute
+  '/_app/v2/agency': typeof AppV2AgencyRoute
+  '/_app/v2/brand-facts': typeof AppV2BrandFactsRouteWithChildren
+  '/_app/v2/diagnostics': typeof AppV2DiagnosticsRouteWithChildren
+  '/_app/v2/geo-assistant': typeof AppV2GeoAssistantRoute
   '/_app/v2/learn': typeof AppV2LearnRoute
-  '/_app/v2/my-work': typeof AppV2MyWorkRoute
+  '/_app/v2/my-work': typeof AppV2MyWorkRouteWithChildren
+  '/_app/v2/notifications': typeof AppV2NotificationsRoute
+  '/_app/v2/onboarding': typeof AppV2OnboardingRouteWithChildren
+  '/_app/v2/plans': typeof AppV2PlansRoute
+  '/_app/v2/settings': typeof AppV2SettingsRouteWithChildren
+  '/_app/v2/sign-in': typeof AppV2SignInRoute
   '/_app/v2/today': typeof AppV2TodayRoute
   '/_app/v2/visibility': typeof AppV2VisibilityRouteWithChildren
   '/_app/prompts/': typeof AppPromptsIndexRoute
   '/_app/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
   '/_app/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
+  '/_app/v2/brand-facts/workspace': typeof AppV2BrandFactsWorkspaceRoute
+  '/_app/v2/diagnostics/competitor-gap': typeof AppV2DiagnosticsCompetitorGapRoute
+  '/_app/v2/diagnostics/geo-signals': typeof AppV2DiagnosticsGeoSignalsRoute
+  '/_app/v2/diagnostics/perception': typeof AppV2DiagnosticsPerceptionRoute
+  '/_app/v2/diagnostics/prompts': typeof AppV2DiagnosticsPromptsRoute
+  '/_app/v2/diagnostics/questions': typeof AppV2DiagnosticsQuestionsRouteWithChildren
+  '/_app/v2/diagnostics/site-health': typeof AppV2DiagnosticsSiteHealthRoute
+  '/_app/v2/my-work/content-opportunities': typeof AppV2MyWorkContentOpportunitiesRoute
+  '/_app/v2/my-work/earned-media': typeof AppV2MyWorkEarnedMediaRoute
+  '/_app/v2/onboarding/baseline': typeof AppV2OnboardingBaselineRoute
+  '/_app/v2/onboarding/baseline-review': typeof AppV2OnboardingBaselineReviewRoute
+  '/_app/v2/onboarding/facts': typeof AppV2OnboardingFactsRoute
+  '/_app/v2/onboarding/inspection': typeof AppV2OnboardingInspectionRoute
+  '/_app/v2/onboarding/questions': typeof AppV2OnboardingQuestionsRoute
+  '/_app/v2/onboarding/start': typeof AppV2OnboardingStartRoute
+  '/_app/v2/settings/billing': typeof AppV2SettingsBillingRoute
+  '/_app/v2/settings/integrations': typeof AppV2SettingsIntegrationsRoute
+  '/_app/v2/settings/team': typeof AppV2SettingsTeamRoute
+  '/_app/v2/visibility/citations': typeof AppV2VisibilityCitationsRoute
   '/_app/v2/visibility/evidence': typeof AppV2VisibilityEvidenceRoute
+  '/_app/v2/visibility/outcome-review': typeof AppV2VisibilityOutcomeReviewRoute
+  '/_app/v2/visibility/report': typeof AppV2VisibilityReportRoute
   '/_app/v2/visibility/results': typeof AppV2VisibilityResultsRoute
   '/_app/prompts/$promptId/': typeof AppPromptsPromptIdIndexRoute
+  '/_app/v2/brand-facts/': typeof AppV2BrandFactsIndexRoute
+  '/_app/v2/diagnostics/': typeof AppV2DiagnosticsIndexRoute
+  '/_app/v2/my-work/': typeof AppV2MyWorkIndexRoute
+  '/_app/v2/settings/': typeof AppV2SettingsIndexRoute
   '/_app/v2/visibility/': typeof AppV2VisibilityIndexRoute
+  '/_app/v2/diagnostics/questions/$questionId': typeof AppV2DiagnosticsQuestionsQuestionIdRoute
+  '/_app/v2/my-work/tasks/$taskId': typeof AppV2MyWorkTasksTaskIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -562,6 +904,7 @@ export interface FileRouteTypes {
     | '/internal-page'
     | '/pricing'
     | '/privacy'
+    | '/v2-preview'
     | '/$'
     | '/act'
     | '/ai-intelligence'
@@ -598,23 +941,59 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/welcome'
     | '/api/$'
+    | '/v2-preview/$board'
     | '/webhooks/$'
+    | '/v2-preview/'
     | '/admin/scrape'
     | '/content/$articleId'
     | '/prompts/$promptId'
+    | '/v2/agency'
     | '/v2/brand-facts'
     | '/v2/diagnostics'
+    | '/v2/geo-assistant'
     | '/v2/learn'
     | '/v2/my-work'
+    | '/v2/notifications'
+    | '/v2/onboarding'
+    | '/v2/plans'
+    | '/v2/settings'
+    | '/v2/sign-in'
     | '/v2/today'
     | '/v2/visibility'
     | '/prompts/'
     | '/admin/scrape/$runId'
     | '/prompts/$promptId/diagnose'
+    | '/v2/brand-facts/workspace'
+    | '/v2/diagnostics/competitor-gap'
+    | '/v2/diagnostics/geo-signals'
+    | '/v2/diagnostics/perception'
+    | '/v2/diagnostics/prompts'
+    | '/v2/diagnostics/questions'
+    | '/v2/diagnostics/site-health'
+    | '/v2/my-work/content-opportunities'
+    | '/v2/my-work/earned-media'
+    | '/v2/onboarding/baseline'
+    | '/v2/onboarding/baseline-review'
+    | '/v2/onboarding/facts'
+    | '/v2/onboarding/inspection'
+    | '/v2/onboarding/questions'
+    | '/v2/onboarding/start'
+    | '/v2/settings/billing'
+    | '/v2/settings/integrations'
+    | '/v2/settings/team'
+    | '/v2/visibility/citations'
     | '/v2/visibility/evidence'
+    | '/v2/visibility/outcome-review'
+    | '/v2/visibility/report'
     | '/v2/visibility/results'
     | '/prompts/$promptId/'
+    | '/v2/brand-facts/'
+    | '/v2/diagnostics/'
+    | '/v2/my-work/'
+    | '/v2/settings/'
     | '/v2/visibility/'
+    | '/v2/diagnostics/questions/$questionId'
+    | '/v2/my-work/tasks/$taskId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -658,21 +1037,53 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/welcome'
     | '/api/$'
+    | '/v2-preview/$board'
     | '/webhooks/$'
+    | '/v2-preview'
     | '/admin/scrape'
     | '/content/$articleId'
-    | '/v2/brand-facts'
-    | '/v2/diagnostics'
+    | '/v2/agency'
+    | '/v2/geo-assistant'
     | '/v2/learn'
-    | '/v2/my-work'
+    | '/v2/notifications'
+    | '/v2/onboarding'
+    | '/v2/plans'
+    | '/v2/sign-in'
     | '/v2/today'
     | '/prompts'
     | '/admin/scrape/$runId'
     | '/prompts/$promptId/diagnose'
+    | '/v2/brand-facts/workspace'
+    | '/v2/diagnostics/competitor-gap'
+    | '/v2/diagnostics/geo-signals'
+    | '/v2/diagnostics/perception'
+    | '/v2/diagnostics/prompts'
+    | '/v2/diagnostics/questions'
+    | '/v2/diagnostics/site-health'
+    | '/v2/my-work/content-opportunities'
+    | '/v2/my-work/earned-media'
+    | '/v2/onboarding/baseline'
+    | '/v2/onboarding/baseline-review'
+    | '/v2/onboarding/facts'
+    | '/v2/onboarding/inspection'
+    | '/v2/onboarding/questions'
+    | '/v2/onboarding/start'
+    | '/v2/settings/billing'
+    | '/v2/settings/integrations'
+    | '/v2/settings/team'
+    | '/v2/visibility/citations'
     | '/v2/visibility/evidence'
+    | '/v2/visibility/outcome-review'
+    | '/v2/visibility/report'
     | '/v2/visibility/results'
     | '/prompts/$promptId'
+    | '/v2/brand-facts'
+    | '/v2/diagnostics'
+    | '/v2/my-work'
+    | '/v2/settings'
     | '/v2/visibility'
+    | '/v2/diagnostics/questions/$questionId'
+    | '/v2/my-work/tasks/$taskId'
   id:
     | '__root__'
     | '/'
@@ -682,6 +1093,7 @@ export interface FileRouteTypes {
     | '/internal-page'
     | '/pricing'
     | '/privacy'
+    | '/v2-preview'
     | '/_app/$'
     | '/_app/act'
     | '/_app/ai-intelligence'
@@ -718,23 +1130,59 @@ export interface FileRouteTypes {
     | '/_app/verify-email'
     | '/_app/welcome'
     | '/api/$'
+    | '/v2-preview/$board'
     | '/webhooks/$'
+    | '/v2-preview/'
     | '/_app/admin/scrape'
     | '/_app/content/$articleId'
     | '/_app/prompts/$promptId'
+    | '/_app/v2/agency'
     | '/_app/v2/brand-facts'
     | '/_app/v2/diagnostics'
+    | '/_app/v2/geo-assistant'
     | '/_app/v2/learn'
     | '/_app/v2/my-work'
+    | '/_app/v2/notifications'
+    | '/_app/v2/onboarding'
+    | '/_app/v2/plans'
+    | '/_app/v2/settings'
+    | '/_app/v2/sign-in'
     | '/_app/v2/today'
     | '/_app/v2/visibility'
     | '/_app/prompts/'
     | '/_app/admin/scrape/$runId'
     | '/_app/prompts/$promptId/diagnose'
+    | '/_app/v2/brand-facts/workspace'
+    | '/_app/v2/diagnostics/competitor-gap'
+    | '/_app/v2/diagnostics/geo-signals'
+    | '/_app/v2/diagnostics/perception'
+    | '/_app/v2/diagnostics/prompts'
+    | '/_app/v2/diagnostics/questions'
+    | '/_app/v2/diagnostics/site-health'
+    | '/_app/v2/my-work/content-opportunities'
+    | '/_app/v2/my-work/earned-media'
+    | '/_app/v2/onboarding/baseline'
+    | '/_app/v2/onboarding/baseline-review'
+    | '/_app/v2/onboarding/facts'
+    | '/_app/v2/onboarding/inspection'
+    | '/_app/v2/onboarding/questions'
+    | '/_app/v2/onboarding/start'
+    | '/_app/v2/settings/billing'
+    | '/_app/v2/settings/integrations'
+    | '/_app/v2/settings/team'
+    | '/_app/v2/visibility/citations'
     | '/_app/v2/visibility/evidence'
+    | '/_app/v2/visibility/outcome-review'
+    | '/_app/v2/visibility/report'
     | '/_app/v2/visibility/results'
     | '/_app/prompts/$promptId/'
+    | '/_app/v2/brand-facts/'
+    | '/_app/v2/diagnostics/'
+    | '/_app/v2/my-work/'
+    | '/_app/v2/settings/'
     | '/_app/v2/visibility/'
+    | '/_app/v2/diagnostics/questions/$questionId'
+    | '/_app/v2/my-work/tasks/$taskId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -745,6 +1193,7 @@ export interface RootRouteChildren {
   InternalPageRoute: typeof InternalPageRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
+  V2PreviewRoute: typeof V2PreviewRouteWithChildren
   ApiSplatRoute: typeof ApiSplatRoute
   WebhooksSplatRoute: typeof WebhooksSplatRoute
 }
@@ -798,6 +1247,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2-preview': {
+      id: '/v2-preview'
+      path: '/v2-preview'
+      fullPath: '/v2-preview'
+      preLoaderRoute: typeof V2PreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/$': {
@@ -1052,6 +1508,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2-preview/': {
+      id: '/v2-preview/'
+      path: '/'
+      fullPath: '/v2-preview/'
+      preLoaderRoute: typeof V2PreviewIndexRouteImport
+      parentRoute: typeof V2PreviewRoute
+    }
+    '/v2-preview/$board': {
+      id: '/v2-preview/$board'
+      path: '/$board'
+      fullPath: '/v2-preview/$board'
+      preLoaderRoute: typeof V2PreviewBoardRouteImport
+      parentRoute: typeof V2PreviewRoute
+    }
     '/webhooks/$': {
       id: '/webhooks/$'
       path: '/webhooks/$'
@@ -1087,6 +1557,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPromptsPromptIdRouteImport
       parentRoute: typeof AppPromptsRoute
     }
+    '/_app/v2/agency': {
+      id: '/_app/v2/agency'
+      path: '/agency'
+      fullPath: '/v2/agency'
+      preLoaderRoute: typeof AppV2AgencyRouteImport
+      parentRoute: typeof AppV2Route
+    }
     '/_app/v2/brand-facts': {
       id: '/_app/v2/brand-facts'
       path: '/brand-facts'
@@ -1101,6 +1578,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppV2DiagnosticsRouteImport
       parentRoute: typeof AppV2Route
     }
+    '/_app/v2/geo-assistant': {
+      id: '/_app/v2/geo-assistant'
+      path: '/geo-assistant'
+      fullPath: '/v2/geo-assistant'
+      preLoaderRoute: typeof AppV2GeoAssistantRouteImport
+      parentRoute: typeof AppV2Route
+    }
     '/_app/v2/learn': {
       id: '/_app/v2/learn'
       path: '/learn'
@@ -1113,6 +1597,41 @@ declare module '@tanstack/react-router' {
       path: '/my-work'
       fullPath: '/v2/my-work'
       preLoaderRoute: typeof AppV2MyWorkRouteImport
+      parentRoute: typeof AppV2Route
+    }
+    '/_app/v2/notifications': {
+      id: '/_app/v2/notifications'
+      path: '/notifications'
+      fullPath: '/v2/notifications'
+      preLoaderRoute: typeof AppV2NotificationsRouteImport
+      parentRoute: typeof AppV2Route
+    }
+    '/_app/v2/onboarding': {
+      id: '/_app/v2/onboarding'
+      path: '/onboarding'
+      fullPath: '/v2/onboarding'
+      preLoaderRoute: typeof AppV2OnboardingRouteImport
+      parentRoute: typeof AppV2Route
+    }
+    '/_app/v2/plans': {
+      id: '/_app/v2/plans'
+      path: '/plans'
+      fullPath: '/v2/plans'
+      preLoaderRoute: typeof AppV2PlansRouteImport
+      parentRoute: typeof AppV2Route
+    }
+    '/_app/v2/settings': {
+      id: '/_app/v2/settings'
+      path: '/settings'
+      fullPath: '/v2/settings'
+      preLoaderRoute: typeof AppV2SettingsRouteImport
+      parentRoute: typeof AppV2Route
+    }
+    '/_app/v2/sign-in': {
+      id: '/_app/v2/sign-in'
+      path: '/sign-in'
+      fullPath: '/v2/sign-in'
+      preLoaderRoute: typeof AppV2SignInRouteImport
       parentRoute: typeof AppV2Route
     }
     '/_app/v2/today': {
@@ -1150,11 +1669,172 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPromptsPromptIdDiagnoseRouteImport
       parentRoute: typeof AppPromptsPromptIdRoute
     }
+    '/_app/v2/brand-facts/': {
+      id: '/_app/v2/brand-facts/'
+      path: '/'
+      fullPath: '/v2/brand-facts/'
+      preLoaderRoute: typeof AppV2BrandFactsIndexRouteImport
+      parentRoute: typeof AppV2BrandFactsRoute
+    }
+    '/_app/v2/brand-facts/workspace': {
+      id: '/_app/v2/brand-facts/workspace'
+      path: '/workspace'
+      fullPath: '/v2/brand-facts/workspace'
+      preLoaderRoute: typeof AppV2BrandFactsWorkspaceRouteImport
+      parentRoute: typeof AppV2BrandFactsRoute
+    }
+    '/_app/v2/diagnostics/': {
+      id: '/_app/v2/diagnostics/'
+      path: '/'
+      fullPath: '/v2/diagnostics/'
+      preLoaderRoute: typeof AppV2DiagnosticsIndexRouteImport
+      parentRoute: typeof AppV2DiagnosticsRoute
+    }
+    '/_app/v2/diagnostics/competitor-gap': {
+      id: '/_app/v2/diagnostics/competitor-gap'
+      path: '/competitor-gap'
+      fullPath: '/v2/diagnostics/competitor-gap'
+      preLoaderRoute: typeof AppV2DiagnosticsCompetitorGapRouteImport
+      parentRoute: typeof AppV2DiagnosticsRoute
+    }
+    '/_app/v2/diagnostics/geo-signals': {
+      id: '/_app/v2/diagnostics/geo-signals'
+      path: '/geo-signals'
+      fullPath: '/v2/diagnostics/geo-signals'
+      preLoaderRoute: typeof AppV2DiagnosticsGeoSignalsRouteImport
+      parentRoute: typeof AppV2DiagnosticsRoute
+    }
+    '/_app/v2/diagnostics/perception': {
+      id: '/_app/v2/diagnostics/perception'
+      path: '/perception'
+      fullPath: '/v2/diagnostics/perception'
+      preLoaderRoute: typeof AppV2DiagnosticsPerceptionRouteImport
+      parentRoute: typeof AppV2DiagnosticsRoute
+    }
+    '/_app/v2/diagnostics/prompts': {
+      id: '/_app/v2/diagnostics/prompts'
+      path: '/prompts'
+      fullPath: '/v2/diagnostics/prompts'
+      preLoaderRoute: typeof AppV2DiagnosticsPromptsRouteImport
+      parentRoute: typeof AppV2DiagnosticsRoute
+    }
+    '/_app/v2/diagnostics/questions': {
+      id: '/_app/v2/diagnostics/questions'
+      path: '/questions'
+      fullPath: '/v2/diagnostics/questions'
+      preLoaderRoute: typeof AppV2DiagnosticsQuestionsRouteImport
+      parentRoute: typeof AppV2DiagnosticsRoute
+    }
+    '/_app/v2/diagnostics/site-health': {
+      id: '/_app/v2/diagnostics/site-health'
+      path: '/site-health'
+      fullPath: '/v2/diagnostics/site-health'
+      preLoaderRoute: typeof AppV2DiagnosticsSiteHealthRouteImport
+      parentRoute: typeof AppV2DiagnosticsRoute
+    }
+    '/_app/v2/my-work/': {
+      id: '/_app/v2/my-work/'
+      path: '/'
+      fullPath: '/v2/my-work/'
+      preLoaderRoute: typeof AppV2MyWorkIndexRouteImport
+      parentRoute: typeof AppV2MyWorkRoute
+    }
+    '/_app/v2/my-work/content-opportunities': {
+      id: '/_app/v2/my-work/content-opportunities'
+      path: '/content-opportunities'
+      fullPath: '/v2/my-work/content-opportunities'
+      preLoaderRoute: typeof AppV2MyWorkContentOpportunitiesRouteImport
+      parentRoute: typeof AppV2MyWorkRoute
+    }
+    '/_app/v2/my-work/earned-media': {
+      id: '/_app/v2/my-work/earned-media'
+      path: '/earned-media'
+      fullPath: '/v2/my-work/earned-media'
+      preLoaderRoute: typeof AppV2MyWorkEarnedMediaRouteImport
+      parentRoute: typeof AppV2MyWorkRoute
+    }
+    '/_app/v2/onboarding/baseline': {
+      id: '/_app/v2/onboarding/baseline'
+      path: '/baseline'
+      fullPath: '/v2/onboarding/baseline'
+      preLoaderRoute: typeof AppV2OnboardingBaselineRouteImport
+      parentRoute: typeof AppV2OnboardingRoute
+    }
+    '/_app/v2/onboarding/baseline-review': {
+      id: '/_app/v2/onboarding/baseline-review'
+      path: '/baseline-review'
+      fullPath: '/v2/onboarding/baseline-review'
+      preLoaderRoute: typeof AppV2OnboardingBaselineReviewRouteImport
+      parentRoute: typeof AppV2OnboardingRoute
+    }
+    '/_app/v2/onboarding/facts': {
+      id: '/_app/v2/onboarding/facts'
+      path: '/facts'
+      fullPath: '/v2/onboarding/facts'
+      preLoaderRoute: typeof AppV2OnboardingFactsRouteImport
+      parentRoute: typeof AppV2OnboardingRoute
+    }
+    '/_app/v2/onboarding/inspection': {
+      id: '/_app/v2/onboarding/inspection'
+      path: '/inspection'
+      fullPath: '/v2/onboarding/inspection'
+      preLoaderRoute: typeof AppV2OnboardingInspectionRouteImport
+      parentRoute: typeof AppV2OnboardingRoute
+    }
+    '/_app/v2/onboarding/questions': {
+      id: '/_app/v2/onboarding/questions'
+      path: '/questions'
+      fullPath: '/v2/onboarding/questions'
+      preLoaderRoute: typeof AppV2OnboardingQuestionsRouteImport
+      parentRoute: typeof AppV2OnboardingRoute
+    }
+    '/_app/v2/onboarding/start': {
+      id: '/_app/v2/onboarding/start'
+      path: '/start'
+      fullPath: '/v2/onboarding/start'
+      preLoaderRoute: typeof AppV2OnboardingStartRouteImport
+      parentRoute: typeof AppV2OnboardingRoute
+    }
+    '/_app/v2/settings/': {
+      id: '/_app/v2/settings/'
+      path: '/'
+      fullPath: '/v2/settings/'
+      preLoaderRoute: typeof AppV2SettingsIndexRouteImport
+      parentRoute: typeof AppV2SettingsRoute
+    }
+    '/_app/v2/settings/billing': {
+      id: '/_app/v2/settings/billing'
+      path: '/billing'
+      fullPath: '/v2/settings/billing'
+      preLoaderRoute: typeof AppV2SettingsBillingRouteImport
+      parentRoute: typeof AppV2SettingsRoute
+    }
+    '/_app/v2/settings/integrations': {
+      id: '/_app/v2/settings/integrations'
+      path: '/integrations'
+      fullPath: '/v2/settings/integrations'
+      preLoaderRoute: typeof AppV2SettingsIntegrationsRouteImport
+      parentRoute: typeof AppV2SettingsRoute
+    }
+    '/_app/v2/settings/team': {
+      id: '/_app/v2/settings/team'
+      path: '/team'
+      fullPath: '/v2/settings/team'
+      preLoaderRoute: typeof AppV2SettingsTeamRouteImport
+      parentRoute: typeof AppV2SettingsRoute
+    }
     '/_app/v2/visibility/': {
       id: '/_app/v2/visibility/'
       path: '/'
       fullPath: '/v2/visibility/'
       preLoaderRoute: typeof AppV2VisibilityIndexRouteImport
+      parentRoute: typeof AppV2VisibilityRoute
+    }
+    '/_app/v2/visibility/citations': {
+      id: '/_app/v2/visibility/citations'
+      path: '/citations'
+      fullPath: '/v2/visibility/citations'
+      preLoaderRoute: typeof AppV2VisibilityCitationsRouteImport
       parentRoute: typeof AppV2VisibilityRoute
     }
     '/_app/v2/visibility/evidence': {
@@ -1164,12 +1844,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppV2VisibilityEvidenceRouteImport
       parentRoute: typeof AppV2VisibilityRoute
     }
+    '/_app/v2/visibility/outcome-review': {
+      id: '/_app/v2/visibility/outcome-review'
+      path: '/outcome-review'
+      fullPath: '/v2/visibility/outcome-review'
+      preLoaderRoute: typeof AppV2VisibilityOutcomeReviewRouteImport
+      parentRoute: typeof AppV2VisibilityRoute
+    }
+    '/_app/v2/visibility/report': {
+      id: '/_app/v2/visibility/report'
+      path: '/report'
+      fullPath: '/v2/visibility/report'
+      preLoaderRoute: typeof AppV2VisibilityReportRouteImport
+      parentRoute: typeof AppV2VisibilityRoute
+    }
     '/_app/v2/visibility/results': {
       id: '/_app/v2/visibility/results'
       path: '/results'
       fullPath: '/v2/visibility/results'
       preLoaderRoute: typeof AppV2VisibilityResultsRouteImport
       parentRoute: typeof AppV2VisibilityRoute
+    }
+    '/_app/v2/diagnostics/questions/$questionId': {
+      id: '/_app/v2/diagnostics/questions/$questionId'
+      path: '/$questionId'
+      fullPath: '/v2/diagnostics/questions/$questionId'
+      preLoaderRoute: typeof AppV2DiagnosticsQuestionsQuestionIdRouteImport
+      parentRoute: typeof AppV2DiagnosticsQuestionsRoute
+    }
+    '/_app/v2/my-work/tasks/$taskId': {
+      id: '/_app/v2/my-work/tasks/$taskId'
+      path: '/tasks/$taskId'
+      fullPath: '/v2/my-work/tasks/$taskId'
+      preLoaderRoute: typeof AppV2MyWorkTasksTaskIdRouteImport
+      parentRoute: typeof AppV2MyWorkRoute
     }
   }
 }
@@ -1213,14 +1921,130 @@ const AppPromptsRouteWithChildren = AppPromptsRoute._addFileChildren(
   AppPromptsRouteChildren,
 )
 
+interface AppV2BrandFactsRouteChildren {
+  AppV2BrandFactsWorkspaceRoute: typeof AppV2BrandFactsWorkspaceRoute
+  AppV2BrandFactsIndexRoute: typeof AppV2BrandFactsIndexRoute
+}
+
+const AppV2BrandFactsRouteChildren: AppV2BrandFactsRouteChildren = {
+  AppV2BrandFactsWorkspaceRoute: AppV2BrandFactsWorkspaceRoute,
+  AppV2BrandFactsIndexRoute: AppV2BrandFactsIndexRoute,
+}
+
+const AppV2BrandFactsRouteWithChildren = AppV2BrandFactsRoute._addFileChildren(
+  AppV2BrandFactsRouteChildren,
+)
+
+interface AppV2DiagnosticsQuestionsRouteChildren {
+  AppV2DiagnosticsQuestionsQuestionIdRoute: typeof AppV2DiagnosticsQuestionsQuestionIdRoute
+}
+
+const AppV2DiagnosticsQuestionsRouteChildren: AppV2DiagnosticsQuestionsRouteChildren =
+  {
+    AppV2DiagnosticsQuestionsQuestionIdRoute:
+      AppV2DiagnosticsQuestionsQuestionIdRoute,
+  }
+
+const AppV2DiagnosticsQuestionsRouteWithChildren =
+  AppV2DiagnosticsQuestionsRoute._addFileChildren(
+    AppV2DiagnosticsQuestionsRouteChildren,
+  )
+
+interface AppV2DiagnosticsRouteChildren {
+  AppV2DiagnosticsCompetitorGapRoute: typeof AppV2DiagnosticsCompetitorGapRoute
+  AppV2DiagnosticsGeoSignalsRoute: typeof AppV2DiagnosticsGeoSignalsRoute
+  AppV2DiagnosticsPerceptionRoute: typeof AppV2DiagnosticsPerceptionRoute
+  AppV2DiagnosticsPromptsRoute: typeof AppV2DiagnosticsPromptsRoute
+  AppV2DiagnosticsQuestionsRoute: typeof AppV2DiagnosticsQuestionsRouteWithChildren
+  AppV2DiagnosticsSiteHealthRoute: typeof AppV2DiagnosticsSiteHealthRoute
+  AppV2DiagnosticsIndexRoute: typeof AppV2DiagnosticsIndexRoute
+}
+
+const AppV2DiagnosticsRouteChildren: AppV2DiagnosticsRouteChildren = {
+  AppV2DiagnosticsCompetitorGapRoute: AppV2DiagnosticsCompetitorGapRoute,
+  AppV2DiagnosticsGeoSignalsRoute: AppV2DiagnosticsGeoSignalsRoute,
+  AppV2DiagnosticsPerceptionRoute: AppV2DiagnosticsPerceptionRoute,
+  AppV2DiagnosticsPromptsRoute: AppV2DiagnosticsPromptsRoute,
+  AppV2DiagnosticsQuestionsRoute: AppV2DiagnosticsQuestionsRouteWithChildren,
+  AppV2DiagnosticsSiteHealthRoute: AppV2DiagnosticsSiteHealthRoute,
+  AppV2DiagnosticsIndexRoute: AppV2DiagnosticsIndexRoute,
+}
+
+const AppV2DiagnosticsRouteWithChildren =
+  AppV2DiagnosticsRoute._addFileChildren(AppV2DiagnosticsRouteChildren)
+
+interface AppV2MyWorkRouteChildren {
+  AppV2MyWorkContentOpportunitiesRoute: typeof AppV2MyWorkContentOpportunitiesRoute
+  AppV2MyWorkEarnedMediaRoute: typeof AppV2MyWorkEarnedMediaRoute
+  AppV2MyWorkIndexRoute: typeof AppV2MyWorkIndexRoute
+  AppV2MyWorkTasksTaskIdRoute: typeof AppV2MyWorkTasksTaskIdRoute
+}
+
+const AppV2MyWorkRouteChildren: AppV2MyWorkRouteChildren = {
+  AppV2MyWorkContentOpportunitiesRoute: AppV2MyWorkContentOpportunitiesRoute,
+  AppV2MyWorkEarnedMediaRoute: AppV2MyWorkEarnedMediaRoute,
+  AppV2MyWorkIndexRoute: AppV2MyWorkIndexRoute,
+  AppV2MyWorkTasksTaskIdRoute: AppV2MyWorkTasksTaskIdRoute,
+}
+
+const AppV2MyWorkRouteWithChildren = AppV2MyWorkRoute._addFileChildren(
+  AppV2MyWorkRouteChildren,
+)
+
+interface AppV2OnboardingRouteChildren {
+  AppV2OnboardingBaselineRoute: typeof AppV2OnboardingBaselineRoute
+  AppV2OnboardingBaselineReviewRoute: typeof AppV2OnboardingBaselineReviewRoute
+  AppV2OnboardingFactsRoute: typeof AppV2OnboardingFactsRoute
+  AppV2OnboardingInspectionRoute: typeof AppV2OnboardingInspectionRoute
+  AppV2OnboardingQuestionsRoute: typeof AppV2OnboardingQuestionsRoute
+  AppV2OnboardingStartRoute: typeof AppV2OnboardingStartRoute
+}
+
+const AppV2OnboardingRouteChildren: AppV2OnboardingRouteChildren = {
+  AppV2OnboardingBaselineRoute: AppV2OnboardingBaselineRoute,
+  AppV2OnboardingBaselineReviewRoute: AppV2OnboardingBaselineReviewRoute,
+  AppV2OnboardingFactsRoute: AppV2OnboardingFactsRoute,
+  AppV2OnboardingInspectionRoute: AppV2OnboardingInspectionRoute,
+  AppV2OnboardingQuestionsRoute: AppV2OnboardingQuestionsRoute,
+  AppV2OnboardingStartRoute: AppV2OnboardingStartRoute,
+}
+
+const AppV2OnboardingRouteWithChildren = AppV2OnboardingRoute._addFileChildren(
+  AppV2OnboardingRouteChildren,
+)
+
+interface AppV2SettingsRouteChildren {
+  AppV2SettingsBillingRoute: typeof AppV2SettingsBillingRoute
+  AppV2SettingsIntegrationsRoute: typeof AppV2SettingsIntegrationsRoute
+  AppV2SettingsTeamRoute: typeof AppV2SettingsTeamRoute
+  AppV2SettingsIndexRoute: typeof AppV2SettingsIndexRoute
+}
+
+const AppV2SettingsRouteChildren: AppV2SettingsRouteChildren = {
+  AppV2SettingsBillingRoute: AppV2SettingsBillingRoute,
+  AppV2SettingsIntegrationsRoute: AppV2SettingsIntegrationsRoute,
+  AppV2SettingsTeamRoute: AppV2SettingsTeamRoute,
+  AppV2SettingsIndexRoute: AppV2SettingsIndexRoute,
+}
+
+const AppV2SettingsRouteWithChildren = AppV2SettingsRoute._addFileChildren(
+  AppV2SettingsRouteChildren,
+)
+
 interface AppV2VisibilityRouteChildren {
+  AppV2VisibilityCitationsRoute: typeof AppV2VisibilityCitationsRoute
   AppV2VisibilityEvidenceRoute: typeof AppV2VisibilityEvidenceRoute
+  AppV2VisibilityOutcomeReviewRoute: typeof AppV2VisibilityOutcomeReviewRoute
+  AppV2VisibilityReportRoute: typeof AppV2VisibilityReportRoute
   AppV2VisibilityResultsRoute: typeof AppV2VisibilityResultsRoute
   AppV2VisibilityIndexRoute: typeof AppV2VisibilityIndexRoute
 }
 
 const AppV2VisibilityRouteChildren: AppV2VisibilityRouteChildren = {
+  AppV2VisibilityCitationsRoute: AppV2VisibilityCitationsRoute,
   AppV2VisibilityEvidenceRoute: AppV2VisibilityEvidenceRoute,
+  AppV2VisibilityOutcomeReviewRoute: AppV2VisibilityOutcomeReviewRoute,
+  AppV2VisibilityReportRoute: AppV2VisibilityReportRoute,
   AppV2VisibilityResultsRoute: AppV2VisibilityResultsRoute,
   AppV2VisibilityIndexRoute: AppV2VisibilityIndexRoute,
 }
@@ -1230,19 +2054,33 @@ const AppV2VisibilityRouteWithChildren = AppV2VisibilityRoute._addFileChildren(
 )
 
 interface AppV2RouteChildren {
-  AppV2BrandFactsRoute: typeof AppV2BrandFactsRoute
-  AppV2DiagnosticsRoute: typeof AppV2DiagnosticsRoute
+  AppV2AgencyRoute: typeof AppV2AgencyRoute
+  AppV2BrandFactsRoute: typeof AppV2BrandFactsRouteWithChildren
+  AppV2DiagnosticsRoute: typeof AppV2DiagnosticsRouteWithChildren
+  AppV2GeoAssistantRoute: typeof AppV2GeoAssistantRoute
   AppV2LearnRoute: typeof AppV2LearnRoute
-  AppV2MyWorkRoute: typeof AppV2MyWorkRoute
+  AppV2MyWorkRoute: typeof AppV2MyWorkRouteWithChildren
+  AppV2NotificationsRoute: typeof AppV2NotificationsRoute
+  AppV2OnboardingRoute: typeof AppV2OnboardingRouteWithChildren
+  AppV2PlansRoute: typeof AppV2PlansRoute
+  AppV2SettingsRoute: typeof AppV2SettingsRouteWithChildren
+  AppV2SignInRoute: typeof AppV2SignInRoute
   AppV2TodayRoute: typeof AppV2TodayRoute
   AppV2VisibilityRoute: typeof AppV2VisibilityRouteWithChildren
 }
 
 const AppV2RouteChildren: AppV2RouteChildren = {
-  AppV2BrandFactsRoute: AppV2BrandFactsRoute,
-  AppV2DiagnosticsRoute: AppV2DiagnosticsRoute,
+  AppV2AgencyRoute: AppV2AgencyRoute,
+  AppV2BrandFactsRoute: AppV2BrandFactsRouteWithChildren,
+  AppV2DiagnosticsRoute: AppV2DiagnosticsRouteWithChildren,
+  AppV2GeoAssistantRoute: AppV2GeoAssistantRoute,
   AppV2LearnRoute: AppV2LearnRoute,
-  AppV2MyWorkRoute: AppV2MyWorkRoute,
+  AppV2MyWorkRoute: AppV2MyWorkRouteWithChildren,
+  AppV2NotificationsRoute: AppV2NotificationsRoute,
+  AppV2OnboardingRoute: AppV2OnboardingRouteWithChildren,
+  AppV2PlansRoute: AppV2PlansRoute,
+  AppV2SettingsRoute: AppV2SettingsRouteWithChildren,
+  AppV2SignInRoute: AppV2SignInRoute,
   AppV2TodayRoute: AppV2TodayRoute,
   AppV2VisibilityRoute: AppV2VisibilityRouteWithChildren,
 }
@@ -1341,6 +2179,20 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface V2PreviewRouteChildren {
+  V2PreviewBoardRoute: typeof V2PreviewBoardRoute
+  V2PreviewIndexRoute: typeof V2PreviewIndexRoute
+}
+
+const V2PreviewRouteChildren: V2PreviewRouteChildren = {
+  V2PreviewBoardRoute: V2PreviewBoardRoute,
+  V2PreviewIndexRoute: V2PreviewIndexRoute,
+}
+
+const V2PreviewRouteWithChildren = V2PreviewRoute._addFileChildren(
+  V2PreviewRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
@@ -1349,6 +2201,7 @@ const rootRouteChildren: RootRouteChildren = {
   InternalPageRoute: InternalPageRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
+  V2PreviewRoute: V2PreviewRouteWithChildren,
   ApiSplatRoute: ApiSplatRoute,
   WebhooksSplatRoute: WebhooksSplatRoute,
 }

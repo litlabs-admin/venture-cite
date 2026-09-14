@@ -6,4 +6,5 @@ import TodayPage from "@/v2/today/TodayPage";
 // the search schema, and neither is repeated here.
 export const Route = createFileRoute("/_app/v2/today")({
   component: TodayPage,
+  staticData: { v2Shell: "guided", v2Board: "b01" },
 });

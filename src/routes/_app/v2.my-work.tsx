@@ -1,5 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
-import MyWorkPage from "@/v2/mywork/MyWorkPage";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
 
 // `/v2/my-work`, and `/v2/my-work?task=<id>` for one task.
 //
@@ -10,11 +9,7 @@ import MyWorkPage from "@/v2/mywork/MyWorkPage";
 // The task lives in the search rather than in the path because it is a
 // selection within this screen, not a different screen: the list and the open
 // task share a rail, and the URL stays copyable either way.
-function MyWorkRoute() {
-  const { task } = Route.useSearch();
-  return <MyWorkPage taskId={task} />;
-}
-
 export const Route = createFileRoute("/_app/v2/my-work")({
-  component: MyWorkRoute,
+  component: Outlet,
+  staticData: { v2Shell: "guided" },
 });

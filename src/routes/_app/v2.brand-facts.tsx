@@ -1,5 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
-import BrandFactsPage from "@/v2/brandfacts/BrandFactsPage";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
 
 // `/v2/brand-facts`.
 //
@@ -7,5 +6,6 @@ import BrandFactsPage from "@/v2/brandfacts/BrandFactsPage";
 // "/_app/v2/brand-facts" - the parent (`v2.tsx`) already carries the gate and
 // the search schema, and neither is repeated here.
 export const Route = createFileRoute("/_app/v2/brand-facts")({
-  component: BrandFactsPage,
+  component: Outlet,
+  staticData: { v2Shell: "guided" },
 });

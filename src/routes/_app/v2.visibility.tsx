@@ -7,4 +7,5 @@ import { Outlet, createFileRoute } from "@tanstack/react-router";
 // and are not repeated here.
 export const Route = createFileRoute("/_app/v2/visibility")({
   component: Outlet,
+  staticData: { v2Shell: "guided" },
 });

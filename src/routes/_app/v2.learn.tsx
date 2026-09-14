@@ -12,4 +12,5 @@ import LearnPage from "@/v2/learn/LearnPage";
 // be visited, and the shape of the area is what is under review.
 export const Route = createFileRoute("/_app/v2/learn")({
   component: LearnPage,
+  staticData: { v2Shell: "guided", v2Board: "b14" },
 });
