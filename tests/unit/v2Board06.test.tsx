@@ -37,7 +37,9 @@ describe("Board 06 buyer guide editor", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Approved buyer question set")).toBeInTheDocument();
     expect(screen.getByText("40 work points after verification")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Continue to publication check" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Continue to publication check" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Draft saved. Publication is not yet verified.")).toBeInTheDocument();
   });
 

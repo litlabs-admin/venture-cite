@@ -1,7 +1,8 @@
 // Live: task projection, task evidence, work points, and level progress.
 // Pending backend work: durable named page checks for URL reachability and updated text.
 
-import { useSearch } from "@tanstack/react-router";
+import { useParams, useSearch } from "@tanstack/react-router";
+import type { EvidenceReference } from "@shared/work";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useWorkSummary, type WorkSummaryView } from "@/v2/data/workSummary";
 import {
@@ -13,6 +14,25 @@ import {
 import type { V2LiveResult } from "@/v2/contracts/screen";
 import type { Board04Data } from "./Screen";
 import type { SharedCheckState, SharedStep, SharedTextValue } from "./shared/ConfirmationShared";
+
+function isEvidenceReference(value: unknown): value is EvidenceReference {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { kind?: unknown }).kind === "string"
+  );
+}
+
+/** The evidence a "verify" call resends, read out of what the task already
+ *  carries - never invented, and the human-confirmation reference is
+ *  appended the same way the verify call itself does. */
+function verificationEvidenceFor(task: WorkTaskDetailView): EvidenceReference[] {
+  return (task.evidence ?? [])
+    .filter((item) => item.role === "submission" || item.role === "verification")
+    .map((item) => item.structuredFinding)
+    .filter(isEvidenceReference)
+    .filter((reference) => reference.kind !== "confirmation");
+}
 
 export type Board04QueryState<TData = unknown> =
   { status: "pending" } | { status: "error"; error: Error } | { status: "success"; data: TData };
@@ -115,6 +135,10 @@ export function mapBoard04Data(
   const after = evidenceFor(task, "submission");
   return {
     task: {
+      id: task.id,
+      revision: task.revision,
+      state: task.state,
+      verificationEvidence: verificationEvidenceFor(task),
       brandId: task.brandId,
       title: task.title,
       points: task.points,
@@ -195,11 +219,27 @@ function readTaskId(search: Record<string, unknown>): string | undefined {
   return typeof search.task === "string" && search.task.length > 0 ? search.task : undefined;
 }
 
+/**
+ * The task actually being opened, when this screen is mounted at
+ * `/v2/my-work/tasks/$taskId` - read loosely (`strict: false`) so a call from
+ * outside that route (the canvas preview, a future embed) does not throw.
+ * This is what makes "Open task" on a specific row show THAT task rather than
+ * whichever repair task happens to sort first; the `?task=` search param and
+ * the "first of type" fallback below only cover callers that predate the
+ * `$taskId` route.
+ */
+function useRouteTaskId(): string | undefined {
+  const params = useParams({ strict: false }) as { taskId?: string };
+  return params.taskId;
+}
+
 export function useBoard04Data(): V2LiveResult<Board04Data> {
   const { selectedBrandId } = useBrandSelection();
   const search = useSearch({ strict: false });
+  const routeTaskId = useRouteTaskId();
   const tasksQuery = useWorkTasks(selectedBrandId);
   const taskId =
+    routeTaskId ??
     readTaskId(search) ??
     tasksQuery.data?.items.find((item) => item.type === "repair_confirmed_access_or_factual_fault")
       ?.id;

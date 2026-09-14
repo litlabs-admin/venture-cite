@@ -65,6 +65,7 @@ import { setupWorkRoutes } from "./routes/work";
 import { setupBusinessResultsRoutes } from "./routes/businessResults";
 import { setupV2BrandFactsRoutes } from "./routes/v2BrandFacts";
 import { setupV2CompetitorGapRoutes } from "./routes/v2CompetitorGap";
+import { setupV2PublicationCheckRoutes } from "./routes/v2PublicationCheck";
 import { mentionsRouter } from "./routes/mentions";
 import { asyncHandler } from "./lib/asyncHandler";
 
@@ -545,6 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupWorkRoutes(app);
   setupBusinessResultsRoutes(app);
   setupV2CompetitorGapRoutes(app);
+  setupV2PublicationCheckRoutes(app);
   setupV2Routes(app);
   setupV2AssistantRoutes(app);
   setupV2DiagnosticsRoutes(app);

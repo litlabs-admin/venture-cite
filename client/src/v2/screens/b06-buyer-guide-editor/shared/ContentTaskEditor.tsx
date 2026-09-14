@@ -29,6 +29,7 @@ export type ContentTaskData<TBoard extends "buyer-guide" | "services"> = {
   brandId: string;
   task: {
     id: string;
+    revision: number;
     title: ContentValue<string>;
     state: "edit" | "edit_page" | "verify";
     steps: readonly EditorStep[];
@@ -38,6 +39,10 @@ export type ContentTaskData<TBoard extends "buyer-guide" | "services"> = {
     pointsAfterVerification: ContentValue<number>;
   };
   draft: {
+    /** The article row this draft persists to - absent when the task's
+     *  linked article does not exist (an orphaned reference, or one not yet
+     *  created), in which case saving and submitting stay disabled. */
+    articleId: ContentValue<string>;
     status: ContentValue<string>;
     title: ContentValue<string>;
     body: ContentValue<string>;
@@ -55,6 +60,20 @@ export type ContentTaskData<TBoard extends "buyer-guide" | "services"> = {
 };
 
 type ContentTaskBoard = ContentTaskData<"buyer-guide"> | ContentTaskData<"services">;
+
+export type ContentTaskActions = {
+  saveDraft: {
+    run: (content: string) => void;
+    pending: boolean;
+    error?: string;
+  };
+  submit: {
+    run: () => void;
+    pending: boolean;
+    blocked: boolean;
+    reason?: string;
+  };
+};
 
 function valueText<T>(value: ContentValue<T>, render: (content: T) => ReactNode): ReactNode {
   if (value.kind === "not-measured") {
@@ -173,17 +192,23 @@ function EditorToolbar() {
 function DraftContent({
   draft,
   onStatusChange,
+  saveDraft,
 }: {
   draft: ContentTaskBoard["draft"];
   onStatusChange: (status: string) => void;
+  saveDraft?: ContentTaskActions["saveDraft"];
 }) {
   return (
     <article
       aria-label="Draft content"
       className="min-h-[510px] px-6 py-5 outline-none"
       contentEditable
+      data-testid="v2-content-task-editable"
       onInput={() => onStatusChange("Saving draft")}
-      onBlur={() => onStatusChange("Draft saved")}
+      onBlur={(event) => {
+        saveDraft?.run(event.currentTarget.innerText);
+        onStatusChange("Draft saved");
+      }}
       role="textbox"
       suppressContentEditableWarning
     >
@@ -246,7 +271,13 @@ function Requirements({ requirements }: { requirements: ContentValue<readonly st
   );
 }
 
-function TaskBrief({ data }: { data: ContentTaskBoard }) {
+function TaskBrief({
+  data,
+  submit,
+}: {
+  data: ContentTaskBoard;
+  submit?: ContentTaskActions["submit"];
+}) {
   const isServices = data.board === "services";
   return (
     <Panel padding="spacious">
@@ -275,15 +306,20 @@ function TaskBrief({ data }: { data: ContentTaskBoard }) {
           (points) => `${points} work points after verification`,
         )}
       </p>
-      <Button asChild className={`${v2Type.body} mt-4 h-10 w-full rounded-lg px-3`}>
-        <a
-          href={v2Href(`/v2/my-work/tasks/${encodeURIComponent(data.task.id)}`, data.brandId, {
-            step: "publication",
-          })}
-        >
-          Continue to publication check
-        </a>
+      <Button
+        className={`${v2Type.body} mt-4 h-10 w-full rounded-lg px-3`}
+        data-testid="v2-content-task-submit"
+        disabled={!submit || submit.blocked || submit.pending}
+        onClick={submit?.run}
+        type="button"
+      >
+        {submit?.pending ? "Submitting…" : "Continue to publication check"}
       </Button>
+      {submit?.reason ? (
+        <p className={`${v2Type.meta} mt-2`} data-testid="v2-content-task-submit-reason">
+          {submit.reason}
+        </p>
+      ) : null}
       <a
         className={`${v2Type.bodyStrong} mt-4 block text-center text-[color:var(--v2-brand)] hover:underline`}
         href={v2Href("/v2/brand-facts", data.brandId)}
@@ -303,13 +339,24 @@ function TaskBrief({ data }: { data: ContentTaskBoard }) {
 export function ContentTaskEditor({
   data,
   staleAsOf,
+  actions,
 }: {
   data: ContentTaskBoard;
   staleAsOf?: string;
+  actions?: ContentTaskActions;
 }) {
   const [localStatus, setLocalStatus] = useState<string>();
-  const status = localStatus
-    ? { kind: "measured" as const, value: localStatus }
+  // The mutation's own pending/error state outranks the optimistic label
+  // `onStatusChange` set on blur: a save that is still in flight, or one the
+  // server rejected, is what actually happened - the optimistic "Draft
+  // saved" was a guess made before the response came back.
+  const savedStatus = actions?.saveDraft.pending
+    ? "Saving draft"
+    : actions?.saveDraft.error
+      ? `Draft not saved: ${actions.saveDraft.error}`
+      : localStatus;
+  const status = savedStatus
+    ? { kind: "measured" as const, value: savedStatus }
     : data.draft.status;
 
   return (
@@ -333,7 +380,11 @@ export function ContentTaskEditor({
           </div>
           <Panel className="mt-3 overflow-hidden" padding="none">
             <EditorToolbar />
-            <DraftContent draft={data.draft} onStatusChange={setLocalStatus} />
+            <DraftContent
+              draft={data.draft}
+              onStatusChange={setLocalStatus}
+              saveDraft={actions?.saveDraft}
+            />
           </Panel>
           <Toast
             tone="brand"
@@ -347,7 +398,7 @@ export function ContentTaskEditor({
         </div>
       </main>
       <aside className="w-full shrink-0 border-t border-[var(--v2-line)] px-7 py-7 lg:w-[322px] lg:border-t-0 lg:border-l">
-        <TaskBrief data={data} />
+        <TaskBrief data={data} submit={actions?.submit} />
       </aside>
     </div>
   );

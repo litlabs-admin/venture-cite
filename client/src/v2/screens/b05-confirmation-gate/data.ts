@@ -1,7 +1,8 @@
 // Live: task projection, task evidence, work points, and level progress.
 // Pending backend work: durable named page checks and a stored approved-fact value.
 
-import { useSearch } from "@tanstack/react-router";
+import { useParams, useSearch } from "@tanstack/react-router";
+import type { EvidenceReference } from "@shared/work";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useWorkSummary, type WorkSummaryView } from "@/v2/data/workSummary";
 import {
@@ -128,6 +129,8 @@ export function mapBoard05Data(task: WorkTaskDetailView, summary: WorkSummaryVie
     : unavailable("The next level is not measured yet.");
   return {
     task: {
+      id: task.id,
+      revision: task.revision,
       brandId: task.brandId,
       title: task.title,
       points: task.points,
@@ -203,13 +206,46 @@ function readTaskId(search: Record<string, unknown>): string | undefined {
   return typeof search.task === "string" && search.task.length > 0 ? search.task : undefined;
 }
 
-export function useBoard05Data(): V2LiveResult<Board05Data> {
+function isEvidenceReference(value: unknown): value is EvidenceReference {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { kind?: unknown }).kind === "string"
+  );
+}
+
+/** The evidence a "verify" call resends, read out of what the task already
+ *  carries - never invented, and the human-confirmation reference is
+ *  appended the same way the verify call itself does. */
+export function verificationEvidenceFor(task: WorkTaskDetailView): EvidenceReference[] {
+  return (task.evidence ?? [])
+    .filter((item) => item.role === "submission" || item.role === "verification")
+    .map((item) => item.structuredFinding)
+    .filter(isEvidenceReference)
+    .filter((reference) => reference.kind !== "confirmation");
+}
+
+/** The task actually being opened at `/v2/my-work/tasks/$taskId` - see the
+ *  identical helper in `b04-factual-correction/data.ts` for why this outranks
+ *  `?task=` and the "first of type" fallback below. Exported so `Route.tsx`
+ *  can resolve the same task id for the verify call without a third
+ *  independent guess at which task is open. */
+export function useBoard05TaskId(): string | undefined {
   const { selectedBrandId } = useBrandSelection();
   const search = useSearch({ strict: false });
+  const params = useParams({ strict: false }) as { taskId?: string };
   const tasksQuery = useWorkTasks(selectedBrandId);
-  const taskId =
+  return (
+    params.taskId ??
     readTaskId(search) ??
-    tasksQuery.data?.items.find((item) => item.type === "improve_page_for_buyer_need")?.id;
+    tasksQuery.data?.items.find((item) => item.type === "improve_page_for_buyer_need")?.id
+  );
+}
+
+export function useBoard05Data(): V2LiveResult<Board05Data> {
+  const { selectedBrandId } = useBrandSelection();
+  const taskId = useBoard05TaskId();
+  const tasksQuery = useWorkTasks(selectedBrandId);
   const detailQuery = useWorkTask(selectedBrandId, taskId);
   const summaryQuery = useWorkSummary(selectedBrandId);
 

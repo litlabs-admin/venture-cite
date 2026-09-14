@@ -7,6 +7,7 @@ export const board19Fixture: Board19Data = {
   brandId: "brand-venture-pr",
   task: {
     id: "content-services-clarity",
+    revision: 0,
     title: measured("Clarify your services for startup buyers"),
     state: "edit_page",
     steps: [
@@ -26,6 +27,7 @@ export const board19Fixture: Board19Data = {
     pointsAfterVerification: measured(40),
   },
   draft: {
+    articleId: measured("article-services-1"),
     status: measured("Draft saved"),
     title: measured("Our services for early-stage startups"),
     body: measured(

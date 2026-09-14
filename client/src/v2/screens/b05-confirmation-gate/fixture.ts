@@ -2,6 +2,8 @@ import type { Board05Data } from "./Screen";
 
 export const board05Fixture: Board05Data = {
   task: {
+    id: "task-confirm-1",
+    revision: 2,
     brandId: "brand-venture-pr",
     title: "Correct the service description",
     points: 40,

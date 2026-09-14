@@ -3,7 +3,7 @@ import type { WorkEvidenceView } from "../data/workTasks";
 // Evidence, in the words the screens use for it.
 //
 // EVERY DISTINCTION A SCREEN DRAWS FROM THIS MODULE IS CARRIED BY A WORD, and
-// by a glyph where one is drawn (`ConfirmationGate.tsx`), never by hue.
+// by a glyph where one is drawn (a confirmation gate's evidence rows), never by hue.
 // `index.css:580` aliases `--warning` to `--brand-accent`, so a "pending"
 // painted `text-warning` would be the same pixel colour as a link. Colour is
 // additive here; strip every tone and the screens still read correctly, which

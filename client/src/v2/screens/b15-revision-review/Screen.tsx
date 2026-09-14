@@ -204,6 +204,8 @@ function TaskBrief({
       </Button>
       <Button
         className="mt-3 h-10 w-full rounded-lg border-[var(--v2-brand)] bg-[var(--v2-paper)] px-4 text-[13.5px] font-semibold text-[color:var(--v2-brand)] hover:bg-[var(--v2-brand-soft)] hover:text-[color:var(--v2-brand)]"
+        disabled
+        title="Requesting edits is not available yet."
         type="button"
         variant="outline"
       >
