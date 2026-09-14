@@ -1,8 +1,8 @@
 import type { V2ScreenProps } from "@/v2/contracts/screen";
-import { NotBuilt } from "../_placeholder/NotBuilt";
+import { TodayLayout, type TodayData } from "./shared/TodayLayout";
 
-export type Board01Data = Record<string, never>;
+export type Board01Data = TodayData<"board01">;
 
-export function Board01Screen(_props: V2ScreenProps<Board01Data>) {
-  return <NotBuilt board="b01" title="Today (Guided)" />;
+export function Board01Screen({ data, staleAsOf }: V2ScreenProps<Board01Data>) {
+  return <TodayLayout data={data} staleAsOf={staleAsOf} />;
 }
