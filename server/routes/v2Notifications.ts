@@ -218,7 +218,11 @@ async function readKeysForUser(userId: string, keys: string[]): Promise<Set<stri
   if (keys.length === 0) return new Set();
   const result = await db.execute(sql`
     SELECT notification_key FROM v2_notification_reads
-    WHERE user_id = ${userId} AND notification_key = ANY(${keys}::text[])
+    WHERE user_id = ${userId}
+      AND notification_key IN (${sql.join(
+        keys.map((key) => sql`${key}`),
+        sql`, `,
+      )})
   `);
   const rows =
     (result as unknown as { rows?: Array<{ notification_key: string }> }).rows ??
