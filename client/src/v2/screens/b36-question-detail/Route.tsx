@@ -1,8 +1,10 @@
+import { useParams } from "@tanstack/react-router";
 import { StateView } from "../_placeholder/StateView";
 import { Board36Screen } from "./Screen";
 import { useBoard36Data } from "./data";
 export function Board36Route() {
-  const result = useBoard36Data();
+  const params = useParams({ strict: false });
+  const result = useBoard36Data(params.questionId);
   if (result.data !== undefined)
     return (
       <Board36Screen
