@@ -1,3 +1,110 @@
-import type { Board14Data } from "./Screen";
+import type { Board14Data, Board14Value } from "./Screen";
 
-export const board14Fixture: Board14Data = {};
+const measured = <T>(value: T): Board14Value<T> => ({ kind: "measured", value });
+
+export const board14Fixture: Board14Data = {
+  context: { brandId: "brand-venture-pr", mode: "guided" },
+  title: "Learn what improves AI visibility",
+  subtitle: "A personalized learning path for your current stage",
+  banner: {
+    label: "You're in Level 3 · Improve",
+    text: "Focus on making changes that increase accurate, verifiable coverage.",
+    progressLabel: "See your progress",
+  },
+  nextLesson: measured({
+    id: "make-brand-facts-easy-to-verify",
+    title: "Make brand facts easy to verify",
+    durationMinutes: measured(8),
+    description:
+      "Learn how to structure and present brand facts so AI systems can find, validate, and cite them with confidence.",
+    goals: [
+      "Understand what makes a fact verifiable for AI systems",
+      "Apply a simple structure to key brand facts",
+      "See real examples from brands that improved citations",
+    ],
+    actionLabel: "Start lesson",
+    rationaleLabel: "Why this lesson?",
+    icon: "doc",
+  }),
+  lessons: measured([
+    {
+      id: "ai-answer-visibility",
+      title: "AI answer visibility",
+      description: "Learn how AI systems find and choose content to include in their answers.",
+      durationMinutes: measured(6),
+      state: "completed",
+      prerequisite: null,
+      icon: "chart",
+    },
+    {
+      id: "citations-and-source-trust",
+      title: "Citations and source trust",
+      description: "Understand what builds source credibility and how to earn more citations.",
+      durationMinutes: measured(8),
+      state: "completed",
+      prerequisite: null,
+      icon: "doc",
+    },
+    {
+      id: "buyer-question-design",
+      title: "Buyer-question design",
+      description: "Create content that directly answers the questions your buyers ask AI tools.",
+      durationMinutes: measured(7),
+      state: "not-started",
+      prerequisite: "After previous lesson",
+      icon: "q",
+    },
+    {
+      id: "site-accessibility-for-ai",
+      title: "Site accessibility for AI",
+      description: "Make it easy for AI crawlers to access, read, and understand your content.",
+      durationMinutes: measured(6),
+      state: "not-started",
+      prerequisite: "After previous lesson",
+      icon: "globe",
+    },
+    {
+      id: "experiment-limits",
+      title: "Experiment limits",
+      description: "Learn what kinds of changes reliably move visibility — and what doesn't.",
+      durationMinutes: measured(5),
+      state: "not-started",
+      prerequisite: "After previous lesson",
+      icon: "diag",
+    },
+    {
+      id: "outcome-attribution",
+      title: "Outcome attribution",
+      description: "Connect your changes to measurable visibility outcomes.",
+      durationMinutes: measured(7),
+      state: "not-started",
+      prerequisite: "After Experiment limits",
+      icon: "chart",
+    },
+  ]),
+  learning: {
+    level: measured(3),
+    stage: measured("Improve"),
+    points: measured(160),
+    nextLevelPoints: measured(320),
+    progressRate: measured(0.5),
+    completedLessons: measured(2),
+    totalLessons: measured(6),
+    minutesSpent: measured(14),
+  },
+  recommendedLesson: measured({
+    id: "buyer-question-design",
+    title: "Buyer-question design",
+    description: "Create content that directly answers the questions your buyers ask AI tools.",
+    durationMinutes: measured(7),
+  }),
+  visibilityNote: {
+    title: "Learning points do not measure visibility.",
+    text: "Learning points track your progress through educational content. They are separate from work points and do not affect your visibility measurements.",
+  },
+  help: {
+    title: "Need help?",
+    text: "Learn more about the Improve stage and get tips from our team.",
+    linkLabel: "Open help center",
+  },
+};
