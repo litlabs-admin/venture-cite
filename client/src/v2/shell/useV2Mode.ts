@@ -1,7 +1,10 @@
 import { useCallback, useState } from "react";
 import type { V2Mode } from "@/v2/contracts/shell";
 
-const STORAGE_KEY = "vc.v2.mode";
+// `venturecite-` prefixed so logout cleanup (client/src/lib/clientStorage.ts)
+// and its completeness check (tests/unit/clientStorageCompleteness.test.ts)
+// pick it up without a separate entry in clientStorageKeys.ts.
+const STORAGE_KEY = "venturecite-v2-mode";
 
 function readStoredMode(): V2Mode {
   try {

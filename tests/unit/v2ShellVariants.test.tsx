@@ -70,6 +70,10 @@ vi.mock("@/hooks/use-auth", () => ({
   }),
 }));
 
+vi.mock("@/v2/shell/useV2NotificationsBadge", () => ({
+  useV2NotificationsBadge: () => 0,
+}));
+
 vi.mock("@/components/BrandLogo", () => ({ BrandLogo: () => <span>VentureCite</span> }));
 
 vi.mock("@/components/BrandSelector", () => ({
@@ -93,7 +97,7 @@ function ModeProbe() {
 
 describe("V2Shell variants", () => {
   beforeEach(() => {
-    localStorage.removeItem("vc.v2.mode");
+    localStorage.removeItem("venturecite-v2-mode");
     routerStub.pathname = "/v2/today";
     routerStub.search = { brandId: "b1" };
     routerStub.matches = [{ staticData: { v2Shell: "guided" } }];
@@ -102,7 +106,7 @@ describe("V2Shell variants", () => {
 
   afterEach(() => {
     cleanup();
-    localStorage.removeItem("vc.v2.mode");
+    localStorage.removeItem("venturecite-v2-mode");
   });
 
   function renderShell(variant: string, pathname = "/v2/today") {
@@ -167,6 +171,58 @@ describe("V2Shell variants", () => {
     renderShell("agency", "/v2/agency");
     expect(screen.getByRole("link", { name: "Portfolio" })).toBeInTheDocument();
     expect(screen.getByTestId("v2-workspace-switcher")).toBeInTheDocument();
+  });
+
+  it("lights Visibility on a Visibility sub-route", () => {
+    renderShell("guided", "/v2/visibility/report");
+    expect(screen.getByRole("link", { name: "Visibility" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: "Today" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("lights My work on a task-detail sub-route", () => {
+    renderShell("guided", "/v2/my-work/tasks/task-9");
+    expect(screen.getByRole("link", { name: "My work" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("every guided destination points to its canonical route", () => {
+    renderShell("guided");
+    const expected: Record<string, string> = {
+      Today: "/v2/today",
+      Visibility: "/v2/visibility",
+      Diagnostics: "/v2/diagnostics",
+      "My work": "/v2/my-work",
+      "Brand facts": "/v2/brand-facts",
+      Learn: "/v2/learn",
+      "GEO assistant": "/v2/geo-assistant",
+      Notifications: "/v2/notifications",
+      Settings: "/v2/settings",
+    };
+    for (const [label, path] of Object.entries(expected)) {
+      expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", path);
+    }
+  });
+
+  it("every expert-nav destination points to its canonical route", () => {
+    renderShell("expert-nav", "/v2/diagnostics/geo-signals");
+    const expected: Record<string, string> = {
+      Overview: "/v2/visibility",
+      "Site health": "/v2/diagnostics/site-health",
+      "GEO signals": "/v2/diagnostics/geo-signals",
+      Competitors: "/v2/diagnostics/competitor-gap",
+      Content: "/v2/my-work/content-opportunities",
+      Mentions: "/v2/visibility/citations",
+      Opportunities: "/v2/my-work/earned-media",
+      Tasks: "/v2/my-work",
+      Reports: "/v2/visibility/report",
+      Diagnostics: "/v2/diagnostics",
+      Settings: "/v2/settings",
+    };
+    for (const [label, path] of Object.entries(expected)) {
+      expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", path);
+    }
   });
 
   it("renders the bare variant without a navigation landmark", () => {

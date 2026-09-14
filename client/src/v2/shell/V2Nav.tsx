@@ -9,22 +9,33 @@ const ACTIVE = "bg-[var(--v2-brand-soft)] text-[color:var(--v2-brand)]";
 const INACTIVE =
   "text-[color:var(--v2-ink2)] hover:bg-[var(--v2-inset)] hover:text-[color:var(--v2-ink)]";
 
+/** The rail links carry the app's shared brand selection and mode
+ *  preference and NOTHING else - not `tab`, not `task`, not whatever else
+ *  happens to be on the current URL. A nav row is a destination, not a
+ *  "keep doing what you were doing" link; leaking the current page's own
+ *  search params onto it is how a stray `?task=<id>` from `/v2/my-work`
+ *  used to ride along onto the Visibility link. */
+type V2NavSearch = { brandId?: string; mode: V2Mode };
+
 type V2NavProps = {
   variant: Exclude<V2ShellVariant, "bare">;
   pathname: string;
-  brandId: string;
-  mode: V2Mode;
-  search: Record<string, unknown>;
+  navSearch: V2NavSearch;
+  /** Real unread count for the "notifications" item, or undefined when it
+   *  is still loading / unknown. Zero and undefined both render no badge. */
+  unreadNotifications?: number;
 };
 
 function NavRow({
   item,
   active,
   search,
+  badgeCount,
 }: {
   item: V2NavItem;
   active: boolean;
-  search: Record<string, unknown>;
+  search: V2NavSearch;
+  badgeCount?: number;
 }) {
   const itemIsActive = active || item.id === "expert-mode";
   const rowClassName = `${ROW} ${itemIsActive ? ACTIVE : INACTIVE}`;
@@ -32,6 +43,14 @@ function NavRow({
     <>
       <V2Icon name={item.icon} size={17} className="shrink-0" />
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {badgeCount ? (
+        <span
+          className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-[var(--v2-brand)] px-1 text-[10px] font-semibold leading-none text-[color:var(--v2-paper)]"
+          data-testid={`v2-nav-badge-${item.id}`}
+        >
+          {badgeCount > 9 ? "9+" : badgeCount}
+        </span>
+      ) : null}
       {item.dot ? (
         <span
           aria-hidden="true"
@@ -67,10 +86,9 @@ function NavRow({
   );
 }
 
-export function V2Nav({ variant, pathname, brandId, mode, search }: V2NavProps) {
+export function V2Nav({ variant, pathname, navSearch, unreadNotifications }: V2NavProps) {
   const sections = V2_NAV_MAP[variant];
   const activeItemId = getActiveNavItemId(sections, pathname);
-  const linkSearch = { ...search, brandId: brandId || undefined, mode };
   const navLabel =
     variant === "expert-nav"
       ? "Expert areas"
@@ -91,7 +109,8 @@ export function V2Nav({ variant, pathname, brandId, mode, search }: V2NavProps) 
                 key={item.id}
                 item={item}
                 active={item.id === activeItemId}
-                search={linkSearch}
+                search={navSearch}
+                badgeCount={item.id === "notifications" ? unreadNotifications : undefined}
               />
             ))}
           </div>
