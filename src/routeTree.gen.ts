@@ -83,11 +83,11 @@ import { Route as AppV2DiagnosticsCompetitorGapRouteImport } from './routes/_app
 import { Route as AppV2DiagnosticsGeoSignalsRouteImport } from './routes/_app/v2.diagnostics.geo-signals'
 import { Route as AppV2DiagnosticsPerceptionRouteImport } from './routes/_app/v2.diagnostics.perception'
 import { Route as AppV2DiagnosticsPromptsRouteImport } from './routes/_app/v2.diagnostics.prompts'
-import { Route as AppV2DiagnosticsQuestionsRouteImport } from './routes/_app/v2.diagnostics.questions'
 import { Route as AppV2DiagnosticsSiteHealthRouteImport } from './routes/_app/v2.diagnostics.site-health'
 import { Route as AppV2MyWorkIndexRouteImport } from './routes/_app/v2.my-work.index'
 import { Route as AppV2MyWorkContentOpportunitiesRouteImport } from './routes/_app/v2.my-work.content-opportunities'
 import { Route as AppV2MyWorkEarnedMediaRouteImport } from './routes/_app/v2.my-work.earned-media'
+import { Route as AppV2MyWorkQueueRouteImport } from './routes/_app/v2.my-work.queue'
 import { Route as AppV2OnboardingBaselineRouteImport } from './routes/_app/v2.onboarding.baseline'
 import { Route as AppV2OnboardingBaselineReviewRouteImport } from './routes/_app/v2.onboarding.baseline-review'
 import { Route as AppV2OnboardingFactsRouteImport } from './routes/_app/v2.onboarding.facts'
@@ -102,10 +102,11 @@ import { Route as AppV2VisibilityIndexRouteImport } from './routes/_app/v2.visib
 import { Route as AppV2VisibilityCitationsRouteImport } from './routes/_app/v2.visibility.citations'
 import { Route as AppV2VisibilityEvidenceRouteImport } from './routes/_app/v2.visibility.evidence'
 import { Route as AppV2VisibilityOutcomeReviewRouteImport } from './routes/_app/v2.visibility.outcome-review'
+import { Route as AppV2VisibilityQuestionsRouteImport } from './routes/_app/v2.visibility.questions'
 import { Route as AppV2VisibilityReportRouteImport } from './routes/_app/v2.visibility.report'
 import { Route as AppV2VisibilityResultsRouteImport } from './routes/_app/v2.visibility.results'
-import { Route as AppV2DiagnosticsQuestionsQuestionIdRouteImport } from './routes/_app/v2.diagnostics.questions.$questionId'
 import { Route as AppV2MyWorkTasksTaskIdRouteImport } from './routes/_app/v2.my-work.tasks.$taskId'
+import { Route as AppV2VisibilityQuestionsQuestionIdRouteImport } from './routes/_app/v2.visibility.questions.$questionId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -481,12 +482,6 @@ const AppV2DiagnosticsPromptsRoute = AppV2DiagnosticsPromptsRouteImport.update({
   path: '/prompts',
   getParentRoute: () => AppV2DiagnosticsRoute,
 } as any)
-const AppV2DiagnosticsQuestionsRoute =
-  AppV2DiagnosticsQuestionsRouteImport.update({
-    id: '/questions',
-    path: '/questions',
-    getParentRoute: () => AppV2DiagnosticsRoute,
-  } as any)
 const AppV2DiagnosticsSiteHealthRoute =
   AppV2DiagnosticsSiteHealthRouteImport.update({
     id: '/site-health',
@@ -507,6 +502,11 @@ const AppV2MyWorkContentOpportunitiesRoute =
 const AppV2MyWorkEarnedMediaRoute = AppV2MyWorkEarnedMediaRouteImport.update({
   id: '/earned-media',
   path: '/earned-media',
+  getParentRoute: () => AppV2MyWorkRoute,
+} as any)
+const AppV2MyWorkQueueRoute = AppV2MyWorkQueueRouteImport.update({
+  id: '/queue',
+  path: '/queue',
   getParentRoute: () => AppV2MyWorkRoute,
 } as any)
 const AppV2OnboardingBaselineRoute = AppV2OnboardingBaselineRouteImport.update({
@@ -585,6 +585,12 @@ const AppV2VisibilityOutcomeReviewRoute =
     path: '/outcome-review',
     getParentRoute: () => AppV2VisibilityRoute,
   } as any)
+const AppV2VisibilityQuestionsRoute =
+  AppV2VisibilityQuestionsRouteImport.update({
+    id: '/questions',
+    path: '/questions',
+    getParentRoute: () => AppV2VisibilityRoute,
+  } as any)
 const AppV2VisibilityReportRoute = AppV2VisibilityReportRouteImport.update({
   id: '/report',
   path: '/report',
@@ -595,17 +601,17 @@ const AppV2VisibilityResultsRoute = AppV2VisibilityResultsRouteImport.update({
   path: '/results',
   getParentRoute: () => AppV2VisibilityRoute,
 } as any)
-const AppV2DiagnosticsQuestionsQuestionIdRoute =
-  AppV2DiagnosticsQuestionsQuestionIdRouteImport.update({
-    id: '/$questionId',
-    path: '/$questionId',
-    getParentRoute: () => AppV2DiagnosticsQuestionsRoute,
-  } as any)
 const AppV2MyWorkTasksTaskIdRoute = AppV2MyWorkTasksTaskIdRouteImport.update({
   id: '/tasks/$taskId',
   path: '/tasks/$taskId',
   getParentRoute: () => AppV2MyWorkRoute,
 } as any)
+const AppV2VisibilityQuestionsQuestionIdRoute =
+  AppV2VisibilityQuestionsQuestionIdRouteImport.update({
+    id: '/$questionId',
+    path: '/$questionId',
+    getParentRoute: () => AppV2VisibilityQuestionsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -678,10 +684,10 @@ export interface FileRoutesByFullPath {
   '/v2/diagnostics/geo-signals': typeof AppV2DiagnosticsGeoSignalsRoute
   '/v2/diagnostics/perception': typeof AppV2DiagnosticsPerceptionRoute
   '/v2/diagnostics/prompts': typeof AppV2DiagnosticsPromptsRoute
-  '/v2/diagnostics/questions': typeof AppV2DiagnosticsQuestionsRouteWithChildren
   '/v2/diagnostics/site-health': typeof AppV2DiagnosticsSiteHealthRoute
   '/v2/my-work/content-opportunities': typeof AppV2MyWorkContentOpportunitiesRoute
   '/v2/my-work/earned-media': typeof AppV2MyWorkEarnedMediaRoute
+  '/v2/my-work/queue': typeof AppV2MyWorkQueueRoute
   '/v2/onboarding/baseline': typeof AppV2OnboardingBaselineRoute
   '/v2/onboarding/baseline-review': typeof AppV2OnboardingBaselineReviewRoute
   '/v2/onboarding/facts': typeof AppV2OnboardingFactsRoute
@@ -694,6 +700,7 @@ export interface FileRoutesByFullPath {
   '/v2/visibility/citations': typeof AppV2VisibilityCitationsRoute
   '/v2/visibility/evidence': typeof AppV2VisibilityEvidenceRoute
   '/v2/visibility/outcome-review': typeof AppV2VisibilityOutcomeReviewRoute
+  '/v2/visibility/questions': typeof AppV2VisibilityQuestionsRouteWithChildren
   '/v2/visibility/report': typeof AppV2VisibilityReportRoute
   '/v2/visibility/results': typeof AppV2VisibilityResultsRoute
   '/prompts/$promptId/': typeof AppPromptsPromptIdIndexRoute
@@ -702,8 +709,8 @@ export interface FileRoutesByFullPath {
   '/v2/my-work/': typeof AppV2MyWorkIndexRoute
   '/v2/settings/': typeof AppV2SettingsIndexRoute
   '/v2/visibility/': typeof AppV2VisibilityIndexRoute
-  '/v2/diagnostics/questions/$questionId': typeof AppV2DiagnosticsQuestionsQuestionIdRoute
   '/v2/my-work/tasks/$taskId': typeof AppV2MyWorkTasksTaskIdRoute
+  '/v2/visibility/questions/$questionId': typeof AppV2VisibilityQuestionsQuestionIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -768,10 +775,10 @@ export interface FileRoutesByTo {
   '/v2/diagnostics/geo-signals': typeof AppV2DiagnosticsGeoSignalsRoute
   '/v2/diagnostics/perception': typeof AppV2DiagnosticsPerceptionRoute
   '/v2/diagnostics/prompts': typeof AppV2DiagnosticsPromptsRoute
-  '/v2/diagnostics/questions': typeof AppV2DiagnosticsQuestionsRouteWithChildren
   '/v2/diagnostics/site-health': typeof AppV2DiagnosticsSiteHealthRoute
   '/v2/my-work/content-opportunities': typeof AppV2MyWorkContentOpportunitiesRoute
   '/v2/my-work/earned-media': typeof AppV2MyWorkEarnedMediaRoute
+  '/v2/my-work/queue': typeof AppV2MyWorkQueueRoute
   '/v2/onboarding/baseline': typeof AppV2OnboardingBaselineRoute
   '/v2/onboarding/baseline-review': typeof AppV2OnboardingBaselineReviewRoute
   '/v2/onboarding/facts': typeof AppV2OnboardingFactsRoute
@@ -784,6 +791,7 @@ export interface FileRoutesByTo {
   '/v2/visibility/citations': typeof AppV2VisibilityCitationsRoute
   '/v2/visibility/evidence': typeof AppV2VisibilityEvidenceRoute
   '/v2/visibility/outcome-review': typeof AppV2VisibilityOutcomeReviewRoute
+  '/v2/visibility/questions': typeof AppV2VisibilityQuestionsRouteWithChildren
   '/v2/visibility/report': typeof AppV2VisibilityReportRoute
   '/v2/visibility/results': typeof AppV2VisibilityResultsRoute
   '/prompts/$promptId': typeof AppPromptsPromptIdIndexRoute
@@ -792,8 +800,8 @@ export interface FileRoutesByTo {
   '/v2/my-work': typeof AppV2MyWorkIndexRoute
   '/v2/settings': typeof AppV2SettingsIndexRoute
   '/v2/visibility': typeof AppV2VisibilityIndexRoute
-  '/v2/diagnostics/questions/$questionId': typeof AppV2DiagnosticsQuestionsQuestionIdRoute
   '/v2/my-work/tasks/$taskId': typeof AppV2MyWorkTasksTaskIdRoute
+  '/v2/visibility/questions/$questionId': typeof AppV2VisibilityQuestionsQuestionIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -868,10 +876,10 @@ export interface FileRoutesById {
   '/_app/v2/diagnostics/geo-signals': typeof AppV2DiagnosticsGeoSignalsRoute
   '/_app/v2/diagnostics/perception': typeof AppV2DiagnosticsPerceptionRoute
   '/_app/v2/diagnostics/prompts': typeof AppV2DiagnosticsPromptsRoute
-  '/_app/v2/diagnostics/questions': typeof AppV2DiagnosticsQuestionsRouteWithChildren
   '/_app/v2/diagnostics/site-health': typeof AppV2DiagnosticsSiteHealthRoute
   '/_app/v2/my-work/content-opportunities': typeof AppV2MyWorkContentOpportunitiesRoute
   '/_app/v2/my-work/earned-media': typeof AppV2MyWorkEarnedMediaRoute
+  '/_app/v2/my-work/queue': typeof AppV2MyWorkQueueRoute
   '/_app/v2/onboarding/baseline': typeof AppV2OnboardingBaselineRoute
   '/_app/v2/onboarding/baseline-review': typeof AppV2OnboardingBaselineReviewRoute
   '/_app/v2/onboarding/facts': typeof AppV2OnboardingFactsRoute
@@ -884,6 +892,7 @@ export interface FileRoutesById {
   '/_app/v2/visibility/citations': typeof AppV2VisibilityCitationsRoute
   '/_app/v2/visibility/evidence': typeof AppV2VisibilityEvidenceRoute
   '/_app/v2/visibility/outcome-review': typeof AppV2VisibilityOutcomeReviewRoute
+  '/_app/v2/visibility/questions': typeof AppV2VisibilityQuestionsRouteWithChildren
   '/_app/v2/visibility/report': typeof AppV2VisibilityReportRoute
   '/_app/v2/visibility/results': typeof AppV2VisibilityResultsRoute
   '/_app/prompts/$promptId/': typeof AppPromptsPromptIdIndexRoute
@@ -892,8 +901,8 @@ export interface FileRoutesById {
   '/_app/v2/my-work/': typeof AppV2MyWorkIndexRoute
   '/_app/v2/settings/': typeof AppV2SettingsIndexRoute
   '/_app/v2/visibility/': typeof AppV2VisibilityIndexRoute
-  '/_app/v2/diagnostics/questions/$questionId': typeof AppV2DiagnosticsQuestionsQuestionIdRoute
   '/_app/v2/my-work/tasks/$taskId': typeof AppV2MyWorkTasksTaskIdRoute
+  '/_app/v2/visibility/questions/$questionId': typeof AppV2VisibilityQuestionsQuestionIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -968,10 +977,10 @@ export interface FileRouteTypes {
     | '/v2/diagnostics/geo-signals'
     | '/v2/diagnostics/perception'
     | '/v2/diagnostics/prompts'
-    | '/v2/diagnostics/questions'
     | '/v2/diagnostics/site-health'
     | '/v2/my-work/content-opportunities'
     | '/v2/my-work/earned-media'
+    | '/v2/my-work/queue'
     | '/v2/onboarding/baseline'
     | '/v2/onboarding/baseline-review'
     | '/v2/onboarding/facts'
@@ -984,6 +993,7 @@ export interface FileRouteTypes {
     | '/v2/visibility/citations'
     | '/v2/visibility/evidence'
     | '/v2/visibility/outcome-review'
+    | '/v2/visibility/questions'
     | '/v2/visibility/report'
     | '/v2/visibility/results'
     | '/prompts/$promptId/'
@@ -992,8 +1002,8 @@ export interface FileRouteTypes {
     | '/v2/my-work/'
     | '/v2/settings/'
     | '/v2/visibility/'
-    | '/v2/diagnostics/questions/$questionId'
     | '/v2/my-work/tasks/$taskId'
+    | '/v2/visibility/questions/$questionId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1058,10 +1068,10 @@ export interface FileRouteTypes {
     | '/v2/diagnostics/geo-signals'
     | '/v2/diagnostics/perception'
     | '/v2/diagnostics/prompts'
-    | '/v2/diagnostics/questions'
     | '/v2/diagnostics/site-health'
     | '/v2/my-work/content-opportunities'
     | '/v2/my-work/earned-media'
+    | '/v2/my-work/queue'
     | '/v2/onboarding/baseline'
     | '/v2/onboarding/baseline-review'
     | '/v2/onboarding/facts'
@@ -1074,6 +1084,7 @@ export interface FileRouteTypes {
     | '/v2/visibility/citations'
     | '/v2/visibility/evidence'
     | '/v2/visibility/outcome-review'
+    | '/v2/visibility/questions'
     | '/v2/visibility/report'
     | '/v2/visibility/results'
     | '/prompts/$promptId'
@@ -1082,8 +1093,8 @@ export interface FileRouteTypes {
     | '/v2/my-work'
     | '/v2/settings'
     | '/v2/visibility'
-    | '/v2/diagnostics/questions/$questionId'
     | '/v2/my-work/tasks/$taskId'
+    | '/v2/visibility/questions/$questionId'
   id:
     | '__root__'
     | '/'
@@ -1157,10 +1168,10 @@ export interface FileRouteTypes {
     | '/_app/v2/diagnostics/geo-signals'
     | '/_app/v2/diagnostics/perception'
     | '/_app/v2/diagnostics/prompts'
-    | '/_app/v2/diagnostics/questions'
     | '/_app/v2/diagnostics/site-health'
     | '/_app/v2/my-work/content-opportunities'
     | '/_app/v2/my-work/earned-media'
+    | '/_app/v2/my-work/queue'
     | '/_app/v2/onboarding/baseline'
     | '/_app/v2/onboarding/baseline-review'
     | '/_app/v2/onboarding/facts'
@@ -1173,6 +1184,7 @@ export interface FileRouteTypes {
     | '/_app/v2/visibility/citations'
     | '/_app/v2/visibility/evidence'
     | '/_app/v2/visibility/outcome-review'
+    | '/_app/v2/visibility/questions'
     | '/_app/v2/visibility/report'
     | '/_app/v2/visibility/results'
     | '/_app/prompts/$promptId/'
@@ -1181,8 +1193,8 @@ export interface FileRouteTypes {
     | '/_app/v2/my-work/'
     | '/_app/v2/settings/'
     | '/_app/v2/visibility/'
-    | '/_app/v2/diagnostics/questions/$questionId'
     | '/_app/v2/my-work/tasks/$taskId'
+    | '/_app/v2/visibility/questions/$questionId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1718,13 +1730,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppV2DiagnosticsPromptsRouteImport
       parentRoute: typeof AppV2DiagnosticsRoute
     }
-    '/_app/v2/diagnostics/questions': {
-      id: '/_app/v2/diagnostics/questions'
-      path: '/questions'
-      fullPath: '/v2/diagnostics/questions'
-      preLoaderRoute: typeof AppV2DiagnosticsQuestionsRouteImport
-      parentRoute: typeof AppV2DiagnosticsRoute
-    }
     '/_app/v2/diagnostics/site-health': {
       id: '/_app/v2/diagnostics/site-health'
       path: '/site-health'
@@ -1751,6 +1756,13 @@ declare module '@tanstack/react-router' {
       path: '/earned-media'
       fullPath: '/v2/my-work/earned-media'
       preLoaderRoute: typeof AppV2MyWorkEarnedMediaRouteImport
+      parentRoute: typeof AppV2MyWorkRoute
+    }
+    '/_app/v2/my-work/queue': {
+      id: '/_app/v2/my-work/queue'
+      path: '/queue'
+      fullPath: '/v2/my-work/queue'
+      preLoaderRoute: typeof AppV2MyWorkQueueRouteImport
       parentRoute: typeof AppV2MyWorkRoute
     }
     '/_app/v2/onboarding/baseline': {
@@ -1851,6 +1863,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppV2VisibilityOutcomeReviewRouteImport
       parentRoute: typeof AppV2VisibilityRoute
     }
+    '/_app/v2/visibility/questions': {
+      id: '/_app/v2/visibility/questions'
+      path: '/questions'
+      fullPath: '/v2/visibility/questions'
+      preLoaderRoute: typeof AppV2VisibilityQuestionsRouteImport
+      parentRoute: typeof AppV2VisibilityRoute
+    }
     '/_app/v2/visibility/report': {
       id: '/_app/v2/visibility/report'
       path: '/report'
@@ -1865,19 +1884,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppV2VisibilityResultsRouteImport
       parentRoute: typeof AppV2VisibilityRoute
     }
-    '/_app/v2/diagnostics/questions/$questionId': {
-      id: '/_app/v2/diagnostics/questions/$questionId'
-      path: '/$questionId'
-      fullPath: '/v2/diagnostics/questions/$questionId'
-      preLoaderRoute: typeof AppV2DiagnosticsQuestionsQuestionIdRouteImport
-      parentRoute: typeof AppV2DiagnosticsQuestionsRoute
-    }
     '/_app/v2/my-work/tasks/$taskId': {
       id: '/_app/v2/my-work/tasks/$taskId'
       path: '/tasks/$taskId'
       fullPath: '/v2/my-work/tasks/$taskId'
       preLoaderRoute: typeof AppV2MyWorkTasksTaskIdRouteImport
       parentRoute: typeof AppV2MyWorkRoute
+    }
+    '/_app/v2/visibility/questions/$questionId': {
+      id: '/_app/v2/visibility/questions/$questionId'
+      path: '/$questionId'
+      fullPath: '/v2/visibility/questions/$questionId'
+      preLoaderRoute: typeof AppV2VisibilityQuestionsQuestionIdRouteImport
+      parentRoute: typeof AppV2VisibilityQuestionsRoute
     }
   }
 }
@@ -1935,27 +1954,11 @@ const AppV2BrandFactsRouteWithChildren = AppV2BrandFactsRoute._addFileChildren(
   AppV2BrandFactsRouteChildren,
 )
 
-interface AppV2DiagnosticsQuestionsRouteChildren {
-  AppV2DiagnosticsQuestionsQuestionIdRoute: typeof AppV2DiagnosticsQuestionsQuestionIdRoute
-}
-
-const AppV2DiagnosticsQuestionsRouteChildren: AppV2DiagnosticsQuestionsRouteChildren =
-  {
-    AppV2DiagnosticsQuestionsQuestionIdRoute:
-      AppV2DiagnosticsQuestionsQuestionIdRoute,
-  }
-
-const AppV2DiagnosticsQuestionsRouteWithChildren =
-  AppV2DiagnosticsQuestionsRoute._addFileChildren(
-    AppV2DiagnosticsQuestionsRouteChildren,
-  )
-
 interface AppV2DiagnosticsRouteChildren {
   AppV2DiagnosticsCompetitorGapRoute: typeof AppV2DiagnosticsCompetitorGapRoute
   AppV2DiagnosticsGeoSignalsRoute: typeof AppV2DiagnosticsGeoSignalsRoute
   AppV2DiagnosticsPerceptionRoute: typeof AppV2DiagnosticsPerceptionRoute
   AppV2DiagnosticsPromptsRoute: typeof AppV2DiagnosticsPromptsRoute
-  AppV2DiagnosticsQuestionsRoute: typeof AppV2DiagnosticsQuestionsRouteWithChildren
   AppV2DiagnosticsSiteHealthRoute: typeof AppV2DiagnosticsSiteHealthRoute
   AppV2DiagnosticsIndexRoute: typeof AppV2DiagnosticsIndexRoute
 }
@@ -1965,7 +1968,6 @@ const AppV2DiagnosticsRouteChildren: AppV2DiagnosticsRouteChildren = {
   AppV2DiagnosticsGeoSignalsRoute: AppV2DiagnosticsGeoSignalsRoute,
   AppV2DiagnosticsPerceptionRoute: AppV2DiagnosticsPerceptionRoute,
   AppV2DiagnosticsPromptsRoute: AppV2DiagnosticsPromptsRoute,
-  AppV2DiagnosticsQuestionsRoute: AppV2DiagnosticsQuestionsRouteWithChildren,
   AppV2DiagnosticsSiteHealthRoute: AppV2DiagnosticsSiteHealthRoute,
   AppV2DiagnosticsIndexRoute: AppV2DiagnosticsIndexRoute,
 }
@@ -1976,6 +1978,7 @@ const AppV2DiagnosticsRouteWithChildren =
 interface AppV2MyWorkRouteChildren {
   AppV2MyWorkContentOpportunitiesRoute: typeof AppV2MyWorkContentOpportunitiesRoute
   AppV2MyWorkEarnedMediaRoute: typeof AppV2MyWorkEarnedMediaRoute
+  AppV2MyWorkQueueRoute: typeof AppV2MyWorkQueueRoute
   AppV2MyWorkIndexRoute: typeof AppV2MyWorkIndexRoute
   AppV2MyWorkTasksTaskIdRoute: typeof AppV2MyWorkTasksTaskIdRoute
 }
@@ -1983,6 +1986,7 @@ interface AppV2MyWorkRouteChildren {
 const AppV2MyWorkRouteChildren: AppV2MyWorkRouteChildren = {
   AppV2MyWorkContentOpportunitiesRoute: AppV2MyWorkContentOpportunitiesRoute,
   AppV2MyWorkEarnedMediaRoute: AppV2MyWorkEarnedMediaRoute,
+  AppV2MyWorkQueueRoute: AppV2MyWorkQueueRoute,
   AppV2MyWorkIndexRoute: AppV2MyWorkIndexRoute,
   AppV2MyWorkTasksTaskIdRoute: AppV2MyWorkTasksTaskIdRoute,
 }
@@ -2031,10 +2035,26 @@ const AppV2SettingsRouteWithChildren = AppV2SettingsRoute._addFileChildren(
   AppV2SettingsRouteChildren,
 )
 
+interface AppV2VisibilityQuestionsRouteChildren {
+  AppV2VisibilityQuestionsQuestionIdRoute: typeof AppV2VisibilityQuestionsQuestionIdRoute
+}
+
+const AppV2VisibilityQuestionsRouteChildren: AppV2VisibilityQuestionsRouteChildren =
+  {
+    AppV2VisibilityQuestionsQuestionIdRoute:
+      AppV2VisibilityQuestionsQuestionIdRoute,
+  }
+
+const AppV2VisibilityQuestionsRouteWithChildren =
+  AppV2VisibilityQuestionsRoute._addFileChildren(
+    AppV2VisibilityQuestionsRouteChildren,
+  )
+
 interface AppV2VisibilityRouteChildren {
   AppV2VisibilityCitationsRoute: typeof AppV2VisibilityCitationsRoute
   AppV2VisibilityEvidenceRoute: typeof AppV2VisibilityEvidenceRoute
   AppV2VisibilityOutcomeReviewRoute: typeof AppV2VisibilityOutcomeReviewRoute
+  AppV2VisibilityQuestionsRoute: typeof AppV2VisibilityQuestionsRouteWithChildren
   AppV2VisibilityReportRoute: typeof AppV2VisibilityReportRoute
   AppV2VisibilityResultsRoute: typeof AppV2VisibilityResultsRoute
   AppV2VisibilityIndexRoute: typeof AppV2VisibilityIndexRoute
@@ -2044,6 +2064,7 @@ const AppV2VisibilityRouteChildren: AppV2VisibilityRouteChildren = {
   AppV2VisibilityCitationsRoute: AppV2VisibilityCitationsRoute,
   AppV2VisibilityEvidenceRoute: AppV2VisibilityEvidenceRoute,
   AppV2VisibilityOutcomeReviewRoute: AppV2VisibilityOutcomeReviewRoute,
+  AppV2VisibilityQuestionsRoute: AppV2VisibilityQuestionsRouteWithChildren,
   AppV2VisibilityReportRoute: AppV2VisibilityReportRoute,
   AppV2VisibilityResultsRoute: AppV2VisibilityResultsRoute,
   AppV2VisibilityIndexRoute: AppV2VisibilityIndexRoute,
