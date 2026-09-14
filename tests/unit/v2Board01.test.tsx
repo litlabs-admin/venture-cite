@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { WorkSummaryView, WorkTaskSummaryView } from "@/v2/data/workSummary";
 import type { VisibilityMentionRate } from "@/v2/data/visibilityTrend";
@@ -241,6 +241,46 @@ describe("Board 01 Today render", () => {
       within(visibility).queryByRole("img", { name: "Observed visibility over time" }),
     ).toBeNull();
   });
+
+  it("prints the recommended change once, not twice, when it repeats the observed reason", () => {
+    const data = {
+      ...board01Fixture,
+      priorityTask: {
+        ...board01Fixture.priorityTask,
+        detail: { kind: "measured", value: "Has not had its outcome reviewed." } as const,
+        approvedDetail: { kind: "measured", value: "Has not had its outcome reviewed." } as const,
+      },
+    };
+    render(<Board01Screen data={data} />);
+
+    expect(screen.getAllByText("Has not had its outcome reviewed.")).toHaveLength(1);
+  });
+
+  it("still prints both lines when the reason and the recommended change differ", () => {
+    render(<Board01Screen data={board01Fixture} />);
+
+    expect(screen.getByText("Your services page says worldwide.")).toBeInTheDocument();
+    expect(screen.getByText("Your approved service region is India.")).toBeInTheDocument();
+  });
+
+  it("changes the displayed window and refetches when the visibility range control is used", () => {
+    const onRefetchVisibility = vi.fn();
+    render(<Board01Screen data={board01Fixture} onRefetchVisibility={onRefetchVisibility} />);
+
+    // Default window is every week the fixture carries: Aug 26 - Sep 8.
+    const control = screen.getByLabelText("Visibility date range") as HTMLSelectElement;
+    expect(control.value).toBe("all");
+    const beforeSentence = screen.getByTestId("board01-visibility").textContent;
+
+    fireEvent.change(control, { target: { value: "recent" } });
+
+    // A shorter window changes the select's own value, refetches, and
+    // changes the sentence below it - proof the control actually re-derives
+    // the screen rather than just moving a selection marker.
+    expect(control.value).toBe("recent");
+    expect(onRefetchVisibility).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("board01-visibility").textContent).not.toBe(beforeSentence);
+  });
 });
 
 describe("Board 01 live adapter", () => {
@@ -282,15 +322,23 @@ describe("Board 01 live adapter", () => {
     );
     expect(useBoard01Data().state.kind).toBe("error");
 
-    mockedUseWorkSummary.mockReturnValue(
-      queryResult(summary(), {
-        isStale: true,
-        dataUpdatedAt: Date.parse("2026-09-07T10:24:00.000Z"),
-      }),
-    );
-    const stale = useBoard01Data();
-    expect(stale.state.kind).toBe("stale");
-    if (stale.state.kind === "stale") expect(stale.state.asOf).toBe("2026-09-07T10:24:00.000Z");
+    // Stale is a fact about the brand's latest real observation (the trend's
+    // last week with `measured > 0` is 2026-09-08), never about React
+    // Query's own cache bookkeeping - `isStale: true` here is deliberately
+    // left set to prove it no longer drives the result on its own.
+    mockedUseWorkSummary.mockReturnValue(queryResult(summary(), { isStale: true }));
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-09-25T00:00:00.000Z")); // 17 days after Sep 8
+      const stale = useBoard01Data();
+      expect(stale.state.kind).toBe("stale");
+      if (stale.state.kind === "stale") expect(stale.state.asOf).toBe("2026-09-08T00:00:00.000Z");
+
+      vi.setSystemTime(new Date("2026-09-10T00:00:00.000Z")); // 2 days after Sep 8
+      expect(useBoard01Data().state.kind).toBe("ready");
+    } finally {
+      vi.useRealTimers();
+    }
 
     mockedUseVisibilityMentionRate.mockReturnValue(
       queryResult({ ...trend, weeks: [] }, { data: { ...trend, weeks: [] } }),

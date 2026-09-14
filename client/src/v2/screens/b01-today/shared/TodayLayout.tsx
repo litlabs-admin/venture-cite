@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/v2/shared/ui/Chip";
@@ -12,6 +12,8 @@ import { TrendChart } from "@/v2/shared/charts/TrendChart";
 import { V2Icon } from "@/v2/theme/V2Icon";
 import { v2Type } from "@/v2/theme/typography";
 import type { V2IconName } from "@/v2/contracts/icons";
+import type { VisibilityWeek } from "@/v2/data/visibilityTrend";
+import { windowedVisibility } from "./todayAdapter";
 
 export type TodayValue<T> =
   | { kind: "measured"; value: T }
@@ -31,6 +33,10 @@ export type TodayVisibility =
       chartPoints: ReadonlyArray<{ x: string; y: number | null }>;
       xLabels: readonly string[];
       note: TodayValue<string>;
+      /** The full week list this projection was windowed from - carried so
+       *  the range control can re-derive a shorter window without a second
+       *  read; the endpoint already returns every week in one call. */
+      weeks: readonly VisibilityWeek[];
     }
   | { kind: "not-measured"; reason: string }
   | { kind: "failed"; reason: string }
@@ -85,6 +91,9 @@ export type TodayData<TVariant extends "board01" | "board02" = "board01" | "boar
 type TodayLayoutProps = {
   data: TodayData;
   staleAsOf?: string;
+  /** Re-requests the visibility read. Omitted in preview, where there is no
+   *  live query to refetch - the range control still re-windows locally. */
+  onRefetchVisibility?: () => void;
 };
 
 const stateForValue: Record<
@@ -189,11 +198,21 @@ function Effort({ value, variant }: { value: TodayValue<number>; variant: "board
   );
 }
 
+/** Several derived task types set `detail` (the observed reason) and
+ *  `approvedDetail` (the recommended change) to the identical sentence.
+ *  Printing both then reads as a rendering fault, not emphasis - real Today
+ *  data for a review-and-decide task does this today - so the second line
+ *  renders only when it actually says something the first one didn't. */
+function sameMeasuredText(a: TodayValue<string>, b: TodayValue<string>): boolean {
+  return a.kind === "measured" && b.kind === "measured" && a.value === b.value;
+}
+
 function PrimaryTask({ data }: { data: TodayData }) {
   const [explained, setExplained] = useState(false);
   const task = data.priorityTask;
   const detail = valueNode(task.detail, (item) => item);
-  const approved = valueNode(task.approvedDetail, (item) => item);
+  const approvedDuplicatesDetail = sameMeasuredText(task.detail, task.approvedDetail);
+  const approved = approvedDuplicatesDetail ? null : valueNode(task.approvedDetail, (item) => item);
   const taskLink = (
     <InternalLink data={data} to="/v2/my-work" aria-label="Review evidence" className="inline-flex">
       Review evidence
@@ -245,7 +264,7 @@ function PrimaryTask({ data }: { data: TodayData }) {
           </div>
           <p className={`${v2Type.body} mb-[15px] space-y-0.5`}>
             <span className="block">{detail}</span>
-            <span className="block">{approved}</span>
+            {approved !== null ? <span className="block">{approved}</span> : null}
           </p>
           <div className="flex flex-wrap items-center gap-[18px]">
             <Button asChild className="h-10 rounded-lg px-4 text-[13.5px]">
@@ -321,7 +340,13 @@ function ChartYAxis() {
   );
 }
 
-function VisibilityChart({ data }: { data: Extract<TodayVisibility, { kind: "measured" }> }) {
+/** Exported for board 46, which shows the same shaped "last verified
+ *  report" chart outside a Today shell. */
+export function VisibilityChart({
+  data,
+}: {
+  data: Extract<TodayVisibility, { kind: "measured" }>;
+}) {
   return (
     <div className="relative pl-8" data-testid="today-trend-chart">
       <style>
@@ -350,30 +375,114 @@ function VisibilityChart({ data }: { data: Extract<TodayVisibility, { kind: "mea
   );
 }
 
-function Visibility({ data, staleAsOf }: { data: TodayData; staleAsOf?: string }) {
-  const visibility = data.visibility;
-  const heading = <h2 className={v2Type.caps}>Observed visibility</h2>;
-  const range =
-    visibility.kind === "measured"
-      ? visibility.rangeLabel
-      : data.variant === "board02"
-        ? "Last 14 days"
-        : "Not measured";
-  const control = (
-    <Button
-      type="button"
-      variant="ghost"
-      className={
-        data.variant === "board02"
-          ? "h-7 rounded-lg border border-[var(--v2-line)] px-2.5 py-[5px] text-[12.5px] font-normal text-[color:var(--v2-ink2)]"
-          : "h-7 rounded-lg px-2.5 py-[5px] text-[12.5px] font-normal text-[color:var(--v2-ink3)]"
-      }
-      aria-label="Visibility date range"
-    >
-      {range}
-      <V2Icon name="cdown" size={13} />
-    </Button>
+/**
+ * The two windows the range control offers.
+ *
+ * "all" is every week the read returned - the full range the screen has
+ * always shown by default, so picking it can never change what a viewer
+ * who never touches the control sees. "recent" is a shorter trailing
+ * window. Deliberately not two fixed week counts (e.g. 4 vs 8): the live
+ * read is 8 real weekly buckets, but the approved board01 render plots 14
+ * daily points through this same shape, and a hardcoded "8" would silently
+ * chop three days off that render's default view instead of showing all of
+ * it.
+ */
+const RANGE_OPTIONS = ["recent", "all"] as const;
+type RangeOption = (typeof RANGE_OPTIONS)[number];
+const RECENT_WINDOW = 4;
+
+function windowSize(option: RangeOption, totalWeeks: number): number {
+  return option === "all" ? totalWeeks : Math.min(RECENT_WINDOW, totalWeeks);
+}
+
+function RangeControl({
+  variant,
+  weeks,
+  option,
+  onChange,
+}: {
+  variant: "board01" | "board02";
+  weeks: readonly VisibilityWeek[];
+  option: RangeOption;
+  onChange: (option: RangeOption) => void;
+}) {
+  const buttonClass =
+    variant === "board02"
+      ? "h-7 rounded-lg border border-[var(--v2-line)] px-2.5 py-[5px] text-[12.5px] font-normal text-[color:var(--v2-ink2)]"
+      : "h-7 rounded-lg px-2.5 py-[5px] text-[12.5px] font-normal text-[color:var(--v2-ink3)]";
+  return (
+    <span className="relative inline-flex items-center">
+      <label htmlFor={`${variant}-visibility-range`} className="sr-only">
+        Visibility date range
+      </label>
+      <select
+        id={`${variant}-visibility-range`}
+        value={option}
+        onChange={(event) => onChange(event.target.value as RangeOption)}
+        className={`${buttonClass} cursor-pointer appearance-none bg-transparent pr-6`}
+      >
+        {RANGE_OPTIONS.map((candidate) => {
+          const windowed = windowedVisibility(weeks, variant, windowSize(candidate, weeks.length));
+          const fallback = candidate === "all" ? "All weeks" : `Last ${RECENT_WINDOW} weeks`;
+          return (
+            <option key={candidate} value={candidate}>
+              {windowed.kind === "measured" ? windowed.rangeLabel : fallback}
+            </option>
+          );
+        })}
+      </select>
+      <V2Icon
+        name="cdown"
+        size={13}
+        className="pointer-events-none absolute right-2 text-[color:var(--v2-ink3)]"
+      />
+    </span>
   );
+}
+
+function Visibility({
+  data,
+  staleAsOf,
+  onRefetchVisibility,
+}: {
+  data: TodayData;
+  staleAsOf?: string;
+  onRefetchVisibility?: () => void;
+}) {
+  const [rangeOption, setRangeOption] = useState<RangeOption>("all");
+  const fullVisibility = data.visibility;
+  const visibility = useMemo(() => {
+    // "all" is the untouched value the adapter (or, in preview, the
+    // fixture) built - re-deriving it from `weeks` would recompute a
+    // generic note in place of a hand-authored one (board02's fixture note,
+    // for instance). Only a shorter window actually needs re-derivation.
+    if (fullVisibility.kind !== "measured" || rangeOption === "all") return fullVisibility;
+    const size = windowSize(rangeOption, fullVisibility.weeks.length);
+    return windowedVisibility(fullVisibility.weeks, data.variant, size);
+  }, [fullVisibility, data.variant, rangeOption]);
+  const heading = <h2 className={v2Type.caps}>Observed visibility</h2>;
+  const control =
+    fullVisibility.kind === "measured" ? (
+      <RangeControl
+        variant={data.variant}
+        weeks={fullVisibility.weeks}
+        option={rangeOption}
+        onChange={(option) => {
+          setRangeOption(option);
+          onRefetchVisibility?.();
+        }}
+      />
+    ) : (
+      <span
+        className={
+          data.variant === "board02"
+            ? "inline-flex h-7 items-center rounded-lg border border-[var(--v2-line)] px-2.5 py-[5px] text-[12.5px] font-normal text-[color:var(--v2-ink2)]"
+            : "inline-flex h-7 items-center rounded-lg px-2.5 py-[5px] text-[12.5px] font-normal text-[color:var(--v2-ink3)]"
+        }
+      >
+        {data.variant === "board02" ? "Last 14 days" : "Not measured"}
+      </span>
+    );
 
   const content = (
     <div data-testid={`${data.variant}-visibility`}>
@@ -591,7 +700,7 @@ function ProgressRail({ data }: { data: TodayData }) {
   );
 }
 
-export function TodayLayout({ data, staleAsOf }: TodayLayoutProps) {
+export function TodayLayout({ data, staleAsOf, onRefetchVisibility }: TodayLayoutProps) {
   const title =
     data.variant === "board01" ? "Your next useful step" : "Make your next improvement count";
   return (
@@ -607,7 +716,7 @@ export function TodayLayout({ data, staleAsOf }: TodayLayoutProps) {
         />
         <PrimaryTask data={data} />
         <QueuedTasks data={data} />
-        <Visibility data={data} staleAsOf={staleAsOf} />
+        <Visibility data={data} staleAsOf={staleAsOf} onRefetchVisibility={onRefetchVisibility} />
       </main>
       <aside
         aria-label="Your progress"

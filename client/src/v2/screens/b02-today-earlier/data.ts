@@ -3,11 +3,12 @@
 import type { V2LiveResult } from "@/v2/contracts/screen";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useAssignedTasks, useWorkSummary } from "@/v2/data/workSummary";
-import { useVisibilityMentionRate } from "@/v2/data/visibilityTrend";
+import { useVisibilityMentionRate, latestObservedWeek } from "@/v2/data/visibilityTrend";
 import type { Board02Data } from "./Screen";
 import { buildTodayData, type AssignedTasksProjection } from "../b01-today/shared/todayAdapter";
 import type { VisibilityMentionRate } from "@/v2/data/visibilityTrend";
 import type { WorkSummaryView } from "@/v2/data/workSummary";
+import { isObservationStale } from "@/v2/today/staleness";
 
 export function mapBoard02Data(
   summary: WorkSummaryView,
@@ -17,11 +18,6 @@ export function mapBoard02Data(
   visibilityState: "loading" | "failed" = "loading",
 ): Board02Data {
   return buildTodayData("board02", summary, tasks, trend, brandName, visibilityState);
-}
-
-function updatedAt(...times: number[]): string {
-  const valid = times.filter((time) => time > 0);
-  return new Date(Math.min(...(valid.length > 0 ? valid : [Date.now()]))).toISOString();
 }
 
 function buildResult(
@@ -51,16 +47,16 @@ function buildResult(
     brandName,
     trendQuery.isError ? "failed" : "loading",
   );
-  if (summaryQuery.isStale || tasksQuery.isStale || trendQuery.isStale) {
+  // Stale means the brand's latest real observation is old, not that some
+  // query's cache entry has crossed its own staleTime - see
+  // client/src/v2/today/staleness.ts.
+  const latestObserved = latestObservedWeek(trendQuery.data?.weeks);
+  if (isObservationStale(latestObserved?.weekStart)) {
     return {
       state: {
         kind: "stale",
-        reason: "Today data may be out of date.",
-        asOf: updatedAt(
-          summaryQuery.dataUpdatedAt,
-          tasksQuery.dataUpdatedAt,
-          trendQuery.dataUpdatedAt,
-        ),
+        reason: "The latest measurement is more than 14 days old.",
+        asOf: `${latestObserved!.weekStart}T00:00:00.000Z`,
       },
       data,
     };
