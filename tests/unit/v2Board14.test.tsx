@@ -1,227 +1,213 @@
 // @vitest-environment happy-dom
+//
+// Board 14 (Learn overview), live. Two things are under test:
+//   - Board14Screen renders every real region from real data, with no
+//     fabricated "not measured" placeholder anywhere a value is genuinely
+//     known once the screen is ready (unlike boards whose individual metrics
+//     can independently fail, Learn's only real absence is "no more lessons
+//     to recommend", which gets its own honest copy - not a generic badge).
+//   - mapBoard14Data (client/src/v2/screens/b14-learn/data.ts) turns a real
+//     work-summary response shape (captured 2026-09-15 via
+//     GET /api/brands/470b15fe-606b-4d96-ab62-69a01e08b237/work/summary
+//     against the local branch `feat/screens` dev server, brand "Venture
+//     PR") and a completions list into the screen contract correctly.
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
-import React from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { board14Fixture } from "@/v2/screens/b14-learn/fixture";
+import { describe, expect, it } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import { Board14Screen, type Board14Data } from "@/v2/screens/b14-learn/Screen";
-import { useBoard14Data } from "@/v2/screens/b14-learn/data";
+import { board14Fixture } from "@/v2/screens/b14-learn/fixture";
+import { mapBoard14Data, LEARNING_STAGES } from "@/v2/screens/b14-learn/data";
+import type { WorkSummaryView } from "@/v2/data/workSummary";
+import type { V2LearnCompletion } from "@/v2/data/learnProgress";
+import { V2_LESSONS, V2_TOTAL_LESSON_POINTS } from "@shared/v2Lessons";
+import { V2_ICON_NAMES } from "@/v2/contracts/icons";
 
-const brandStub = vi.hoisted(() => ({
-  value: {
-    selectedBrandId: "brand-venture-pr",
-    brands: [{ id: "brand-venture-pr" }],
-    isLoading: false,
+// The real shape GET /api/brands/:id/work/summary returned for Venture PR
+// (brandId 470b15fe-606b-4d96-ab62-69a01e08b237) on the running feat/screens
+// dev server, via the LIVE-RULES token-mint recipe. Only the fields
+// mapBoard14Data reads are asserted on below, but the whole captured object
+// is kept so the fixture stays a faithful shape, not a hand-trimmed one.
+const REAL_WORK_SUMMARY: WorkSummaryView = {
+  brandId: "470b15fe-606b-4d96-ab62-69a01e08b237",
+  points: 20,
+  pendingCount: 7,
+  milestones: ["goal_selected_and_queue_reviewed"],
+  currentLevel: { level: 1, name: "Start", points: 0 },
+  nextThreshold: { level: 2, name: "Ready", points: 60 },
+  goal: {
+    title: "Help buyers find accurate information about Venture PR",
+    statement:
+      "Buyers researching Venture PR should find correct, current facts about it wherever they ask, not stale or fabricated claims.",
   },
-}));
-
-const searchStub = vi.hoisted(() => ({ value: { mode: "guided" as const } }));
-
-vi.mock("@/hooks/use-brand-selection", () => ({
-  useBrandSelection: () => brandStub.value,
-}));
-
-vi.mock("@tanstack/react-router", () => ({
-  useSearch: () => searchStub.value,
-}));
-
-function renderBoard(data: Board14Data = board14Fixture) {
-  return render(<Board14Screen data={data} />);
-}
-
-function unavailable(reason: string): { kind: "not-measured"; reason: string } {
-  return { kind: "not-measured", reason };
-}
-
-function withUnavailable(data: Board14Data, field: keyof Board14Data): Board14Data {
-  if (field === "learning") {
-    return {
-      ...data,
-      learning: {
-        level: unavailable("Learning level is not measured."),
-        stage: unavailable("Learning stage is not measured."),
-        points: unavailable("Learning points are not measured."),
-        nextLevelPoints: unavailable("The next learning threshold is not measured."),
-        progressRate: unavailable("Learning progress is not measured."),
-        completedLessons: unavailable("Completed lessons are not measured."),
-        totalLessons: unavailable("The lesson path is not measured."),
-        minutesSpent: unavailable("Learning time is not measured."),
-      },
-    };
-  }
-  if (field === "nextLesson") {
-    return { ...data, nextLesson: unavailable("The lesson catalog is not available.") };
-  }
-  if (field === "lessons") {
-    return { ...data, lessons: unavailable("The lesson catalog is not available.") };
-  }
-  return { ...data, recommendedLesson: unavailable("The recommended lesson is not measured.") };
-}
-
-const summaryResponse = {
-  brandId: "brand-venture-pr",
-  points: 160,
-  pendingCount: 1,
-  milestones: ["evidenced_changes_complete"],
-  currentLevel: { level: 3, name: "Improve", points: 160 },
-  nextThreshold: { level: 4, name: "Learn", points: 320 },
-  goal: { title: "Improve AI visibility", statement: "Increase accurate, verifiable coverage." },
   nextTask: null,
   waitingTasks: [],
-  mode: "guided" as const,
+  mode: "guided",
 };
 
-function renderAdapter() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <AdapterProbe />
-    </QueryClientProvider>,
-  );
-}
-
-function AdapterProbe() {
-  const result = useBoard14Data();
-  return (
-    <output data-testid="adapter-state">
-      {result.state.kind}
-      {result.data ? `:${result.data.context.brandId}:${result.data.context.mode}` : ""}
-    </output>
-  );
-}
-
-beforeEach(() => {
-  brandStub.value = {
-    selectedBrandId: "brand-venture-pr",
-    brands: [{ id: "brand-venture-pr" }],
-    isLoading: false,
+function completion(
+  lessonId: string,
+  overrides: Partial<V2LearnCompletion> = {},
+): V2LearnCompletion {
+  return {
+    lessonId,
+    completedAt: "2026-09-10T12:00:00.000Z",
+    brandId: REAL_WORK_SUMMARY.brandId,
+    ...overrides,
   };
-  searchStub.value = { mode: "guided" };
-});
+}
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
-describe("Board 14 fixture", () => {
-  it("renders the title, banner, next lesson, lesson path, and progress rail", () => {
-    renderBoard();
-
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Learn what improves AI visibility",
-    );
-    expect(screen.getByText("A personalized learning path for your current stage")).toBeTruthy();
-    expect(screen.getByText("You're in Level 3 · Improve")).toBeTruthy();
-    expect(
-      screen.getByText("Focus on making changes that increase accurate, verifiable coverage."),
-    ).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Your next lesson" })).toBeTruthy();
-    expect(screen.getByText("Make brand facts easy to verify")).toBeTruthy();
-    expect(screen.getAllByText("8 minutes").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Understand what makes a fact verifiable for AI systems")).toBeTruthy();
-    expect(screen.getByTestId("board14-start-lesson")).toHaveTextContent("Start lesson");
-    expect(screen.getByRole("heading", { name: "All lessons in your path" })).toBeTruthy();
-    expect(screen.getByText("AI answer visibility")).toBeTruthy();
-    expect(screen.getByText("Citations and source trust")).toBeTruthy();
-    expect(screen.getByText("Outcome attribution")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Your learning progress" })).toBeTruthy();
-    const rail = screen.getByTestId("board14-progress-rail");
-    expect(rail).toHaveTextContent("160 / 320 learning points");
-    expect(rail).toHaveTextContent("50%");
-    expect(rail).toHaveTextContent("2 of 6");
-    expect(screen.getByText("Learning points do not measure visibility.")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Need help?" })).toBeTruthy();
-  });
-
-  it("keeps internal links scoped to the active brand and mode", () => {
-    renderBoard();
-
-    const links = screen.getAllByRole("link");
-    expect(links.length).toBeGreaterThanOrEqual(5);
-    for (const link of links) {
-      const href = link.getAttribute("href") ?? "";
-      if (href.startsWith("/v2/")) {
-        expect(href).toContain("brandId=brand-venture-pr");
-        expect(href).toContain("mode=guided");
-      }
+describe("shared/v2Lessons content", () => {
+  it("uses only real V2Icon names", () => {
+    for (const lesson of V2_LESSONS) {
+      expect(V2_ICON_NAMES).toContain(lesson.icon);
     }
   });
 
-  it("keeps completed and locked lesson states distinct", () => {
-    renderBoard();
-    const lessonRows = screen.getAllByTestId("board14-lesson-row");
-    expect(lessonRows).toHaveLength(6);
-    expect(within(lessonRows[0]).getByText("Completed")).toBeTruthy();
-    expect(within(lessonRows[1]).getByText("Completed")).toBeTruthy();
-    expect(within(lessonRows[2]).getByText("Not started")).toBeTruthy();
-    expect(within(lessonRows[2]).getByText("After previous lesson")).toBeTruthy();
+  it("has exactly the six lessons the board lists, each with content", () => {
+    expect(V2_LESSONS.map((lesson) => lesson.id)).toEqual([
+      "ai-answer-visibility",
+      "citations-and-source-trust",
+      "buyer-question-design",
+      "site-accessibility-for-ai",
+      "experiment-limits",
+      "outcome-attribution",
+    ]);
+    for (const lesson of V2_LESSONS) {
+      expect(lesson.sections.length).toBeGreaterThan(0);
+      expect(lesson.goals.length).toBeGreaterThan(0);
+      expect(lesson.points).toBe(lesson.durationMinutes * 5);
+    }
   });
 });
 
-describe("Board 14 unavailable values", () => {
-  it("labels unavailable progress instead of rendering numbers", () => {
-    renderBoard(withUnavailable(board14Fixture, "learning"));
+describe("mapBoard14Data", () => {
+  it("maps the real work summary and an empty completion list honestly", () => {
+    const data = mapBoard14Data(REAL_WORK_SUMMARY, [], "guided");
 
-    const rail = screen.getByTestId("board14-progress-rail");
-    expect(rail).toHaveTextContent("Not measured");
-    expect(rail).not.toHaveTextContent("160");
-    expect(rail).not.toHaveTextContent("320");
-    expect(rail).not.toHaveTextContent("50%");
+    expect(data.context.brandId).toBe(REAL_WORK_SUMMARY.brandId);
+    expect(data.banner.label).toBe("Real work level: Start (Level 1)");
+    expect(data.lessons.every((lesson) => lesson.state === "not-started")).toBe(true);
+    expect(data.nextLesson?.id).toBe("ai-answer-visibility");
+    expect(data.recommendedLesson?.id).toBe("ai-answer-visibility");
+    expect(data.learning).toEqual({
+      level: 1,
+      stage: LEARNING_STAGES[0],
+      points: 0,
+      totalPoints: V2_TOTAL_LESSON_POINTS,
+      progressRate: 0,
+      completedLessons: 0,
+      totalLessons: 6,
+      minutesSpent: 0,
+    });
   });
 
-  it("labels an unavailable next lesson and lesson list", () => {
-    renderBoard(withUnavailable(withUnavailable(board14Fixture, "nextLesson"), "lessons"));
+  it("sums points and minutes only over completed lessons", () => {
+    const data = mapBoard14Data(
+      REAL_WORK_SUMMARY,
+      [completion("ai-answer-visibility"), completion("citations-and-source-trust")],
+      "guided",
+    );
 
-    expect(screen.getAllByText("Not measured").length).toBeGreaterThanOrEqual(2);
-    expect(screen.queryByText("Make brand facts easy to verify")).toBeNull();
-    expect(screen.queryByText("AI answer visibility")).toBeNull();
+    expect(data.learning.completedLessons).toBe(2);
+    expect(data.learning.points).toBe(30 + 40); // 6*5 + 8*5
+    expect(data.learning.minutesSpent).toBe(6 + 8);
+    expect(data.learning.stage).toBe(LEARNING_STAGES[2]);
+    expect(data.learning.level).toBe(3);
+    expect(data.nextLesson?.id).toBe("buyer-question-design");
+    expect(data.recommendedLesson?.id).toBe("buyer-question-design");
+
+    const first = data.lessons.find((lesson) => lesson.id === "ai-answer-visibility");
+    expect(first?.state).toBe("completed");
+    expect(first?.completedAt).toBe("2026-09-10T12:00:00.000Z");
+    const third = data.lessons.find((lesson) => lesson.id === "buyer-question-design");
+    expect(third?.state).toBe("not-started");
+    expect(third?.prerequisite).toBe("After Citations and source trust");
   });
 
-  it("labels an unavailable recommendation", () => {
-    renderBoard(withUnavailable(board14Fixture, "recommendedLesson"));
-    const recommendation = screen.getByTestId("board14-recommendation");
-    expect(recommendation).toHaveTextContent("Not measured");
-    expect(recommendation).not.toHaveTextContent("Buyer-question design");
+  it("reports no next or recommended lesson once every lesson is complete", () => {
+    const data = mapBoard14Data(
+      REAL_WORK_SUMMARY,
+      V2_LESSONS.map((lesson) => completion(lesson.id)),
+      "guided",
+    );
+
+    expect(data.nextLesson).toBeNull();
+    expect(data.recommendedLesson).toBeNull();
+    expect(data.learning.completedLessons).toBe(6);
+    expect(data.learning.points).toBe(V2_TOTAL_LESSON_POINTS);
+    expect(data.learning.progressRate).toBe(1);
+    expect(data.learning.stage).toBe("Course complete");
   });
 });
 
-describe("Board 14 live adapter", () => {
-  it("maps the real work-summary response without converting work points into learning points", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ success: true, data: summaryResponse }), { status: 200 }),
-      ),
-    );
+describe("Board14Screen render", () => {
+  it("renders every real region with the fixture's values", () => {
+    render(<Board14Screen data={board14Fixture} />);
 
-    renderAdapter();
-    await waitFor(() =>
-      expect(screen.getByTestId("adapter-state")).toHaveTextContent(
-        "ready:brand-venture-pr:guided",
-      ),
+    expect(
+      screen.getByRole("heading", { name: "Learn what improves AI visibility" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(board14Fixture.banner.label)).toBeInTheDocument();
+    expect(screen.getByTestId("board14-next-lesson")).toHaveTextContent(
+      board14Fixture.nextLesson!.title,
     );
+    expect(screen.getAllByTestId("board14-lesson-row")).toHaveLength(6);
+    expect(screen.getAllByText("Completed").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Not started").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(`Level ${board14Fixture.learning.level} · ${board14Fixture.learning.stage}`),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        `${board14Fixture.learning.points} / ${board14Fixture.learning.totalPoints}`,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Learning points do not measure visibility.")).toBeInTheDocument();
+
+    // "Open help center" links back to the lesson list - there is no real
+    // help-center route to send it to, and this tree never links to one that
+    // doesn't exist.
+    const helpLink = screen.getByTestId("board14-help-link");
+    expect(helpLink.getAttribute("href")).toMatch(/^\/v2\/learn\?/);
   });
 
-  it("returns loading while the work-summary request is pending", () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => new Promise<Response>(() => {})),
-    );
-    renderAdapter();
-    expect(screen.getByTestId("adapter-state")).toHaveTextContent("loading");
+  it("every lesson row and the start-lesson button link into the lesson reader via ?lesson=", () => {
+    render(<Board14Screen data={board14Fixture} />);
+
+    for (const row of screen.getAllByTestId("board14-lesson-row")) {
+      const link = row.closest("a");
+      expect(link?.getAttribute("href")).toMatch(/[?&]lesson=/);
+    }
+    const start = screen.getByTestId("board14-start-lesson").closest("a");
+    expect(start?.getAttribute("href")).toMatch(/[?&]lesson=/);
   });
 
-  it("returns an error state when the work-summary request fails", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(JSON.stringify({ success: false }), { status: 500 })),
-    );
+  it("states plainly that the path is complete instead of a generic unavailable badge", () => {
+    const data: Board14Data = {
+      ...board14Fixture,
+      nextLesson: null,
+      recommendedLesson: null,
+    };
+    render(<Board14Screen data={data} />);
 
-    renderAdapter();
-    await waitFor(() => expect(screen.getByTestId("adapter-state")).toHaveTextContent("error"));
+    expect(screen.getByTestId("board14-next-lesson-complete")).toHaveTextContent(
+      /completed every lesson/i,
+    );
+    expect(screen.getByTestId("board14-recommendation-complete")).toHaveTextContent(
+      /every lesson in the path is complete/i,
+    );
+    expect(screen.queryByText("Not measured")).toBeNull();
+  });
+
+  it("carries brandId and mode on the banner and rail links", () => {
+    render(<Board14Screen data={board14Fixture} />);
+
+    const links = within(screen.getByTestId("board14-progress-rail")).getAllByRole("link");
+    const todayLink = screen.getByRole("link", { name: /see your progress/i });
+    for (const link of [...links, todayLink]) {
+      const href = link.getAttribute("href") ?? "";
+      expect(href).toContain(`brandId=${board14Fixture.context.brandId}`);
+      expect(href).toContain(`mode=${board14Fixture.context.mode}`);
+    }
   });
 });

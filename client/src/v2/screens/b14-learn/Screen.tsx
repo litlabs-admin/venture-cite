@@ -11,18 +11,58 @@ import { StateLabel } from "@/v2/shared/ui/StateLabel";
 import { V2Icon } from "@/v2/theme/V2Icon";
 import { v2Type } from "@/v2/theme/typography";
 
-export type Board14Measured<T> = { kind: "measured"; value: T };
-export type Board14Unavailable = { kind: "not-measured"; reason: string };
-export type Board14Value<T> = Board14Measured<T> | Board14Unavailable;
+// Board 14, live. Every field below is a real value once the screen reaches
+// "ready": the six lessons are static content (shared/v2Lessons.ts) and
+// completion comes from server/routes/v2Learn.ts, so - unlike boards whose
+// metrics can independently fail to exist - there is no per-field "not
+// measured" case left once the whole-screen state (Route.tsx, driven by
+// data.ts's V2LiveResult) is itself ready. `nextLesson` and
+// `recommendedLesson` are the one place a value can still be genuinely
+// absent: once every lesson is complete, there is no next lesson to
+// recommend, and that is a fact worth stating plainly rather than routing
+// through a generic "not measured" badge that would misreport a finished
+// course as an unmeasured one.
 
 export type Board14Lesson = {
   id: string;
   title: string;
   description: string;
-  durationMinutes: Board14Value<number>;
-  state: "completed" | "not-started";
-  prerequisite: string | null;
+  durationMinutes: number;
+  points: number;
   icon: V2IconName;
+  state: "completed" | "not-started";
+  completedAt: string | null;
+  prerequisite: string | null;
+};
+
+export type Board14NextLesson = {
+  id: string;
+  title: string;
+  durationMinutes: number;
+  description: string;
+  goals: readonly string[];
+  actionLabel: string;
+  rationaleLabel: string;
+  icon: V2IconName;
+};
+
+export type Board14RecommendedLesson = {
+  id: string;
+  title: string;
+  description: string;
+  durationMinutes: number;
+};
+
+export type Board14Learning = {
+  level: number;
+  stage: string;
+  points: number;
+  totalPoints: number;
+  /** 0..1: `points / totalPoints`. */
+  progressRate: number;
+  completedLessons: number;
+  totalLessons: number;
+  minutesSpent: number;
 };
 
 export type Board14Data = {
@@ -30,63 +70,30 @@ export type Board14Data = {
   title: string;
   subtitle: string;
   banner: { label: string; text: string; progressLabel: string };
-  nextLesson: Board14Value<{
-    id: string;
-    title: string;
-    durationMinutes: Board14Value<number>;
-    description: string;
-    goals: readonly string[];
-    actionLabel: string;
-    rationaleLabel: string;
-    icon: V2IconName;
-  }>;
-  lessons: Board14Value<readonly Board14Lesson[]>;
-  learning: {
-    level: Board14Value<number>;
-    stage: Board14Value<string>;
-    points: Board14Value<number>;
-    nextLevelPoints: Board14Value<number>;
-    progressRate: Board14Value<number>;
-    completedLessons: Board14Value<number>;
-    totalLessons: Board14Value<number>;
-    minutesSpent: Board14Value<number>;
-  };
-  recommendedLesson: Board14Value<{
-    id: string;
-    title: string;
-    description: string;
-    durationMinutes: Board14Value<number>;
-  }>;
+  /** `null` once every lesson is complete - there is no next lesson. */
+  nextLesson: Board14NextLesson | null;
+  lessons: readonly Board14Lesson[];
+  learning: Board14Learning;
+  /** `null` once every lesson is complete. */
+  recommendedLesson: Board14RecommendedLesson | null;
   visibilityNote: { title: string; text: string };
   help: { title: string; text: string; linkLabel: string };
 };
 
 type Board14Props = V2ScreenProps<Board14Data>;
 
-function isMeasured<T>(value: Board14Value<T>): value is Board14Measured<T> {
-  return value.kind === "measured";
-}
-
 function scopedHref(context: Board14Data["context"], path: string): string {
   const search = new URLSearchParams({ brandId: context.brandId, mode: context.mode });
   return `${path}?${search.toString()}`;
 }
 
-function Availability({ className = "" }: { className?: string }) {
-  return <StateLabel state="not-measured" className={className} />;
-}
-
-function ValueText<T>({
-  value,
-  format,
-  className = v2Type.body,
-}: {
-  value: Board14Value<T>;
-  format: (value: T) => string;
-  className?: string;
-}) {
-  if (!isMeasured(value)) return <Availability />;
-  return <span className={className}>{format(value.value)}</span>;
+function lessonHref(context: Board14Data["context"], lessonId: string, anchor?: string): string {
+  const search = new URLSearchParams({
+    brandId: context.brandId,
+    mode: context.mode,
+    lesson: lessonId,
+  });
+  return `/v2/learn?${search.toString()}${anchor ? `#${anchor}` : ""}`;
 }
 
 function HexBadge({ size }: { size: "banner" | "rail" }) {
@@ -124,13 +131,12 @@ function LessonIcon({ name }: { name: V2IconName }) {
   return <V2Icon name={name} size={28} className="mt-0.5 shrink-0 text-[color:var(--v2-brand)]" />;
 }
 
-function LessonDuration({ value }: { value: Board14Value<number> }) {
-  if (!isMeasured(value)) return <Availability className="mt-1" />;
+function LessonDuration({ minutes }: { minutes: number }) {
   return (
     <span
       className={`${v2Type.meta} inline-flex w-[82px] shrink-0 items-center justify-center rounded-full border border-[var(--v2-highlight)] bg-[var(--v2-paper)] px-2.5 py-1 font-medium tabular-nums text-[color:var(--v2-brand)]`}
     >
-      {value.value} minutes
+      {minutes} minutes
     </span>
   );
 }
@@ -160,23 +166,37 @@ function LessonStatus({ lesson }: { lesson: Board14Lesson }) {
   );
 }
 
+/** The card in place of "Your next lesson" once there is none - every
+ *  lesson in the path is complete. States the fact plainly instead of
+ *  reusing a generic unavailable badge that would read as "not measured". */
+function AllLessonsComplete() {
+  return (
+    <div data-testid="board14-next-lesson-complete" className="flex items-start gap-3 py-3">
+      <V2Icon name="check" size={24} className="mt-0.5 shrink-0 text-[color:var(--v2-ok)]" />
+      <p className={v2Type.body}>
+        You have completed every lesson in this path. Revisit any lesson from the list below.
+      </p>
+    </div>
+  );
+}
+
 function NextLesson({ data }: { data: Board14Data }) {
-  if (!isMeasured(data.nextLesson)) {
+  if (!data.nextLesson) {
     return (
-      <div data-testid="board14-next-lesson" className="py-3">
-        <Availability />
+      <div data-testid="board14-next-lesson">
+        <AllLessonsComplete />
       </div>
     );
   }
 
-  const lesson = data.nextLesson.value;
+  const lesson = data.nextLesson;
   return (
     <div data-testid="board14-next-lesson" className="flex items-start gap-4 pb-2">
       <LessonIcon name={lesson.icon} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-3">
           <h3 className={v2Type.cardTitle}>{lesson.title}</h3>
-          <LessonDuration value={lesson.durationMinutes} />
+          <LessonDuration minutes={lesson.durationMinutes} />
         </div>
         <p className={`${v2Type.body} mt-1 max-w-[60ch]`}>{lesson.description}</p>
         <h4 className={`${v2Type.label} mt-2`}>Learning goals</h4>
@@ -194,13 +214,12 @@ function NextLesson({ data }: { data: Board14Data }) {
             className="h-10 rounded-lg px-4 text-[13.5px]"
             data-testid="board14-start-lesson"
           >
-            <a href={scopedHref(data.context, `/v2/learn/lesson/${lesson.id}`)}>
-              {lesson.actionLabel}
-            </a>
+            <a href={lessonHref(data.context, lesson.id)}>{lesson.actionLabel}</a>
           </Button>
           <a
             className="text-[13.5px] font-semibold text-[color:var(--v2-brand)] hover:text-[color:var(--v2-brand-fill)]"
-            href={scopedHref(data.context, `/v2/learn/lesson/${lesson.id}/why`)}
+            href={lessonHref(data.context, lesson.id, "why")}
+            data-testid="board14-why-lesson"
           >
             {lesson.rationaleLabel}
           </a>
@@ -211,17 +230,14 @@ function NextLesson({ data }: { data: Board14Data }) {
 }
 
 function LessonPath({ data }: { data: Board14Data }) {
-  if (!isMeasured(data.lessons))
-    return (
-      <div data-testid="board14-lessons" className="py-3">
-        <Availability />
-      </div>
-    );
-
   return (
     <div data-testid="board14-lessons">
-      {data.lessons.value.map((lesson) => {
-        const row = (
+      {data.lessons.map((lesson) => (
+        <a
+          key={lesson.id}
+          className="block rounded-[var(--v2-radius)] hover:bg-[var(--v2-inset)]"
+          href={lessonHref(data.context, lesson.id)}
+        >
           <div
             className="flex items-start gap-4 border-t border-[var(--v2-line)] px-0.5 py-1"
             data-testid="board14-lesson-row"
@@ -231,88 +247,48 @@ function LessonPath({ data }: { data: Board14Data }) {
               <div className={v2Type.bodyStrong}>{lesson.title}</div>
               <div className={`${v2Type.meta} leading-[1.4]`}>{lesson.description}</div>
             </div>
-            <LessonDuration value={lesson.durationMinutes} />
+            <LessonDuration minutes={lesson.durationMinutes} />
             <LessonStatus lesson={lesson} />
           </div>
-        );
-
-        if (lesson.state === "completed") {
-          return (
-            <a
-              key={lesson.id}
-              className="block rounded-[var(--v2-radius)] hover:bg-[var(--v2-inset)]"
-              href={scopedHref(data.context, `/v2/learn/lesson/${lesson.id}/review`)}
-            >
-              {row}
-            </a>
-          );
-        }
-        return <div key={lesson.id}>{row}</div>;
-      })}
+        </a>
+      ))}
     </div>
   );
 }
 
-function ProgressStat<T>({
-  icon,
-  label,
-  value,
-  format,
-}: {
-  icon: V2IconName;
-  label: string;
-  value: Board14Value<T>;
-  format?: (value: T) => string;
-}) {
+function ProgressStat({ icon, label, value }: { icon: V2IconName; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3 py-2">
       <V2Icon name={icon} size={19} className="shrink-0 text-[color:var(--v2-ink)]" />
       <span className={`${v2Type.body} flex-1`}>{label}</span>
-      <ValueText
-        className={`${v2Type.body} font-medium tabular-nums text-[color:var(--v2-ink)]`}
-        format={format ?? ((item) => String(item))}
-        value={value}
-      />
+      <span className={`${v2Type.body} font-medium tabular-nums text-[color:var(--v2-ink)]`}>
+        {value}
+      </span>
     </div>
   );
 }
 
 function RecommendedLesson({ data }: { data: Board14Data }) {
-  if (!isMeasured(data.recommendedLesson)) return <Availability />;
-  const lesson = data.recommendedLesson.value;
+  if (!data.recommendedLesson) {
+    return (
+      <p className={v2Type.body} data-testid="board14-recommendation-complete">
+        No lesson to recommend - every lesson in the path is complete.
+      </p>
+    );
+  }
+  const lesson = data.recommendedLesson;
   return (
     <div className="flex items-start gap-3.5">
       <V2Icon name="q" size={28} className="mt-0.5 shrink-0 text-[color:var(--v2-brand)]" />
       <div className="min-w-0">
         <h3 className={v2Type.bodyStrong}>{lesson.title}</h3>
         <p className={`${v2Type.meta} mt-1.5 leading-[1.6]`}>{lesson.description}</p>
-        <LessonDuration value={lesson.durationMinutes} />
-        <LinkWithArrow
-          className="mt-3"
-          href={scopedHref(data.context, `/v2/learn/lesson/${lesson.id}`)}
-        >
+        <LessonDuration minutes={lesson.durationMinutes} />
+        <LinkWithArrow className="mt-3" href={lessonHref(data.context, lesson.id)}>
           Start next lesson
         </LinkWithArrow>
       </div>
     </div>
-  );
-}
-
-type ProgressReadyLearning = Board14Data["learning"] & {
-  level: Board14Measured<number>;
-  stage: Board14Measured<string>;
-  points: Board14Measured<number>;
-  nextLevelPoints: Board14Measured<number>;
-  progressRate: Board14Measured<number>;
-};
-
-function isProgressReady(learning: Board14Data["learning"]): learning is ProgressReadyLearning {
-  return (
-    isMeasured(learning.level) &&
-    isMeasured(learning.stage) &&
-    isMeasured(learning.points) &&
-    isMeasured(learning.nextLevelPoints) &&
-    isMeasured(learning.progressRate)
   );
 }
 
@@ -327,55 +303,39 @@ function ProgressRail({ data }: { data: Board14Data }) {
       data-v2-region="aside"
     >
       <h2 className={v2Type.sectionTitle}>Your learning progress</h2>
-      {isProgressReady(learning) ? (
-        <div className="mt-4 flex items-center gap-3.5">
-          <HexBadge size="rail" />
-          <div>
-            <div className={`${v2Type.cardTitle} text-[18px]`}>
-              Level {learning.level.value} · {learning.stage.value}
-            </div>
-            <div className={`${v2Type.body} mt-0.5`}>
-              <span className={v2Type.num}>
-                {learning.points.value} / {learning.nextLevelPoints.value}
-              </span>{" "}
-              learning points
-            </div>
+      <div className="mt-4 flex items-center gap-3.5">
+        <HexBadge size="rail" />
+        <div>
+          <div className={`${v2Type.cardTitle} text-[18px]`}>
+            Level {learning.level} · {learning.stage}
+          </div>
+          <div className={`${v2Type.body} mt-0.5`}>
+            <span className={v2Type.num}>
+              {learning.points} / {learning.totalPoints}
+            </span>{" "}
+            learning points
           </div>
         </div>
-      ) : (
-        <div className="mt-4">
-          <Availability />
-        </div>
-      )}
+      </div>
 
-      {isProgressReady(learning) ? (
-        <div className="mt-4 flex items-center gap-3">
-          <ProgressBar
-            className="flex-1"
-            showValue={false}
-            value={learning.progressRate.value * 100}
-          />
-          <span className={`${v2Type.num} text-[14px] text-[color:var(--v2-ink2)]`}>
-            {Math.round(learning.progressRate.value * 100)}%
-          </span>
-        </div>
-      ) : null}
+      <div className="mt-4 flex items-center gap-3">
+        <ProgressBar className="flex-1" showValue={false} value={learning.progressRate * 100} />
+        <span className={`${v2Type.num} text-[14px] text-[color:var(--v2-ink2)]`}>
+          {Math.round(learning.progressRate * 100)}%
+        </span>
+      </div>
 
       <div className="mt-4 space-y-0.5">
         <ProgressStat
           icon="learn"
           label="Lessons completed"
-          value={learning.completedLessons}
-          format={(value) =>
-            `${value} of ${learning.totalLessons.kind === "measured" ? learning.totalLessons.value : "—"}`
-          }
+          value={`${learning.completedLessons} of ${learning.totalLessons}`}
         />
-        <ProgressStat icon="star" label="Learning points earned" value={learning.points} />
+        <ProgressStat icon="star" label="Learning points earned" value={String(learning.points)} />
         <ProgressStat
           icon="clock"
           label="Time spent learning"
-          value={learning.minutesSpent}
-          format={(value) => `${value} minutes`}
+          value={`${learning.minutesSpent} minutes`}
         />
       </div>
 
@@ -398,7 +358,8 @@ function ProgressRail({ data }: { data: Board14Data }) {
         <p className={`${v2Type.body} mt-2 mb-3`}>{data.help.text}</p>
         <a
           className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[color:var(--v2-brand)] hover:text-[color:var(--v2-brand-fill)]"
-          href="/help"
+          href={scopedHref(data.context, "/v2/learn")}
+          data-testid="board14-help-link"
         >
           {data.help.linkLabel}
           <V2Icon name="arrow" size={14} />
