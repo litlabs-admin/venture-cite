@@ -13,6 +13,11 @@ import { StateLabel } from "@/v2/shared/ui/StateLabel";
 import { TextArea } from "@/v2/shared/ui/TextArea";
 import { TextField } from "@/v2/shared/ui/TextField";
 import {
+  useRecordBusinessResults,
+  type BusinessResultEventInput,
+} from "@/v2/data/visibilityEvidence";
+import { visibilityTabHref, VisibilityTabStrip } from "@/v2/visibility/VisibilityTabStrip";
+import {
   BrandProgressRail,
   NotMeasured,
   ReviewFormPanel,
@@ -169,6 +174,72 @@ function ApplicationVerifiedData({ data }: { data: Board21Data }) {
   );
 }
 
+/** The form's fields, translated into the rows `business_result_events`
+ *  actually stores. See `useRecordBusinessResults` for why a demo-request
+ *  count maps onto `inquiry` and a qualified-inquiry count onto
+ *  `qualified_lead`: the table has no fifth kind for either field by name.
+ *  CRM opportunity ids and free-form notes have no numeric column of their
+ *  own, so they ride along as `notes` on the first event this produces. */
+function buildBusinessResultEvents(input: {
+  qualifiedInquiries: string;
+  demoRequests: string;
+  urls: string;
+  opportunities: string;
+  notes: string;
+}): BusinessResultEventInput[] {
+  const occurredAt = new Date().toISOString();
+  const events: BusinessResultEventInput[] = [];
+
+  const qualified = Number(input.qualifiedInquiries);
+  if (input.qualifiedInquiries.trim() !== "" && Number.isFinite(qualified)) {
+    events.push({
+      eventKind: "qualified_lead",
+      value: qualified,
+      valueUnit: "count",
+      occurredAt,
+      notes: null,
+    });
+  }
+
+  const demos = Number(input.demoRequests);
+  if (input.demoRequests.trim() !== "" && Number.isFinite(demos)) {
+    events.push({
+      eventKind: "inquiry",
+      value: demos,
+      valueUnit: "count",
+      occurredAt,
+      notes: null,
+    });
+  }
+
+  const urlList = input.urls
+    .split("\n")
+    .map((url) => url.trim())
+    .filter(Boolean);
+  if (urlList.length > 0) {
+    events.push({
+      eventKind: "referral_visit",
+      value: urlList.length,
+      valueUnit: "referrer",
+      occurredAt,
+      notes: urlList.join(", "),
+    });
+  }
+
+  const noteParts = [
+    input.notes.trim(),
+    input.opportunities.trim() ? `CRM opportunities: ${input.opportunities.trim()}` : "",
+  ].filter(Boolean);
+  if (noteParts.length > 0 && events.length > 0) {
+    events[0] = {
+      ...events[0],
+      notes: [events[0].notes, ...noteParts].filter(Boolean).join(" — "),
+    };
+  }
+
+  return events;
+}
+
 function OutcomeForm({ data, staleAsOf }: { data: Board21Data; staleAsOf?: string }) {
   const [qualifiedInquiries, setQualifiedInquiries] = useState(
     data.qualifiedInquiries.kind === "measured" ? String(data.qualifiedInquiries.value) : "",
@@ -183,7 +254,14 @@ function OutcomeForm({ data, staleAsOf }: { data: Board21Data; staleAsOf?: strin
   );
   const [opportunities, setOpportunities] = useState(data.crmOpportunityIds);
   const [notes, setNotes] = useState(data.outcomeNotes);
-  const [saved, setSaved] = useState(false);
+  const record = useRecordBusinessResults(data.context.brandId);
+  const events = buildBusinessResultEvents({
+    qualifiedInquiries,
+    demoRequests,
+    urls,
+    opportunities,
+    notes,
+  });
 
   return (
     <ReviewFormPanel
@@ -193,7 +271,8 @@ function OutcomeForm({ data, staleAsOf }: { data: Board21Data; staleAsOf?: strin
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          setSaved(true);
+          if (events.length === 0) return;
+          record.mutate(events);
         }}
       >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -208,7 +287,7 @@ function OutcomeForm({ data, staleAsOf }: { data: Board21Data; staleAsOf?: strin
             }
             onChange={(event) => {
               setQualifiedInquiries(event.target.value);
-              setSaved(false);
+              record.reset();
             }}
             type="number"
             value={qualifiedInquiries}
@@ -221,7 +300,7 @@ function OutcomeForm({ data, staleAsOf }: { data: Board21Data; staleAsOf?: strin
             }
             onChange={(event) => {
               setDemoRequests(event.target.value);
-              setSaved(false);
+              record.reset();
             }}
             type="number"
             value={demoRequests}
@@ -237,7 +316,7 @@ function OutcomeForm({ data, staleAsOf }: { data: Board21Data; staleAsOf?: strin
             }
             onChange={(event) => {
               setUrls(event.target.value);
-              setSaved(false);
+              record.reset();
             }}
             rows={2}
             value={urls}
@@ -248,7 +327,7 @@ function OutcomeForm({ data, staleAsOf }: { data: Board21Data; staleAsOf?: strin
             label="CRM opportunity IDs"
             onChange={(event) => {
               setOpportunities(event.target.value);
-              setSaved(false);
+              record.reset();
             }}
             placeholder="e.g. OPP-12345, OPP-67890"
             rows={2}
@@ -261,7 +340,7 @@ function OutcomeForm({ data, staleAsOf }: { data: Board21Data; staleAsOf?: strin
           label="Notes (optional)"
           onChange={(event) => {
             setNotes(event.target.value);
-            setSaved(false);
+            record.reset();
           }}
           rows={2}
           value={notes}
@@ -269,10 +348,16 @@ function OutcomeForm({ data, staleAsOf }: { data: Board21Data; staleAsOf?: strin
         <div className="mt-4 flex flex-wrap items-center gap-4">
           <Button
             className={cn(v2Type.bodyStrong, "h-10 rounded-lg px-4")}
-            disabled={staleAsOf !== undefined || data.awardPoints.kind !== "measured"}
+            disabled={
+              staleAsOf !== undefined ||
+              data.awardPoints.kind !== "measured" ||
+              events.length === 0 ||
+              record.isPending ||
+              record.isSuccess
+            }
             type="submit"
           >
-            Save outcome review
+            {record.isPending ? "Saving…" : "Save outcome review"}
           </Button>
           <span className={v2Type.meta}>
             <strong className="font-semibold text-[color:var(--v2-brand)]">
@@ -286,7 +371,17 @@ function OutcomeForm({ data, staleAsOf }: { data: Board21Data; staleAsOf?: strin
             Stale data. This review cannot award points until it refreshes.
           </p>
         ) : null}
-        {saved ? (
+        {events.length === 0 ? (
+          <p className={cn(v2Type.meta, "mt-3")} role="status">
+            Enter at least one outcome before saving.
+          </p>
+        ) : null}
+        {record.isError ? (
+          <p className={cn(v2Type.meta, "mt-3 text-[color:var(--v2-warn)]")} role="status">
+            The outcome was not recorded. Nothing has been saved - try again.
+          </p>
+        ) : null}
+        {record.isSuccess ? (
           <p className={cn(v2Type.meta, "mt-3 text-[color:var(--v2-ok)]")} role="status">
             Your outcome review is recorded for this period.
           </p>
@@ -361,13 +456,11 @@ function AttributionLimits({ data }: { data: Board21Data }) {
   );
 }
 
+// Neither provider has an OAuth flow behind this screen, so "Connect" is a
+// real link to the one place a connection can actually be made - never a
+// button that flips local state to "Connected" without connecting anything.
 function ConnectionOptions({ data }: { data: Board21Data }) {
-  const [hubspot, setHubspot] = useState(data.crmConnections.hubspot);
-  const [salesforce, setSalesforce] = useState(data.crmConnections.salesforce);
-  const connect = (provider: "hubspot" | "salesforce") => {
-    if (provider === "hubspot") setHubspot("connected");
-    else setSalesforce("connected");
-  };
+  const integrationsHref = visibilityTabHref("/v2/settings/integrations", data.context);
   return (
     <Panel className="mt-3 px-4 py-3.5">
       <PanelHeader
@@ -389,12 +482,13 @@ function ConnectionOptions({ data }: { data: Board21Data }) {
             <p className={v2Type.meta}>Automatically verify opportunities and revenue.</p>
           </div>
           <Button
+            asChild
             className={cn(v2Type.bodyStrong, "h-10 rounded-lg px-3")}
-            onClick={() => connect("hubspot")}
-            type="button"
             variant="outline"
           >
-            {hubspot === "connected" ? "Connected" : "Connect"}
+            <a href={integrationsHref}>
+              {data.crmConnections.hubspot === "connected" ? "Connected" : "Connect"}
+            </a>
           </Button>
         </div>
         <div className="flex items-center gap-2.5 py-2 last:pb-0">
@@ -411,12 +505,13 @@ function ConnectionOptions({ data }: { data: Board21Data }) {
             <p className={v2Type.meta}>Verify opportunities and closed won revenue.</p>
           </div>
           <Button
+            asChild
             className={cn(v2Type.bodyStrong, "h-10 rounded-lg px-3")}
-            onClick={() => connect("salesforce")}
-            type="button"
             variant="outline"
           >
-            {salesforce === "connected" ? "Connected" : "Connect"}
+            <a href={integrationsHref}>
+              {data.crmConnections.salesforce === "connected" ? "Connected" : "Connect"}
+            </a>
           </Button>
         </div>
       </div>
@@ -464,6 +559,9 @@ export function Board21Screen({ data, staleAsOf }: V2ScreenProps<Board21Data>) {
               title="Connect visibility work to business results"
               start={reviewDate}
             />
+            <div className="mb-1 mt-4">
+              <VisibilityTabStrip active="b21" context={data.context} />
+            </div>
             <ReviewSummaryCards
               align="start"
               cards={[

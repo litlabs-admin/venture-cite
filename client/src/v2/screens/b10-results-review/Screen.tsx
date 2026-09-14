@@ -8,6 +8,11 @@ import { TextArea } from "@/v2/shared/ui/TextArea";
 import { Panel } from "@/v2/shared/ui/Panel";
 import { cn } from "@/lib/utils";
 import {
+  useRecordResultsReview,
+  type ReviewDecision as ApiReviewDecision,
+} from "@/v2/data/visibilityEvidence";
+import { VisibilityTabStrip } from "@/v2/visibility/VisibilityTabStrip";
+import {
   BrandProgressRail,
   NotMeasured,
   ReviewFormPanel,
@@ -37,6 +42,11 @@ export type Board10Data = {
     decision: Board10Decision | null;
     notes: string;
     awardPoints: ReviewMetric<number>;
+    /** The review task this form posts against. Without one in the queue
+     *  there is nothing to save against, so the form disables and says why
+     *  rather than failing on submit. */
+    taskId: ReviewMetric<string>;
+    taskRevision: ReviewMetric<number>;
   };
   progress: ReviewProgressData & {
     awardHistory: readonly Board10Award[];
@@ -139,6 +149,18 @@ function AwardHistory({ entries }: { entries: readonly Board10Award[] }) {
   );
 }
 
+// This screen's decision values read better on the canvas than the server's
+// own (`improvement` | `no_material_change` | `decline` | `unavailable`,
+// `visibilityEvidence.ts`'s `ReviewDecision`), so the two are kept distinct
+// and translated here rather than forcing one vocabulary onto both.
+// "unavailable" is the one value both sides spell the same way.
+const DECISION_TO_API: Record<Board10Decision, ApiReviewDecision> = {
+  improvement: "improvement",
+  not_conclusive: "no_material_change",
+  revision: "decline",
+  unavailable: "unavailable",
+};
+
 function DecisionForm({
   context,
   review,
@@ -150,7 +172,7 @@ function DecisionForm({
 }) {
   const [decision, setDecision] = useState<Board10Decision | null>(review.decision);
   const [notes, setNotes] = useState(review.notes);
-  const [saved, setSaved] = useState(false);
+  const record = useRecordResultsReview(context.brandId);
   const options =
     review.decision === "unavailable"
       ? [
@@ -162,12 +184,40 @@ function DecisionForm({
         ]
       : DECISION_OPTIONS;
 
+  // Both are needed before anything can be posted: a task to record against,
+  // and the period it reviews (the server's once-per-period key).
+  const canSave =
+    review.taskId.kind === "measured" &&
+    review.taskRevision.kind === "measured" &&
+    review.periodStart.kind === "measured";
+  const blocked =
+    review.taskId.kind !== "measured"
+      ? "No results review is in the queue for this brand yet."
+      : review.periodStart.kind !== "measured"
+        ? "No observation has been recorded, so there is no period to review."
+        : null;
+
   return (
     <ReviewFormPanel title="What did you learn?">
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          setSaved(true);
+          if (
+            !canSave ||
+            review.taskId.kind !== "measured" ||
+            review.taskRevision.kind !== "measured" ||
+            review.periodStart.kind !== "measured" ||
+            decision === null
+          ) {
+            return;
+          }
+          record.mutate({
+            taskId: review.taskId.value,
+            expectedRevision: review.taskRevision.value,
+            cycleKey: review.periodStart.value,
+            decision: DECISION_TO_API[decision],
+            notes: notes.trim() === "" ? null : notes.trim(),
+          });
         }}
       >
         <fieldset>
@@ -184,7 +234,7 @@ function DecisionForm({
                   name="board10-decision"
                   onChange={() => {
                     setDecision(option.value);
-                    setSaved(false);
+                    record.reset();
                   }}
                   type="radio"
                   value={option.value}
@@ -207,7 +257,7 @@ function DecisionForm({
           label="Record your decision"
           onChange={(event) => {
             setNotes(event.target.value);
-            setSaved(false);
+            record.reset();
           }}
           rows={3}
           value={notes}
@@ -216,11 +266,16 @@ function DecisionForm({
           <Button
             className={cn(v2Type.bodyStrong, "h-10 rounded-lg px-4")}
             disabled={
-              decision === null || staleAsOf !== undefined || review.awardPoints.kind !== "measured"
+              decision === null ||
+              staleAsOf !== undefined ||
+              review.awardPoints.kind !== "measured" ||
+              !canSave ||
+              record.isPending ||
+              record.isSuccess
             }
             type="submit"
           >
-            Save results review
+            {record.isPending ? "Saving…" : "Save results review"}
           </Button>
           <span className={v2Type.meta}>
             <strong className="font-semibold text-[color:var(--v2-brand)]">
@@ -234,7 +289,17 @@ function DecisionForm({
             Stale data. This review cannot award points until it refreshes.
           </p>
         ) : null}
-        {saved ? (
+        {blocked ? (
+          <p className={cn(v2Type.meta, "mt-3")} role="status">
+            {blocked}
+          </p>
+        ) : null}
+        {record.isError ? (
+          <p className={cn(v2Type.meta, "mt-3 text-[color:var(--v2-warn)]")} role="status">
+            The review was not recorded. Nothing has been saved - try again.
+          </p>
+        ) : null}
+        {record.isSuccess ? (
           <p className={cn(v2Type.meta, "mt-3 text-[color:var(--v2-ok)]")} role="status">
             Your decision is recorded for this period.
           </p>
@@ -330,6 +395,9 @@ export function Board10Screen({ data, staleAsOf }: V2ScreenProps<Board10Data>) {
         main={
           <div>
             <ReviewPeriod review={data.review} />
+            <div className="mb-1 mt-4">
+              <VisibilityTabStrip active="b10" context={data.context} />
+            </div>
             <ReviewSummaryCards
               cards={[
                 {

@@ -7,6 +7,7 @@ import { LinkWithArrow } from "@/v2/shared/ui/LinkWithArrow";
 import { StateLabel } from "@/v2/shared/ui/StateLabel";
 import { V2Icon } from "@/v2/theme/V2Icon";
 import { v2Type } from "@/v2/theme/typography";
+import { visibilityTabHref, VisibilityTabStrip } from "@/v2/visibility/VisibilityTabStrip";
 
 export type Board08Value<T> =
   | { kind: "measured"; value: T }
@@ -50,17 +51,8 @@ export type Board08Data = {
 
 type Board08ScreenProps = V2ScreenProps<Board08Data>;
 
-const tabs = [
-  { label: "Overview", path: "/v2/visibility", active: true },
-  { label: "Answers", path: "/v2/visibility/evidence", active: false },
-  { label: "Citations", path: "/v2/visibility/citations", active: false },
-  { label: "Competitors", path: "/v2/diagnostics/competitor-gap", active: false },
-  { label: "Results", path: "/v2/visibility/results", active: false },
-] as const;
-
 function v2Href(path: string, navigation: Board08Data["navigation"]): string {
-  const search = new URLSearchParams({ brandId: navigation.brandId, mode: navigation.mode });
-  return `${path}?${search.toString()}`;
+  return visibilityTabHref(path, navigation);
 }
 
 function unavailableState(value: Exclude<Board08Value<unknown>, { kind: "measured" }>) {
@@ -134,29 +126,6 @@ function MetricFilter({ children }: { children: ReactNode }) {
       {children}
       <V2Icon name="cdown" size={13} className="text-[color:var(--v2-ink3)]" />
     </Button>
-  );
-}
-
-function Board08Tabs({ navigation }: { navigation: Board08Data["navigation"] }) {
-  return (
-    <nav aria-label="Visibility sections" className="border-b border-[var(--v2-line)]">
-      <div className="flex flex-wrap gap-6">
-        {tabs.map((tab) => (
-          <a
-            key={tab.label}
-            aria-current={tab.active ? "page" : undefined}
-            className={`pb-2.5 text-[13.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--v2-brand)] ${
-              tab.active
-                ? "border-b-2 border-[var(--v2-brand)] text-[color:var(--v2-brand)]"
-                : "text-[color:var(--v2-ink3)] hover:text-[color:var(--v2-ink)]"
-            }`}
-            href={v2Href(tab.path, navigation)}
-          >
-            {tab.label}
-          </a>
-        ))}
-      </div>
-    </nav>
   );
 }
 
@@ -411,7 +380,7 @@ export function Board08Screen({ data, staleAsOf }: Board08ScreenProps) {
         <main className="min-w-0 px-7 pb-8 pt-7">
           <h1 className={v2Type.pageTitle}>Understand what changed</h1>
           <div className="mb-[18px] mt-4">
-            <Board08Tabs navigation={data.navigation} />
+            <VisibilityTabStrip active="b08" context={data.navigation} />
           </div>
           <div className="mb-3 flex flex-wrap items-start justify-between gap-5">
             <div>

@@ -75,6 +75,8 @@ export function useBoard10Data(): V2LiveResult<Board10Data> {
       decision: null,
       notes: "",
       awardPoints: reviewTask ? measured(reviewTask.points) : notMeasured<number>(),
+      taskId: reviewTask ? measured(reviewTask.id) : notMeasured<string>(),
+      taskRevision: reviewTask ? measured(reviewTask.revision) : notMeasured<number>(),
     },
     progress: {
       level: summary ? measured(summary.currentLevel.level) : notMeasured<number>(),
