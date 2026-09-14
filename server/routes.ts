@@ -52,6 +52,7 @@ import { setupFactSheetV2Routes } from "./routes/factSheetV2";
 import { setupAdminScrapeInspectorRoutes } from "./routes/adminScrapeInspector";
 import { setupLlmJobsRoutes } from "./routes/llmJobs";
 import { setupWorkRoutes } from "./routes/work";
+import { setupV2CompetitorGapRoutes } from "./routes/v2CompetitorGap";
 import { mentionsRouter } from "./routes/mentions";
 import { asyncHandler } from "./lib/asyncHandler";
 
@@ -530,6 +531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAdminScrapeInspectorRoutes(app);
   setupLlmJobsRoutes(app);
   setupWorkRoutes(app);
+  setupV2CompetitorGapRoutes(app);
   setupV2Routes(app);
   app.use("/api/brand-mentions", mentionsRouter);
 
