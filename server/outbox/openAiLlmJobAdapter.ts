@@ -105,6 +105,13 @@ export function createOpenAiLlmJobHandler(
       });
     } catch (error) {
       const failure = classifyProviderError(error);
+      // The row only ever stores a generic message, so without this the
+      // provider's own reason for a 400 is lost and the job looks like an
+      // unexplained rejection.
+      logger.warn(
+        { err: error, llmJobId: payload.llmJobId, code: failure.code },
+        "llm job kickoff rejected by provider",
+      );
       if (failure.kind === "permanent" || command.attemptCount >= command.maxAttempts) {
         await failPendingLlmJob(
           database,
@@ -209,13 +216,41 @@ function createResponseRequest(request: LlmJobProviderRequest): ResponseCreatePa
   return {
     model: request.model,
     instructions: request.instructions,
-    input: request.input,
+    input: withJsonObjectDirective(request.input, request.responseFormat),
     background: true,
     store: true,
     ...(request.responseFormat
       ? { text: { format: toResponseFormat(request.responseFormat) } }
       : {}),
   };
+}
+
+// Appended when `input` doesn't already say "json". Short and literal so it
+// can't pull the model away from the shape the caller's own prompt asked for.
+const JSON_OBJECT_DIRECTIVE = "Respond with a single JSON object and nothing else.";
+
+/**
+ * `text.format` of type `json_object` makes the Responses API reject the
+ * request with a 400 unless the word "json" appears in the *input messages*.
+ * `instructions` does not count towards that check, so a caller that puts its
+ * "Return a JSON object of the shape ..." wording in `instructions` alone -
+ * as keyword discovery did - never reached the model: every job failed at
+ * kickoff with error_kind='provider_rejected'.
+ *
+ * Enforcing the precondition here, at the single place that attaches
+ * `text.format`, keeps it true for every present and future caller instead of
+ * relying on each prompt author to remember it. `json_schema` and `text`
+ * formats carry no such requirement and pass through untouched.
+ */
+function withJsonObjectDirective(
+  input: string,
+  responseFormat: LlmJobProviderRequest["responseFormat"],
+): string {
+  if (responseFormat?.type !== "json_object") return input;
+  if (/json/i.test(input)) return input;
+  return `${input}
+
+${JSON_OBJECT_DIRECTIVE}`;
 }
 
 function toResponseFormat(

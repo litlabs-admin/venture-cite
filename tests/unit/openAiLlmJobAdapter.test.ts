@@ -118,6 +118,100 @@ describe("OpenAI LLM job outbox adapter", () => {
     );
   });
 
+  // The Responses API rejects `text.format: json_object` with a 400 unless the
+  // word "json" appears in the input messages; `instructions` does not count.
+  // Keyword discovery kept its "Return a JSON object" wording in
+  // `instructions` only, so every job died at kickoff as provider_rejected.
+  it("adds a json directive when a json_object job's input never says json", async () => {
+    const client = {
+      responses: { create: vi.fn().mockResolvedValue({ id: "resp-json" }), cancel: vi.fn() },
+    };
+    const handler = createOpenAiLlmJobHandler(
+      database({
+        status: "pending",
+        responseId: null,
+        providerRequest: {
+          model: "gpt-test",
+          instructions: "Return a JSON object of the shape {}",
+          input: "Discover 12-15 keywords for this brand.",
+          responseFormat: { type: "json_object" },
+        },
+        link: "linked",
+      }),
+      client,
+    );
+
+    await handler({
+      command: command(),
+      idempotencyKey: openAiLlmJobIdempotencyKey("llm-job-1"),
+      signal: new AbortController().signal,
+    });
+
+    const sent = client.responses.create.mock.calls[0][0] as { input: string };
+    expect(sent.input).toMatch(/json/i);
+    expect(sent.input).toContain("Discover 12-15 keywords for this brand.");
+  });
+
+  it("leaves the input alone when it already says json", async () => {
+    const client = {
+      responses: { create: vi.fn().mockResolvedValue({ id: "resp-keep" }), cancel: vi.fn() },
+    };
+    const handler = createOpenAiLlmJobHandler(
+      database({
+        status: "pending",
+        responseId: null,
+        providerRequest: {
+          model: "gpt-test",
+          instructions: null,
+          input: "Return the FAQs as a JSON object.",
+          responseFormat: { type: "json_object" },
+        },
+        link: "linked",
+      }),
+      client,
+    );
+
+    await handler({
+      command: command(),
+      idempotencyKey: openAiLlmJobIdempotencyKey("llm-job-1"),
+      signal: new AbortController().signal,
+    });
+
+    expect((client.responses.create.mock.calls[0][0] as { input: string }).input).toBe(
+      "Return the FAQs as a JSON object.",
+    );
+  });
+
+  it("leaves a non json_object job's input alone", async () => {
+    const client = {
+      responses: { create: vi.fn().mockResolvedValue({ id: "resp-text" }), cancel: vi.fn() },
+    };
+    const handler = createOpenAiLlmJobHandler(
+      database({
+        status: "pending",
+        responseId: null,
+        providerRequest: {
+          model: "gpt-test",
+          instructions: null,
+          input: "Write a paragraph.",
+          responseFormat: { type: "text" },
+        },
+        link: "linked",
+      }),
+      client,
+    );
+
+    await handler({
+      command: command(),
+      idempotencyKey: openAiLlmJobIdempotencyKey("llm-job-1"),
+      signal: new AbortController().signal,
+    });
+
+    expect((client.responses.create.mock.calls[0][0] as { input: string }).input).toBe(
+      "Write a paragraph.",
+    );
+  });
+
   it("cancels a provider response when the conditional link loses to cancellation", async () => {
     const client = {
       responses: {

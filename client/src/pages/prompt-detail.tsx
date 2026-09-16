@@ -144,8 +144,12 @@ export default function PromptDetailPage() {
   return (
     <PanelPage>
       <div className="flex items-center justify-between border-b border-vc-default px-8 py-4">
+        {/* Closes back to the prompts list inside the Monitor spine, which is
+            where every row that opens this page lives. The standalone
+            /prompts page has no nav entry, so returning there stranded the
+            reader outside the workflow. */}
         <CCLink
-          dest={{ to: "/prompts" }}
+          dest={{ to: "/monitor", search: { tab: "citations", ptab: "prompts" } }}
           className="flex items-center gap-1 text-data text-vc-tertiary hover:text-vc-primary"
         >
           <X className="h-3.5 w-3.5" /> Prompts

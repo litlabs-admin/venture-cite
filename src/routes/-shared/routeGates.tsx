@@ -175,8 +175,12 @@ export function FirstRunGate({ component: Component }: { component: ComponentTyp
  * existing query param (brandId, action, autoScrape, …) and adding `?tab=`.
  * The spine target is itself auth-gated, so unauthenticated hits still bounce
  * to /login. `replace` keeps the old URL out of history so Back doesn't loop.
+ *
+ * `ptab` lands the reader on an inner tab of the spine tab - /monitor's
+ * citations tab owns three (prompts/results/history). Omitted, it leaves the
+ * inner tab to the target's own last-used fallback.
  */
-export function SpineRedirect({ to, tab }: { to: SpineTarget; tab: string }) {
+export function SpineRedirect({ to, tab, ptab }: { to: SpineTarget; tab: string; ptab?: string }) {
   const search = useSearch({ strict: false });
-  return <Navigate to={to} search={{ ...search, tab }} replace />;
+  return <Navigate to={to} search={{ ...search, tab, ...(ptab ? { ptab } : {}) }} replace />;
 }
