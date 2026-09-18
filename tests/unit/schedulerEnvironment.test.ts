@@ -20,6 +20,21 @@ afterEach(() => {
 });
 
 describe("scheduler environment validation", () => {
+  it("accepts remote services and provider keys during development", async () => {
+    stubValidProductionEnvironment();
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("OPENROUTER_API_KEY", "test-openrouter-key");
+    vi.stubEnv("RESEND_API_KEY", "test-resend-key");
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_key");
+    vi.stubEnv("ALLOW_REMOTE_DEVELOPMENT_SERVICES", "false");
+
+    const { env } = await import("../../server/env");
+
+    expect(env.DATABASE_URL).toBe("postgresql://test:test@database.test:5432/venturecite");
+    expect(env.SUPABASE_URL).toBe("https://venturecite.supabase.co");
+    expect(env.OPENAI_API_KEY).toBe("test-openai-key");
+  });
+
   it("rejects an invalid scheduler boolean during environment parsing", async () => {
     stubValidProductionEnvironment();
     vi.stubEnv("EXTERNAL_CRON_ORCHESTRATOR_ENABLED", "sometimes");
