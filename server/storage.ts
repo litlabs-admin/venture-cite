@@ -198,6 +198,11 @@ export interface IStorage {
   getGeoRankingsByPlatform(platform: string): Promise<GeoRanking[]>;
   countCitedRankingsForArticle(articleId: string): Promise<number>;
   getGeoRankingsByBrandPromptIds(ids: string[], sinceDate?: Date): Promise<GeoRanking[]>;
+  /** Distinct citing-outlet URLs across these prompts since sinceDate - a
+   *  `select distinct`, not the full ranking rows, for a caller (Ask's
+   *  read_page allowlist, server/ask/context.ts) that only needs the set of
+   *  hosts already cited, not the rows themselves. */
+  getDistinctCitingOutletUrls(ids: string[], sinceDate?: Date): Promise<string[]>;
   /** Aggregate citation counts per prompt. */
   getPromptCitationCounts(
     promptIds: string[],

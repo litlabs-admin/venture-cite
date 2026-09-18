@@ -58,6 +58,7 @@ export const STEP_CAPS_MS = {
   // at least one whole engine or the step can never make progress.
   "drain-pending-perception-probe-runs": 10_000,
   "content-cost-outbox-drain": 20_000,
+  "ask-outbox-drain": 20_000,
   "account-purge": 5_000,
   "brand-purge": 5_000,
   "chatbot-prune": 5_000,

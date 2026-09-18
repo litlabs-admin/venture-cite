@@ -143,6 +143,14 @@ const envSchemaBase = z.object({
   // be disabled. The typed guard prevents duplicate scheduled work.
   EXTERNAL_CRON_ORCHESTRATOR_ENABLED: schedulerBooleanSchema,
 
+  // Ask feature flag (docs/ask-feature/07-integration-and-hardening.md §9).
+  // There is no general feature-flag system in this codebase; this is the
+  // smallest thing that works for one flag. Unset/"false" -> /api/ask/* and
+  // the client route return 404 (never 403, per AGENTS.md's anti-
+  // enumeration policy). Off in production until the build order's
+  // milestone 16; on in development.
+  ASK_ENABLED: z.enum(["true", "false"]).optional(),
+
   // No REDDIT_* credentials. The mention scanner reads Reddit
   // unauthenticated only (public JSON + RSS fallback); the OAuth path and
   // these four vars were removed together. Re-declaring them here would

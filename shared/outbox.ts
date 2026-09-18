@@ -36,6 +36,31 @@ export const outboxCommandPayloadSchema = z.discriminatedUnion("kind", [
     tokensIn: nonNegativeInteger,
     tokensOut: nonNegativeInteger,
   }),
+  // Ask action-card kinds (docs/ask-feature/04-implementation-plan.md §4).
+  // agent_tasks is a shared platform table; these outbox kinds are the
+  // "queue" half of "Add to queue" - approving a card enqueues one of
+  // these, it never executes inline (01-trakkr-teardown.md R1).
+  z.object({
+    kind: z.literal("ask.track_prompt"),
+    taskId: identifier, // agent_tasks.id - the proposal being approved
+    promptId: identifier, // brand_prompts.id, status='suggested', validated at propose time
+  }),
+  z.object({
+    kind: z.literal("ask.untrack_prompt"),
+    taskId: identifier,
+    promptId: identifier,
+  }),
+  z.object({
+    kind: z.literal("ask.run_citation_check"),
+    taskId: identifier,
+    brandId: identifier,
+    userId: identifier,
+    promptIds: z.array(identifier).optional(),
+  }),
+  z.object({
+    kind: z.literal("ask.cancel_citation_check"),
+    taskId: identifier,
+  }),
 ]);
 
 export type OutboxCommandPayload = z.infer<typeof outboxCommandPayloadSchema>;

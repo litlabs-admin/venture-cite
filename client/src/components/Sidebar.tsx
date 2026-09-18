@@ -23,6 +23,9 @@ import SidebarOnboarding from "@/components/SidebarOnboarding";
 import SidebarNeedHelp from "@/components/SidebarNeedHelp";
 import { ThemeMenuItems, QuickThemeToggle } from "@/components/ThemeMenuItems";
 import { BrandLogo } from "@/components/BrandLogo";
+import { cn } from "@/lib/utils";
+import { openAskWindow } from "@/lib/askWindow";
+import { focusAskComposer } from "@/lib/askComposerFocus";
 
 // ─── Workflow spine ──────────────────────────────────────────────────────────
 // One flat list, no section labels. The product is a single operating system,
@@ -129,6 +132,41 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               wider than it is tall. */}
           <BrandLogo />
         </Link>
+      </div>
+
+      {/* Ask entry (01-trakkr-teardown.md §1.1: a pill with a status dot,
+          "Ask", and a ⌘K badge, sitting just below the brand mark). A
+          button, not a link: it opens the Ask window (askWindow.ts), the
+          same thing ⌘K does (AppShell.tsx) - except already on /agent,
+          where both instead focus that page's composer
+          (askComposerFocus.ts), since the window would only open on top of
+          the page it represents. */}
+      <div className="shrink-0 px-2 pt-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (isActive("/agent")) {
+              focusAskComposer();
+            } else {
+              openAskWindow();
+            }
+            onNavigate?.();
+          }}
+          className={cn(
+            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-caption transition-colors",
+            isActive("/agent")
+              ? "bg-vc-muted text-vc-primary"
+              : "text-vc-secondary hover:bg-vc-hover",
+          )}
+        >
+          <span className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full border border-positive">
+            <span className="h-1 w-1 rounded-full bg-positive" />
+          </span>
+          <span className="flex-1 text-left">Ask</span>
+          <kbd className="rounded border border-vc-default bg-vc-muted px-1 py-0.5 font-mono text-data text-vc-tertiary">
+            ⌘K
+          </kbd>
+        </button>
       </div>
 
       {/* Spine nav. Rendered in workflow order - the sequence a user

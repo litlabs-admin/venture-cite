@@ -46,6 +46,7 @@ import { setupGeoSignalsRoutes } from "./routes/geoSignals";
 import { setupCommunityRoutes } from "./routes/community";
 import { setupCronRoutes } from "./routes/cron";
 import { setupAssistantRoutes } from "./routes/assistant";
+import { setupAskRoutes } from "./routes/ask";
 import { setupFactSheetRoutes } from "./routes/factSheet";
 import { setupFactSheetV2Routes } from "./routes/factSheetV2";
 import { setupAdminScrapeInspectorRoutes } from "./routes/adminScrapeInspector";
@@ -523,6 +524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupGeoSignalsRoutes(app);
   setupCommunityRoutes(app);
   setupAssistantRoutes(app);
+  setupAskRoutes(app);
   setupFactSheetRoutes(app);
   setupFactSheetV2Routes(app);
   setupAdminScrapeInspectorRoutes(app);

@@ -75,6 +75,7 @@ export async function buildUserExport(userId: string): Promise<Record<string, un
     brandMentions,
     brandPrompts,
     auditLogs,
+    askThreads,
   ] = await Promise.all([
     byBrand(schema.articles) as Promise<Array<typeof schema.articles.$inferSelect>>,
     byBrand(schema.competitors),
@@ -83,6 +84,16 @@ export async function buildUserExport(userId: string): Promise<Record<string, un
     byBrand(schema.brandMentions),
     byBrand(schema.brandPrompts),
     db.select().from(schema.auditLogs).where(eq(schema.auditLogs.userId, userId)),
+    // Ask's own tables (docs/ask-feature/07-integration-and-hardening.md §0
+    // - never chatbot_*). Fetched directly by user_id, not via byBrand, so
+    // an Ask thread with no brand selected (thread.brandId null) still
+    // exports. Deletion needs no corresponding code here: ask_threads.
+    // user_id cascades ON DELETE CASCADE, so the account-purge job's
+    // `DELETE FROM users` already removes every ask_thread/ask_message/
+    // ask_step for this user - verified against
+    // runAccountPurgeJobImpl (server/scheduler.ts) and the FK definitions
+    // in shared/schema/ask.ts.
+    db.select().from(schema.askThreads).where(eq(schema.askThreads.userId, userId)),
   ]);
 
   // geoRankings keys off article_id (not brand_id) - second-pass query.
@@ -94,6 +105,15 @@ export async function buildUserExport(userId: string): Promise<Record<string, un
           .select()
           .from(schema.geoRankings)
           .where(inArray(schema.geoRankings.articleId, articleIds));
+
+  const askThreadIds = askThreads.map((t) => t.id);
+  const askMessages =
+    askThreadIds.length === 0
+      ? []
+      : await db
+          .select()
+          .from(schema.askMessages)
+          .where(inArray(schema.askMessages.threadId, askThreadIds));
 
   return {
     exportedAt: new Date().toISOString(),
@@ -108,6 +128,8 @@ export async function buildUserExport(userId: string): Promise<Record<string, un
     brandPrompts,
     geoRankings,
     auditLogs,
+    askThreads,
+    askMessages,
   };
 }
 

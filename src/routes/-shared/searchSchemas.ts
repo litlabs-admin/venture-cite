@@ -155,3 +155,23 @@ export const geoToolsSearchSchema = z
     brand: z.string().optional().catch(undefined),
   })
   .passthrough();
+
+/** `/agent` (Ask). `threadId` selects the active thread; `brandId` follows
+ *  the same cross-cutting contract every brand-scoped route already uses
+ *  (rule 3 above) - carried on deep links from CommandPalette.tsx exactly
+ *  like every other brand-scoped destination. See
+ *  docs/ask-feature/04-implementation-plan.md §7 (routes). */
+export const askSearchSchema = z
+  .object({
+    threadId: z.string().optional().catch(undefined),
+    // One-shot: the Ask window (client/src/components/CommandPalette.tsx)
+    // already created the thread and navigates straight here with the
+    // question attached, so AskWorkspace sends it the moment this route
+    // mounts - never just a prefilled composer (that was the old `draft`
+    // field's job; replaced because Trakkr's own Ask window sends
+    // immediately, and a reader picking a suggestion expects the same).
+    // AskWorkspace strips it from the URL right after reading it, so a
+    // refresh or back-nav never re-sends it.
+    q: z.string().optional().catch(undefined),
+  })
+  .passthrough();

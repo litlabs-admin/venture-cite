@@ -294,6 +294,34 @@ describe("outbox worker", () => {
     });
   });
 
+  it("recognises every kind in outboxCommandPayloadSchema, including ask.* - regression for the silent-drop bug", async () => {
+    // ALL_OUTBOX_COMMAND_KINDS (module-private) used to be a hand-maintained
+    // array separate from outboxCommandPayloadSchema's discriminated union.
+    // Adding shared/outbox.ts's ask.* kinds without also adding them there
+    // made handledKinds() filter every ask.* handler out silently, and a
+    // worker left with zero recognised kinds threw "requires at least one
+    // handler" the first time the scheduled ask-outbox-drain cron actually
+    // ran. ALL_OUTBOX_COMMAND_KINDS is now derived from the schema instead
+    // of duplicated, which should make this structurally impossible - this
+    // test is the direct proof, exercised through the real public API
+    // (runOutboxWorkerOnce) rather than reaching into the private constant.
+    const { outboxCommandPayloadSchema } = await import("../../shared/outbox");
+    const everyKind = outboxCommandPayloadSchema.options.map((o) => o.shape.kind.value);
+    expect(everyKind).toContain("ask.track_prompt");
+    expect(everyKind.length).toBeGreaterThan(0);
+
+    const handlers = Object.fromEntries(everyKind.map((kind) => [kind, vi.fn()])) as Record<
+      ClaimedOutboxCommand["kind"],
+      OutboxCommandHandler
+    >;
+    const outbox = repository(null); // idle - nothing to claim
+    // Would throw "Outbox worker requires at least one handler" before even
+    // reaching claimNext if any kind here were silently dropped.
+    await expect(runOutboxWorkerOnce({ outbox, handlers, leaseSeconds: 3 })).resolves.toEqual({
+      kind: "idle",
+    });
+  });
+
   it("aborts a handler after a heartbeat loses the lease", async () => {
     vi.useFakeTimers();
     try {

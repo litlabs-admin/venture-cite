@@ -175,3 +175,22 @@ supabase/.branches/
 # are ours.
 .codex/config.toml
 .codex/hooks.json
+
+# Ask-feature teardown, platform analysis and build plan. Working notes for an
+# unapproved feature, kept out of the repository until the plan is accepted.
+docs/ask-feature/
+
+# TLS material. `prod-ca-2021.crt` is the Supabase CA bundle each developer
+# points DATABASE_CA_CERT_PATH at - machine-local config, not source, and it
+# rotates on Supabase's schedule rather than ours. Ignored by pattern rather
+# than by that one filename so the next bundle (prod-ca-2025.crt, a .pem, a
+# bare .key) is covered without anyone having to remember this rule. No
+# certificate or key is tracked today, so this hides nothing that already
+# exists. A cert that genuinely belongs in git can still be forced in with
+# `git add -f`.
+*.crt
+*.pem
+*.key
+*.cer
+*.p12
+*.pfx

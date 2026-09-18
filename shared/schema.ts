@@ -1,3 +1,4 @@
+export * from "./schema/ask";
 export * from "./schema/brands";
 export * from "./schema/chatbot";
 export * from "./schema/competitors";

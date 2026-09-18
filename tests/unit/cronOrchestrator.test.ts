@@ -50,6 +50,18 @@ const stubs = vi.hoisted(() => ({
     lostLease: 0,
     stopReason: "idle" as const,
   })),
+  // Ask's own outbox drain (docs/ask-feature/04-implementation-plan.md §4) -
+  // stubbed with the same idle-result shape as content-cost-outbox-drain
+  // immediately above, its nearest sibling.
+  runAskOutboxDrain: vi.fn(async () => ({
+    claimed: 0,
+    succeeded: 0,
+    rescheduled: 0,
+    deadLettered: 0,
+    cancelled: 0,
+    lostLease: 0,
+    stopReason: "idle" as const,
+  })),
   dbSelect: vi.fn(),
 }));
 
@@ -126,6 +138,9 @@ vi.mock("../../server/contentGenerationWorker", () => ({
 }));
 vi.mock("../../server/outbox/contentCostOutboxDrain", () => ({
   runContentCostOutboxDrain: stubs.runContentCostOutboxDrain,
+}));
+vi.mock("../../server/ask/actions/outboxDrain", () => ({
+  runAskOutboxDrain: stubs.runAskOutboxDrain,
 }));
 vi.mock("../../server/setupProducts", () => ({
   setupStripeProducts: stubs.setupStripeProducts,
@@ -286,9 +301,15 @@ describe("cron orchestrator", () => {
       deadlineMs: expect.any(Number),
       leaseSeconds: 60,
     });
+    expect(stubs.runAskOutboxDrain).toHaveBeenCalledWith({
+      maxCommands: 25,
+      deadlineMs: expect.any(Number),
+      leaseSeconds: 60,
+    });
     expect(body.results).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ step: "content-cost-outbox-drain", ok: true }),
+        expect.objectContaining({ step: "ask-outbox-drain", ok: true }),
       ]),
     );
   });

@@ -14,6 +14,7 @@
 export const SCHEDULER_JOB_NAMES = {
   resumeInFlightAutopilots: "resume-in-flight-autopilots",
   contentCostOutboxDrain: "content-cost-outbox-drain",
+  askOutboxDrain: "ask-outbox-drain",
   accountPurge: "account-purge",
   brandPurge: "brand-purge",
   tourEventsCleanup: "tour-events-cleanup",

@@ -483,6 +483,34 @@
   }
 }
 
+@utility ask-shimmer-text {
+  /* Ask's "Thinking through your question" / "Reviewing what it found" line
+     (AskThinking.tsx): a moving highlight passes through the text itself,
+     reusing the existing `shimmer` keyframe (background-position sweep)
+     with background-clip: text instead of shimmer-sweep's opaque overlay -
+     the same recipe libraries.dev/beautifului.dev use for a "live" status
+     line. prefers-reduced-motion falls back to a plain, static colour. */
+  background-image: linear-gradient(
+    90deg,
+    var(--color-vc-tertiary) 0%,
+    var(--color-vc-primary) 50%,
+    var(--color-vc-tertiary) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 2.5s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: unset;
+    color: var(--color-vc-secondary);
+  }
+}
+
 @layer utilities {
   /* ───────────────────────────────────────────────────────────────────────────
    Token system. Two layers: primitive tokens, then the shadcn semantic vars

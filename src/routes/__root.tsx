@@ -248,9 +248,11 @@ const THEME_FOUC_SCRIPT = `
     }
     var root = document.documentElement;
     if (resolved === "dark") root.classList.add("dark");
+    root.setAttribute("data-theme", resolved);
     root.style.colorScheme = resolved;
   } catch (e) {
     document.documentElement.classList.remove("dark");
+    document.documentElement.setAttribute("data-theme", "light");
     document.documentElement.style.colorScheme = "light";
   }
 })();

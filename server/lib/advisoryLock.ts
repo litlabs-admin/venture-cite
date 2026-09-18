@@ -51,6 +51,11 @@ export const dynamicLockNamespaces = {
   // same moment) would otherwise run overlapping slices for one brand and
   // repeat paid work - a second prompt generation, a second citation run.
   onboardingAutopilotSlice: 920003,
+  // Per-thread lock around one Ask run (04-implementation-plan.md §4.1,
+  // 07 §4.1). Two tabs starting a run on the same thread would otherwise
+  // interleave steps into one corrupted transcript; the second request gets
+  // a 409 with the active runId instead of racing the first.
+  askRunThread: 920004,
 } as const;
 
 export type DynamicLockNamespace =

@@ -107,6 +107,7 @@ describe("buildUserExport", () => {
     queueSelect([]); // brandMentions
     queueSelect([]); // brandPrompts
     queueSelect([{ id: "audit-1", userId: "user-1" }]); // auditLogs
+    queueSelect([]); // askThreads (Ask's own tables - see shared/schema/ask.ts)
     queueSelect([{ id: "rank-1", articleId: "art-1" }]); // geoRankings
 
     const data = await buildUserExport("user-1");
@@ -120,19 +121,26 @@ describe("buildUserExport", () => {
     expect(data.articles).toEqual([{ id: "art-1", brandId: "brand-1" }]);
     expect(data.geoRankings).toEqual([{ id: "rank-1", articleId: "art-1" }]);
     expect(data.auditLogs).toEqual([{ id: "audit-1", userId: "user-1" }]);
+    // Ask's own tables (docs/ask-feature/07-integration-and-hardening.md
+    // §0) - exported alongside everything else, never chatbot_*.
+    expect(data.askThreads).toEqual([]);
+    expect(data.askMessages).toEqual([]);
     expect(data.schemaVersion).toBe(1);
   });
 
   it("skips brand-scoped and geo-ranking queries when the user has no brands", async () => {
     queueSelect([{ id: "user-1", email: "a@b.com" }]); // userRow
     queueSelect([]); // userBrands - empty
-    queueSelect([]); // auditLogs (the only unconditional query left in Promise.all)
+    queueSelect([]); // auditLogs
+    queueSelect([]); // askThreads - also unconditional (queried by user_id, not byBrand)
 
     const data = await buildUserExport("user-1");
 
     expect(data.articles).toEqual([]);
     expect(data.competitors).toEqual([]);
     expect(data.geoRankings).toEqual([]);
+    expect(data.askThreads).toEqual([]);
+    expect(data.askMessages).toEqual([]);
   });
 });
 

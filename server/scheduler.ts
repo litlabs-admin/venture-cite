@@ -820,6 +820,25 @@ export function initScheduler(): void {
     logger.info({ cron: CONTENT_COST_OUTBOX_CRON }, "content cost outbox drain scheduled");
   }
 
+  // Ask action-card outbox drain (docs/ask-feature/04-implementation-plan.md
+  // §4). Deliberately its own cron/handler set, not folded into the
+  // content-cost drain above, so a bug in either cannot affect the other.
+  const ASK_OUTBOX_CRON = process.env.ASK_OUTBOX_CRON || "*/1 * * * *";
+  if (cron.validate(ASK_OUTBOX_CRON)) {
+    cron.schedule(
+      ASK_OUTBOX_CRON,
+      cronCrashGuard(SCHEDULER_JOB_NAMES.askOutboxDrain, async () => {
+        const { runAskOutboxDrain } = await import("./ask/actions/outboxDrain");
+        await runAskOutboxDrain({
+          maxCommands: 25,
+          deadlineMs: Date.now() + 20_000,
+          leaseSeconds: 60,
+        });
+      }),
+    );
+    logger.info({ cron: ASK_OUTBOX_CRON }, "ask outbox drain scheduled");
+  }
+
   // Operational health check: provider spend, outbox staleness, overdue
   // scheduled jobs, stuck citation runs. Every 15 minutes - frequent enough
   // to catch a runaway spend spike or a broken outbox drain within the hour,

@@ -18,6 +18,7 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as AppSplatRouteImport } from './routes/_app/$'
 import { Route as AppActRouteImport } from './routes/_app/act'
+import { Route as AppAgentRouteImport } from './routes/_app/agent'
 import { Route as AppAiIntelligenceRouteImport } from './routes/_app/ai-intelligence'
 import { Route as AppAiVisibilityRouteImport } from './routes/_app/ai-visibility'
 import { Route as AppArticlesRouteImport } from './routes/_app/articles'
@@ -102,6 +103,11 @@ const AppSplatRoute = AppSplatRouteImport.update({
 const AppActRoute = AppActRouteImport.update({
   id: '/act',
   path: '/act',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAgentRoute = AppAgentRouteImport.update({
+  id: '/agent',
+  path: '/agent',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAiIntelligenceRoute = AppAiIntelligenceRouteImport.update({
@@ -320,6 +326,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/$': typeof AppSplatRoute
   '/act': typeof AppActRoute
+  '/agent': typeof AppAgentRoute
   '/ai-intelligence': typeof AppAiIntelligenceRoute
   '/ai-visibility': typeof AppAiVisibilityRoute
   '/articles': typeof AppArticlesRoute
@@ -371,6 +378,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/$': typeof AppSplatRoute
   '/act': typeof AppActRoute
+  '/agent': typeof AppAgentRoute
   '/ai-intelligence': typeof AppAiIntelligenceRoute
   '/ai-visibility': typeof AppAiVisibilityRoute
   '/articles': typeof AppArticlesRoute
@@ -422,6 +430,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/_app/$': typeof AppSplatRoute
   '/_app/act': typeof AppActRoute
+  '/_app/agent': typeof AppAgentRoute
   '/_app/ai-intelligence': typeof AppAiIntelligenceRoute
   '/_app/ai-visibility': typeof AppAiVisibilityRoute
   '/_app/articles': typeof AppArticlesRoute
@@ -475,6 +484,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/$'
     | '/act'
+    | '/agent'
     | '/ai-intelligence'
     | '/ai-visibility'
     | '/articles'
@@ -526,6 +536,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/$'
     | '/act'
+    | '/agent'
     | '/ai-intelligence'
     | '/ai-visibility'
     | '/articles'
@@ -576,6 +587,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/_app/$'
     | '/_app/act'
+    | '/_app/agent'
     | '/_app/ai-intelligence'
     | '/_app/ai-visibility'
     | '/_app/articles'
@@ -694,6 +706,13 @@ declare module '@tanstack/react-router' {
       path: '/act'
       fullPath: '/act'
       preLoaderRoute: typeof AppActRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/agent': {
+      id: '/_app/agent'
+      path: '/agent'
+      fullPath: '/agent'
+      preLoaderRoute: typeof AppAgentRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/ai-intelligence': {
@@ -1040,6 +1059,7 @@ const AppAdminScrapeRouteWithChildren = AppAdminScrapeRoute._addFileChildren(
 interface AppRouteChildren {
   AppSplatRoute: typeof AppSplatRoute
   AppActRoute: typeof AppActRoute
+  AppAgentRoute: typeof AppAgentRoute
   AppAiIntelligenceRoute: typeof AppAiIntelligenceRoute
   AppAiVisibilityRoute: typeof AppAiVisibilityRoute
   AppArticlesRoute: typeof AppArticlesRoute
@@ -1078,6 +1098,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppSplatRoute: AppSplatRoute,
   AppActRoute: AppActRoute,
+  AppAgentRoute: AppAgentRoute,
   AppAiIntelligenceRoute: AppAiIntelligenceRoute,
   AppAiVisibilityRoute: AppAiVisibilityRoute,
   AppArticlesRoute: AppArticlesRoute,

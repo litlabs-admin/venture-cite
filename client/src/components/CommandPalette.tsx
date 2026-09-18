@@ -1,246 +1,140 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Command as CommandPrimitive } from "cmdk";
 import {
-  Home,
-  FileText,
-  Link2,
-  Swords,
-  History,
-  Radar,
-  AlertTriangle,
-  Radio,
-  Bug,
-  PenLine,
   Search,
-  Wrench,
-  HelpCircle,
-  Users,
-  Building2,
-  Shield,
-  ScanEye,
   Settings,
   Sparkles,
+  TrendingUp,
+  Share2,
+  Target,
+  Radar,
+  CornerDownLeft,
 } from "lucide-react";
-import {
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-} from "@/components/ui/command";
-import { DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogPortal, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
-import { openChatbotPrompt } from "@/lib/openChatbotPrompt";
+import { useAskThreads } from "@/hooks/useAskThreads";
+import { usePrompts } from "@/hooks/usePrompts";
+import { cn } from "@/lib/utils";
+import {
+  NAV,
+  QUICK_ACTIONS,
+  SETTINGS_ENTRIES,
+  matchesQuery,
+  containsAllWords,
+  type Icon,
+  type NavEntry,
+  type QuickAction,
+  type SettingsEntry,
+} from "@/lib/askWindowSearch";
+import { ASK_SUGGESTION_PALETTE, type AskSuggestionIcon } from "@shared/ask/suggestions";
 
-// ─── Cmd-K command palette ───────────────────────────────────────────────────
-// Global keyboard-first switcher. Two intents:
-//   Go to - every authenticated route + each spine tab as a deep-link
-//   Ask   - hand the typed query to the assistant (openChatbotPrompt)
+// ─── The Ask window ──────────────────────────────────────────────────────────
+// ⌘K's one merged window (Trakkr screenshots): a single input over five
+// groups. Empty input shows only the four Ask suggestions - rendered from
+// the shared shared/ask/suggestions.ts constant, not fetched, so they never
+// have a blank/"Nothing matches" moment before the window's very first
+// paint. Typed input shows Ask agent (always first) then Quick actions /
+// Pages / Settings / Prompts, each hidden when nothing matches - the
+// matching rule and the fixed lists themselves live in
+// client/src/lib/askWindowSearch.ts. Picking the Ask row or a suggestion
+// creates a thread and starts the run immediately - it never just prefills
+// the composer (that was the old `?draft=` behaviour; see
+// src/routes/-shared/searchSchemas.ts's `q` field for the replacement).
 //
-// The Cmd/Ctrl+K listener that toggles `open` lives in AppShell so the palette
-// is one keystroke away from every authenticated route. This component is pure
-// UI: it never owns the shortcut. No in-palette mutations by design - Act items
-// route to where the action happens, they don't fire side effects here.
-//
-// The nav table mirrors the spine tab definitions in pages/{monitor,diagnose,
-// act,setup}.tsx and the routes in App.tsx. Tab `value`s must stay in sync
-// with those SpineShell configs or a deep-link lands on the default tab.
+// Built directly on cmdk + Radix Dialog primitives, not client/src/
+// components/ui/command.tsx's wrappers - that file's CommandItem/CommandList
+// bake in their own selected-state and sizing classes, which would have to
+// fight this window's green-tint selection and taller rows on every render.
+// Cheaper to compose the primitives directly than to out-specify them.
 
-type Icon = React.ComponentType<{ className?: string }>;
+// One list row. `accentDot` renders the Ask window's green "you typed this"
+// dot instead of an icon; the ↵ glyph only shows on the highlighted row
+// (cmdk sets data-selected on CommandPrimitive.Item, and `group` lets the
+// child key off it).
+function Row({
+  value,
+  icon: Icon,
+  title,
+  description,
+  accentDot,
+  capitalizeTitle,
+  onSelect,
+}: {
+  value: string;
+  icon?: Icon;
+  title: string;
+  description?: string;
+  accentDot?: boolean;
+  // Display only - `title` itself is untouched, and is still exactly what
+  // gets sent as the question (sendAsk(s.text) below reads the ORIGINAL
+  // string). shared/ask/suggestions.ts's sentences are written lowercase
+  // (they read as a question, not a heading) - `capitalize` (CSS
+  // text-transform) is cosmetic-only here, never applied to what the model
+  // actually receives.
+  capitalizeTitle?: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <CommandPrimitive.Item
+      value={value}
+      onSelect={onSelect}
+      className="group flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-caption text-vc-secondary outline-none data-[selected=true]:bg-positive-subtle"
+    >
+      {accentDot ? (
+        <span className="h-2 w-2 shrink-0 rounded-full bg-positive" />
+      ) : Icon ? (
+        <Icon className="h-3.5 w-3.5 shrink-0 text-vc-tertiary" />
+      ) : (
+        <span className="w-3.5 shrink-0" />
+      )}
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn(
+            "block truncate font-medium text-vc-primary",
+            capitalizeTitle && "capitalize",
+          )}
+        >
+          {title}
+        </span>
+        {description && <span className="block truncate text-vc-tertiary">{description}</span>}
+      </span>
+      <CornerDownLeft className="hidden h-3 w-3 shrink-0 text-vc-tertiary group-data-[selected=true]:block" />
+    </CommandPrimitive.Item>
+  );
+}
 
-/** Every route this palette links to, as a literal union - not `string` -
- *  so `navigate({ to: entry.to })` below stays checked against the
- *  generated route tree. Tab-scoped destinations carry their tab in the
- *  separate `tab` field rather than baked into the path string. */
-type NavPath = "/" | "/report" | "/monitor" | "/diagnose" | "/act" | "/setup" | "/settings";
+function Group({
+  heading,
+  accent,
+  children,
+}: {
+  heading: string;
+  accent?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <CommandPrimitive.Group
+      heading={heading}
+      className={cn(
+        "mb-1 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-data [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide",
+        accent
+          ? "[&_[cmdk-group-heading]]:text-positive"
+          : "[&_[cmdk-group-heading]]:text-vc-tertiary",
+      )}
+    >
+      {children}
+    </CommandPrimitive.Group>
+  );
+}
 
-type NavEntry = {
-  section: string;
-  label: string;
-  to: NavPath;
-  /** Mirrored to the `?tab=` search param on navigate; omitted for
-   *  destinations that don't own a tab strip. */
-  tab?: string;
-  icon: Icon;
-  brandScoped: boolean;
-  keywords?: string;
+const askIconByKey: Record<AskSuggestionIcon, Icon> = {
+  "trending-up": TrendingUp,
+  share: Share2,
+  target: Target,
+  radar: Radar,
 };
-
-const NAV: NavEntry[] = [
-  {
-    section: "",
-    label: "Dashboard",
-    to: "/",
-    icon: Home,
-    brandScoped: false,
-    keywords: "home dashboard overview start",
-  },
-  {
-    section: "",
-    label: "Report",
-    to: "/report",
-    icon: FileText,
-    brandScoped: true,
-    keywords: "proof export pdf share results",
-  },
-
-  {
-    section: "Monitor",
-    label: "Citations",
-    to: "/monitor",
-    tab: "citations",
-    icon: Link2,
-    brandScoped: true,
-    keywords: "cited prompts runs scan",
-  },
-  {
-    section: "Monitor",
-    label: "Competitors",
-    to: "/monitor",
-    tab: "competitors",
-    icon: Swords,
-    brandScoped: true,
-    keywords: "rivals share of voice leaderboard",
-  },
-  {
-    section: "Monitor",
-    label: "Trends",
-    to: "/monitor",
-    tab: "trends",
-    icon: History,
-    brandScoped: true,
-    keywords: "history over time change",
-  },
-  {
-    section: "Monitor",
-    label: "Mentions",
-    to: "/monitor",
-    tab: "mentions",
-    icon: Radar,
-    brandScoped: true,
-    keywords: "reddit hacker news detected",
-  },
-
-  {
-    section: "Diagnose",
-    label: "Hallucinations",
-    to: "/diagnose",
-    tab: "hallucinations",
-    icon: AlertTriangle,
-    brandScoped: true,
-    keywords: "inaccurate false claims accuracy",
-  },
-  {
-    section: "Diagnose",
-    label: "Signals",
-    to: "/diagnose",
-    tab: "signals",
-    icon: Radio,
-    brandScoped: true,
-    keywords: "geo chunkability schema readiness",
-  },
-  {
-    section: "Diagnose",
-    label: "Crawler",
-    to: "/diagnose",
-    tab: "crawler",
-    icon: Bug,
-    brandScoped: true,
-    keywords: "robots gptbot permissions blocked",
-  },
-  {
-    section: "Act",
-    label: "Create",
-    to: "/act",
-    tab: "create",
-    icon: PenLine,
-    brandScoped: true,
-    keywords: "generate content write article",
-  },
-  {
-    section: "Act",
-    label: "Library",
-    to: "/act",
-    tab: "library",
-    icon: FileText,
-    brandScoped: true,
-    keywords: "articles published drafts",
-  },
-  {
-    section: "Act",
-    label: "Keywords",
-    to: "/act",
-    tab: "keywords",
-    icon: Search,
-    brandScoped: true,
-    keywords: "research keyword ideas",
-  },
-  {
-    section: "Act",
-    label: "GEO Assets",
-    to: "/act",
-    tab: "geo-assets",
-    icon: Wrench,
-    brandScoped: true,
-    keywords: "tools wikipedia bofu",
-  },
-  {
-    section: "Act",
-    label: "FAQ",
-    to: "/act",
-    tab: "faq",
-    icon: HelpCircle,
-    brandScoped: true,
-    keywords: "questions answers faq manager",
-  },
-  {
-    section: "Act",
-    label: "Community",
-    to: "/act",
-    tab: "community",
-    icon: Users,
-    brandScoped: true,
-    keywords: "reddit outreach aeo posts",
-  },
-
-  {
-    section: "Setup",
-    label: "Brands",
-    to: "/setup",
-    tab: "brands",
-    icon: Building2,
-    brandScoped: false,
-    keywords: "brand profile create company",
-  },
-  {
-    section: "Setup",
-    label: "Fact Sheet",
-    to: "/setup",
-    tab: "fact-sheet",
-    icon: Shield,
-    brandScoped: true,
-    keywords: "facts scrape source of truth",
-  },
-  {
-    section: "Setup",
-    label: "Visibility Checklist",
-    to: "/setup",
-    tab: "visibility",
-    icon: ScanEye,
-    brandScoped: true,
-    keywords: "checklist tasks progress",
-  },
-
-  {
-    section: "",
-    label: "Account settings",
-    to: "/settings",
-    icon: Settings,
-    brandScoped: false,
-    keywords: "profile password account preferences",
-  },
-];
 
 export default function CommandPalette({
   open,
@@ -250,8 +144,13 @@ export default function CommandPalette({
   onOpenChange: (open: boolean) => void;
 }) {
   const navigate = useNavigate();
-  const { selectedBrandId } = useBrandSelection();
+  const { selectedBrandId, selectedBrand } = useBrandSelection();
   const [query, setQuery] = useState("");
+
+  // Thread creation only - the list query itself belongs to AskThreadList /
+  // AskWorkspace, both already mounted; this window never renders a list.
+  const { createThread } = useAskThreads({ enabled: false, brandId: selectedBrandId || null });
+  const promptsQuery = usePrompts(open ? selectedBrandId : null);
 
   function close() {
     onOpenChange(false);
@@ -260,11 +159,18 @@ export default function CommandPalette({
     setTimeout(() => setQuery(""), 150);
   }
 
-  function go(entry: NavEntry) {
-    // Carry the active brand on brand-scoped deep-links (as `brandId`) so
-    // the selection stays sticky when navigating from the palette, and
-    // mirror the entry's tab (if any) to `?tab=`. Built as a plain object
-    // rather than a query string so `to` stays a literal route path.
+  // Ask agent row + suggestions: create a thread, then hand the question to
+  // AskWorkspace via the one-shot `q` param (askSearchSchema) so the run
+  // starts the moment /agent mounts - never just a prefilled composer.
+  async function sendAsk(text: string) {
+    const q = text.trim();
+    if (!q || !selectedBrandId) return;
+    close();
+    const thread = await createThread.mutateAsync();
+    navigate({ to: "/agent", search: { threadId: thread.id, brandId: selectedBrandId, q } });
+  }
+
+  function goToPage(entry: NavEntry) {
     const search: Record<string, string> = {};
     if (entry.tab) search.tab = entry.tab;
     if (entry.brandScoped && selectedBrandId) search.brandId = selectedBrandId;
@@ -272,68 +178,175 @@ export default function CommandPalette({
     close();
   }
 
-  function ask() {
-    const q = query.trim();
-    if (!q) return;
-    openChatbotPrompt(q);
+  function goToQuickAction(action: QuickAction) {
+    const search: Record<string, string> = { tab: action.tab };
+    if (action.ptab) search.ptab = action.ptab;
+    if (selectedBrandId) search.brandId = selectedBrandId;
+    navigate({ to: action.to, search });
+    close();
+  }
+
+  function goToSettings(entry: SettingsEntry) {
+    navigate({ to: "/settings", hash: entry.id });
+    close();
+  }
+
+  function goToPrompt(promptId: string) {
+    navigate({ to: "/prompts/$promptId", params: { promptId } });
     close();
   }
 
   const trimmed = query.trim();
-  const sections = Array.from(new Set(NAV.map((n) => n.section)));
+
+  const matchedQuickActions = trimmed ? QUICK_ACTIONS.filter((a) => matchesQuery(trimmed, a)) : [];
+  const matchedPages = trimmed ? NAV.filter((n) => matchesQuery(trimmed, n)) : [];
+  const matchedSettings = trimmed ? SETTINGS_ENTRIES.filter((s) => matchesQuery(trimmed, s)) : [];
+  const prompts = promptsQuery.data?.data ?? [];
+  const matchedPrompts = trimmed
+    ? prompts.filter((p) => containsAllWords(p.prompt, trimmed)).slice(0, 6)
+    : [];
 
   return (
-    <CommandDialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
-      <DialogTitle className="sr-only">Command palette</DialogTitle>
-      <CommandInput placeholder="Search or ask…" value={query} onValueChange={setQuery} />
-      <CommandList>
-        <CommandEmpty>No matches. Press Enter on “Ask” to ask the assistant.</CommandEmpty>
+    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogPrimitive.Content
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          className="fixed left-1/2 top-[18%] z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-lg border border-vc-default bg-vc-surface shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+        >
+          <DialogTitle className="sr-only">Ask</DialogTitle>
+          <CommandPrimitive shouldFilter={false} loop className="flex flex-col">
+            <div className="flex items-center gap-3 px-4 py-4">
+              <CommandPrimitive.Input
+                autoFocus
+                value={query}
+                onValueChange={setQuery}
+                placeholder={
+                  selectedBrand ? `Ask anything about ${selectedBrand.name}…` : "Ask anything…"
+                }
+                className="flex-1 bg-transparent text-dialog text-vc-primary outline-none placeholder:text-vc-tertiary"
+              />
+              <kbd className="shrink-0 rounded border border-vc-default bg-vc-muted px-1.5 py-0.5 font-mono text-data text-vc-tertiary">
+                esc
+              </kbd>
+            </div>
 
-        {sections.map((section) => {
-          const entries = NAV.filter((n) => n.section === section);
-          return (
-            <CommandGroup
-              key={section || "general"}
-              heading={section ? `Go to · ${section}` : "Go to"}
-            >
-              {entries.map((entry) => {
-                const I = entry.icon;
-                return (
-                  <CommandItem
-                    key={`${entry.to}${entry.tab ? `?tab=${entry.tab}` : ""}`}
-                    value={`${section} ${entry.label} ${entry.keywords ?? ""}`}
-                    onSelect={() => go(entry)}
-                    className="cursor-pointer"
-                  >
-                    <I className="text-muted-foreground" />
-                    <span>{entry.label}</span>
-                    {section && (
-                      <span className="ml-auto text-caption text-muted-foreground">{section}</span>
-                    )}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          );
-        })}
+            <CommandPrimitive.List className="max-h-[420px] overflow-y-auto border-t border-vc-default px-2 py-2">
+              <CommandPrimitive.Empty className="px-3 py-6 text-center text-caption text-vc-tertiary">
+                Nothing matches “{trimmed}”.
+              </CommandPrimitive.Empty>
 
-        {trimmed !== "" && (
-          <CommandGroup heading="Ask">
-            <CommandItem
-              // Value embeds the live query so cmdk's filter always keeps this
-              // row visible while the user is typing a question.
-              value={`ask ${query}`}
-              onSelect={ask}
-              className="cursor-pointer"
-            >
-              <Sparkles className="text-muted-foreground" />
-              <span className="truncate">
-                Ask the assistant: <span className="text-foreground">“{trimmed}”</span>
-              </span>
-            </CommandItem>
-          </CommandGroup>
-        )}
-      </CommandList>
-    </CommandDialog>
+              {trimmed === "" ? (
+                selectedBrand && (
+                  <Group heading={`For ${selectedBrand.name} · this week`}>
+                    {ASK_SUGGESTION_PALETTE.map((s, i) => (
+                      <Row
+                        key={i}
+                        value={`suggestion:${i}:${s.text}`}
+                        icon={askIconByKey[s.icon] ?? Sparkles}
+                        title={s.text}
+                        capitalizeTitle
+                        onSelect={() => sendAsk(s.text)}
+                      />
+                    ))}
+                  </Group>
+                )
+              ) : (
+                <>
+                  <Group heading="Ask agent" accent>
+                    <Row
+                      value={`ask:${trimmed}`}
+                      accentDot
+                      title={trimmed}
+                      onSelect={() => sendAsk(trimmed)}
+                    />
+                  </Group>
+
+                  {matchedQuickActions.length > 0 && (
+                    <Group heading="Quick actions">
+                      {matchedQuickActions.map((a) => (
+                        <Row
+                          key={a.label}
+                          value={`qa:${a.label}`}
+                          icon={a.icon}
+                          title={a.label}
+                          description={a.description}
+                          onSelect={() => goToQuickAction(a)}
+                        />
+                      ))}
+                    </Group>
+                  )}
+
+                  {matchedPages.length > 0 && (
+                    <Group heading="Pages">
+                      {matchedPages.map((entry) => (
+                        <Row
+                          key={`${entry.to}${entry.tab ? `?tab=${entry.tab}` : ""}`}
+                          value={`page:${entry.section} ${entry.label}`}
+                          icon={entry.icon}
+                          title={entry.label}
+                          description={entry.description}
+                          onSelect={() => goToPage(entry)}
+                        />
+                      ))}
+                    </Group>
+                  )}
+
+                  {matchedSettings.length > 0 && (
+                    <Group heading="Settings">
+                      {matchedSettings.map((s) => (
+                        <Row
+                          key={s.id}
+                          value={`settings:${s.id}`}
+                          icon={Settings}
+                          title={s.label}
+                          description={s.description}
+                          onSelect={() => goToSettings(s)}
+                        />
+                      ))}
+                    </Group>
+                  )}
+
+                  {matchedPrompts.length > 0 && (
+                    <Group heading="Prompts">
+                      {matchedPrompts.map((p) => (
+                        <Row
+                          key={p.id}
+                          value={`prompt:${p.id}`}
+                          icon={Search}
+                          title={p.prompt}
+                          description="Active prompt"
+                          onSelect={() => goToPrompt(p.id)}
+                        />
+                      ))}
+                    </Group>
+                  )}
+                </>
+              )}
+            </CommandPrimitive.List>
+
+            <div className="flex items-center justify-between border-t border-vc-default px-4 py-2 text-data text-vc-tertiary">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <CornerDownLeft className="h-3 w-3" /> open
+                </span>
+                <span>↑ ↓ navigate</span>
+                <span>esc close</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigate({ to: "/agent" });
+                  close();
+                }}
+                className="text-vc-secondary hover:text-vc-primary"
+              >
+                Open workspace ↗
+              </button>
+            </div>
+          </CommandPrimitive>
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    </Dialog>
   );
 }

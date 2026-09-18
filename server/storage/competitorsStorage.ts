@@ -8,7 +8,6 @@ import type {
   Competitor,
   CompetitorCitationSnapshot,
   CompetitorGeoRanking,
-  GeoRanking,
   InsertCompetitor,
   InsertCompetitorCitationSnapshot,
   InsertCompetitorGeoRanking,
@@ -406,39 +405,56 @@ export const competitorsStorage = {
     }
     const promptIds = allPrompts.map((p) => p.id);
 
-    // Pull cited rankings for articles + brand_prompts in a single query.
-    // Filters on (article_id IN ... OR brand_prompt_id IN ...) + is_cited=1
-    // + checked_at >= since.
-    let cited: GeoRanking[] = [];
+    // Cited rankings for articles + brand_prompts, GROUPED in SQL rather
+    // than fetched as full rows. This used to `select()` every matching
+    // geo_rankings row and count them in JS - for an account with months of
+    // repeated citation-check runs, that is every historical row in the
+    // window, not just the current state. Grouping by (article_id,
+    // brand_prompt_id, ai_platform) returns one row per combination that
+    // actually occurs, which is what the JS loop below reduced them to
+    // anyway. `count(distinct id)` keeps the original dedup guarantee (a row
+    // with both an article_id and a brand_prompt_id, which shouldn't happen
+    // today but was defended against, still counts once).
+    let citedGroups: Array<{
+      articleId: string | null;
+      brandPromptId: string | null;
+      aiPlatform: string;
+      n: number;
+    }> = [];
     if (articleIds.length > 0 || promptIds.length > 0) {
       const orClauses: any[] = [];
       if (articleIds.length > 0) orClauses.push(inArray(schema.geoRankings.articleId, articleIds));
       if (promptIds.length > 0)
         orClauses.push(inArray(schema.geoRankings.brandPromptId, promptIds));
       const scope = orClauses.length === 1 ? orClauses[0] : or(...orClauses);
-      cited = await db
-        .select()
+      citedGroups = await db
+        .select({
+          articleId: schema.geoRankings.articleId,
+          brandPromptId: schema.geoRankings.brandPromptId,
+          aiPlatform: schema.geoRankings.aiPlatform,
+          n: sql<number>`count(distinct ${schema.geoRankings.id})::int`,
+        })
         .from(schema.geoRankings)
         .where(
           and(scope, eq(schema.geoRankings.isCited, 1), gte(schema.geoRankings.checkedAt, since)),
+        )
+        .groupBy(
+          schema.geoRankings.articleId,
+          schema.geoRankings.brandPromptId,
+          schema.geoRankings.aiPlatform,
         );
     }
 
-    // Bucket by brand via whichever key the ranking has. Dedup each
-    // ranking by id so a row that has BOTH article_id and brand_prompt_id
-    // (shouldn't happen today, but defensively) doesn't double-count.
+    // Bucket by brand via whichever key the group has.
     const perBrand = new Map<string, Record<string, number>>();
     for (const b of brandIds) perBrand.set(b, {});
-    const seenRankings = new Set<string>();
-    for (const r of cited) {
-      if (seenRankings.has(r.id)) continue;
-      seenRankings.add(r.id);
+    for (const g of citedGroups) {
       let bId: string | undefined;
-      if (r.articleId) bId = articleToBrand.get(r.articleId);
-      if (!bId && r.brandPromptId) bId = promptToBrand.get(r.brandPromptId);
+      if (g.articleId) bId = articleToBrand.get(g.articleId);
+      if (!bId && g.brandPromptId) bId = promptToBrand.get(g.brandPromptId);
       if (!bId) continue;
       const bucket = perBrand.get(bId)!;
-      bucket[r.aiPlatform] = (bucket[r.aiPlatform] || 0) + 1;
+      bucket[g.aiPlatform] = (bucket[g.aiPlatform] || 0) + g.n;
     }
 
     for (const brand of brands) {
@@ -477,8 +493,16 @@ export const competitorsStorage = {
       : await this.getCompetitors();
     if (allCompetitors.length > 0) {
       const compIds = allCompetitors.map((c) => c.id);
-      const cgr = await db
-        .select()
+      // Grouped in SQL, same reasoning as the citedGroups query above - this
+      // was the single most expensive query in an Ask "list_competitors"
+      // call (measured: ~4.1s selecting every row vs ~0.3s counting
+      // grouped, on an account with months of history).
+      const cgrGroups = await db
+        .select({
+          competitorId: schema.competitorGeoRankings.competitorId,
+          aiPlatform: schema.competitorGeoRankings.aiPlatform,
+          n: sql<number>`count(*)::int`,
+        })
         .from(schema.competitorGeoRankings)
         .where(
           and(
@@ -486,14 +510,18 @@ export const competitorsStorage = {
             eq(schema.competitorGeoRankings.isCited, 1),
             gte(schema.competitorGeoRankings.checkedAt, since),
           ),
+        )
+        .groupBy(
+          schema.competitorGeoRankings.competitorId,
+          schema.competitorGeoRankings.aiPlatform,
         );
 
       const perCompetitor = new Map<string, Map<string, number>>();
       for (const c of compIds) perCompetitor.set(c, new Map());
-      for (const r of cgr) {
-        const bucket = perCompetitor.get(r.competitorId);
+      for (const g of cgrGroups) {
+        const bucket = perCompetitor.get(g.competitorId);
         if (!bucket) continue;
-        bucket.set(r.aiPlatform, (bucket.get(r.aiPlatform) || 0) + 1);
+        bucket.set(g.aiPlatform, (bucket.get(g.aiPlatform) ?? 0) + g.n);
       }
 
       // One row per core competitor, carrying the citations of every row for

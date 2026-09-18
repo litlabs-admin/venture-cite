@@ -52,6 +52,7 @@ import { storage } from "../storage";
 import { setupStripeProducts } from "../setupProducts";
 import { asyncHandler } from "../lib/asyncHandler";
 import { runContentCostOutboxDrain } from "../outbox/contentCostOutboxDrain";
+import { runAskOutboxDrain } from "../ask/actions/outboxDrain";
 import { runOpsHealthCheck } from "../lib/opsHealthCheck";
 import { isCronAuthorized } from "../services/cronAuth";
 import {
@@ -109,6 +110,13 @@ export function setupCronRoutes(app: Express): void {
       );
       await orch.run("content-cost-outbox-drain", (deadlineMs) =>
         runContentCostOutboxDrain({ maxCommands: 25, deadlineMs, leaseSeconds: 60 }),
+      );
+      // Ask action-card outbox (docs/ask-feature/04-implementation-plan.md
+      // §4). Own step, own drain, own handler set - mirrors
+      // content-cost-outbox-drain immediately above rather than sharing it,
+      // so a bug in either outbox cannot affect the other.
+      await orch.run("ask-outbox-drain", (deadlineMs) =>
+        runAskOutboxDrain({ maxCommands: 25, deadlineMs, leaseSeconds: 60 }),
       );
 
       // Both are millisecond-scale daily housekeeping, and both used to live

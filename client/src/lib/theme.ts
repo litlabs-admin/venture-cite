@@ -119,6 +119,16 @@ export function applyResolvedTheme(resolved: ResolvedTheme): void {
   } else {
     root.classList.remove("dark");
   }
+  // Explicit marker, not just the `.dark` class's absence - a third party
+  // that walks up from its own element looking for light/dark (e.g.
+  // thinking-orbs' `theme="auto"`, AskThinking.tsx) has no way to tell "no
+  // .dark class" apart from "no theme info here at all" unless something
+  // sets this. Without it, that exact walk fell through to the OS's own
+  // prefers-color-scheme - so a reader on a light-themed page with a
+  // dark-mode OS got dark-mode (light) ink invisible against this page's
+  // light background. `data-theme` is the convention those libraries
+  // document reading first, ahead of any class.
+  root.setAttribute("data-theme", resolved);
   // Set the standard `color-scheme` so native form controls, scrollbars,
   // and the `<canvas>` default backdrop all pick the right palette. This
   // is what fixes the white-flash on native datepickers under dark mode.

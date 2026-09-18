@@ -9,6 +9,16 @@
 // statements, etc.). Migrations need a session connection, so they
 // prefer DATABASE_DIRECT_URL when set. Local dev keeps the single
 // DATABASE_URL.
+//
+// `dotenv/config` first, and before every other import: a deploy platform
+// injects DATABASE_URL directly into the process environment, but local dev
+// keeps it in .env, which nothing loads otherwise - server/app.ts does this
+// same import for the same reason (npm run dev works without it precisely
+// because it goes through app.ts first; this standalone script does not).
+// Must run before `./migrationRelease` and everything else below, all of
+// which either read process.env themselves or import server/db.ts, which
+// reads it at module load time.
+import "dotenv/config";
 
 import {
   assertProductionMigrationReady,

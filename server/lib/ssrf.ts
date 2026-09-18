@@ -191,7 +191,7 @@ export async function safeFetchBuffer(
 export async function safeFetchText(
   raw: string,
   opts: { maxBytes?: number; timeoutMs?: number; headers?: Record<string, string> } = {},
-): Promise<{ status: number; text: string; contentType: string }> {
+): Promise<{ status: number; text: string; contentType: string; finalUrl: string }> {
   const maxBytes = opts.maxBytes ?? 2 * 1024 * 1024; // 2 MB default
   const timeoutMs = opts.timeoutMs ?? 10_000;
 
@@ -202,10 +202,18 @@ export async function safeFetchText(
       headers: opts.headers,
       signal: controller.signal,
     });
+    // `res.url` is the fetch spec's own "final URL after redirects" field -
+    // exposing it lets a caller re-check an application-level allowlist
+    // (distinct from this function's own SSRF/private-IP revalidation, which
+    // already runs on every hop inside fetchRevalidatingRedirects above)
+    // against where the request actually landed. Additive field: every
+    // existing caller destructures specific keys off this return value, so
+    // adding one more key changes nothing for them.
+    const finalUrl = res.url || raw;
     const contentType = res.headers.get("content-type") ?? "";
     const reader = res.body?.getReader();
     if (!reader) {
-      return { status: res.status, text: "", contentType };
+      return { status: res.status, text: "", contentType, finalUrl };
     }
     let total = 0;
     const chunks: Uint8Array[] = [];
@@ -222,7 +230,7 @@ export async function safeFetchText(
       }
     }
     const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)));
-    return { status: res.status, text: buf.toString("utf8"), contentType };
+    return { status: res.status, text: buf.toString("utf8"), contentType, finalUrl };
   } finally {
     clearTimeout(timer);
   }

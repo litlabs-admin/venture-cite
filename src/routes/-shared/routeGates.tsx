@@ -76,6 +76,35 @@ export function AuthenticatedRoute({ component: Component }: { component: Compon
   );
 }
 
+// Ask's /agent route (docs/ask-feature/07-integration-and-hardening.md
+// §3.1). Same auth gate as AuthenticatedRoute, but mounts AppShell with
+// chrome="rail" instead of the default "full" - no context bar, no
+// inspector, and critically no EducationAssistant (its fixed bottom-right
+// pill would sit on top of the Ask composer). AuthenticatedRoute itself is
+// untouched; this is a sibling, not a modification.
+export function AuthenticatedRailRoute({ component: Component }: { component: ComponentType }) {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <RouteSpinner />;
+  }
+
+  if (!isAuthenticated) {
+    window.location.href = "/login";
+    return null;
+  }
+
+  return (
+    <AppShell chrome="rail">
+      <ErrorBoundary>
+        <Suspense fallback={<ContentSkeleton />}>
+          <Component />
+        </Suspense>
+      </ErrorBoundary>
+    </AppShell>
+  );
+}
+
 export function AuthenticatedBareRoute({ component: Component }: { component: ComponentType }) {
   const { isAuthenticated, isLoading } = useAuth();
 

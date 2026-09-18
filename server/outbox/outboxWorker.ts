@@ -1,6 +1,10 @@
 import type { ClaimedOutboxCommand, OutboxRepository } from "./outboxRepository";
 import type { OutboxCommandKind, OutboxProviderResult } from "@shared/outbox";
-import { outboxErrorCodeSchema, type OutboxErrorCode } from "@shared/outbox";
+import {
+  outboxCommandPayloadSchema,
+  outboxErrorCodeSchema,
+  type OutboxErrorCode,
+} from "@shared/outbox";
 
 export type OutboxCommandFailure = { kind: "permanent" | "transient"; code: OutboxErrorCode };
 export type OutboxCommandHandler = (input: {
@@ -94,14 +98,18 @@ export async function runOutboxWorkerOnce(input: {
   }
 }
 
-const ALL_OUTBOX_COMMAND_KINDS = [
-  "stripe.create_customer",
-  "resend.send_email",
-  "buffer.create_post",
-  "openai.create_response",
-  "openai.start_llm_job",
-  "content_cost.record",
-] as const satisfies readonly OutboxCommandKind[];
+// Derived from outboxCommandPayloadSchema's discriminated union rather than
+// hand-listed: this used to be a separate hardcoded array that had to be
+// kept in sync with the schema by hand, and it drifted silently - adding
+// ask.* to the schema without also adding it here made handledKinds() drop
+// every ask.* handler, and a worker left with zero recognised kinds throws
+// "requires at least one handler" (exactly what happened - see the ask
+// outbox drain's first production run). Deriving it makes that class of
+// bug impossible: a new kind added to the schema is automatically handled
+// here with no second edit required.
+const ALL_OUTBOX_COMMAND_KINDS = outboxCommandPayloadSchema.options.map(
+  (option) => option.shape.kind.value,
+) as readonly OutboxCommandKind[];
 
 function handledKinds(handlers: OutboxWorkerHandlers): OutboxCommandKind[] {
   return ALL_OUTBOX_COMMAND_KINDS.filter((kind) => handlers[kind] !== undefined);

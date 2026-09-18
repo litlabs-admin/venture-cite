@@ -5,6 +5,7 @@
 // can grow here as their own sections.
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -629,7 +630,7 @@ function BillingSection() {
           </div>
         )}
 
-        <div>
+        <div id="invoices" className="scroll-mt-6">
           <PanelLabel>Invoices</PanelLabel>
           {invLoading ? (
             <p className="mt-2 text-caption text-vc-tertiary">Loading invoices…</p>
@@ -799,6 +800,21 @@ export default function Settings() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
 
+  // Deep-link target for the Ask window's "SETTINGS" group
+  // (CommandPalette.tsx navigates to `/settings#profile` etc). Reads
+  // router state, not a native `hashchange` listener - `navigate({hash})`
+  // uses pushState, which per spec does not fire `hashchange`, so a native
+  // listener would miss a second hash-only jump while already on this page.
+  const hash = useRouterState({ select: (s) => s.location.hash });
+  useEffect(() => {
+    if (!hash) return;
+    // One frame so the panels above have laid out before we scroll.
+    const id = requestAnimationFrame(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [hash]);
+
   const { state: tourState, isReady: tourStateReady } = useTourState();
   const { mutate: patchTour } = useTourStatePatch();
   const wildcardSuppressed = (tourState.perUserSuppressed ?? []).includes("*");
@@ -935,26 +951,35 @@ export default function Settings() {
         />
       </div>
 
-      <PanelRow cols={1}>
-        <Panel width="wide" border="last">
-          <ProfileSection />
-        </Panel>
-      </PanelRow>
+      {/* ids + scroll-mt are the CommandPalette's Ask-window deep-link
+          targets ("SETTINGS" group, CommandPalette.tsx) - `/settings#profile`
+          etc lands here instead of just at the top of the page. */}
+      <div id="profile" className="scroll-mt-6">
+        <PanelRow cols={1}>
+          <Panel width="wide" border="last">
+            <ProfileSection />
+          </Panel>
+        </PanelRow>
+      </div>
       <PanelRow cols={1}>
         <Panel width="wide" border="last">
           <AppearanceSection />
         </Panel>
       </PanelRow>
-      <PanelRow cols={1}>
-        <Panel width="wide" border="last">
-          <PasswordSection />
-        </Panel>
-      </PanelRow>
-      <PanelRow cols={1}>
-        <Panel width="wide" border="last">
-          <BillingSection />
-        </Panel>
-      </PanelRow>
+      <div id="password" className="scroll-mt-6">
+        <PanelRow cols={1}>
+          <Panel width="wide" border="last">
+            <PasswordSection />
+          </Panel>
+        </PanelRow>
+      </div>
+      <div id="billing" className="scroll-mt-6">
+        <PanelRow cols={1}>
+          <Panel width="wide" border="last">
+            <BillingSection />
+          </Panel>
+        </PanelRow>
+      </div>
       <PanelRow cols={1}>
         <Panel width="wide" border="last">
           <IntegrationsSection />

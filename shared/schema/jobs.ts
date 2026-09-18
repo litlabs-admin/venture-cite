@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { OutboxCommandPayload, OutboxStatus } from "../outbox";
 import { brands } from "./brands";
 import { users } from "./identity";
+import { askMessages, askThreads } from "./ask";
 
 // llm_jobs (migration 0079, 2026-05-28).
 //
@@ -112,12 +113,32 @@ export const agentTasks = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
+    // Ask action-card fields (migration 0127). agent_tasks is a shared
+    // platform table (belongs to neither Ask nor the AI Tutor per 07 §0),
+    // so these FKs point at ask_threads/ask_messages - never chatbot_*.
+    // NULL on every row created outside Ask (the existing prompt_test
+    // task type, weeklyCatchup, etc).
+    askThreadId: uuid("ask_thread_id").references(() => askThreads.id, { onDelete: "set null" }),
+    askMessageId: uuid("ask_message_id").references(() => askMessages.id, {
+      onDelete: "set null",
+    }),
+    // Trakkr's six work-kind categories (shared/ask/constants.ts), stored
+    // verbatim but left NULL by every Ask row in this release - see that
+    // file's header comment for why.
+    workKind: text("work_kind"),
+    proposedAt: timestamp("proposed_at", { withTimezone: true }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decidedBy: varchar("decided_by").references(() => users.id, { onDelete: "set null" }),
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
   },
   (table) => [
     index("agent_tasks_brand_id_idx").on(table.brandId),
     index("agent_tasks_status_idx").on(table.status),
     index("agent_tasks_artifact_idx").on(table.artifactType, table.artifactId),
     index("agent_tasks_workflow_run_idx").on(table.workflowRunId),
+    index("agent_tasks_ask_thread_idx")
+      .on(table.askThreadId, table.createdAt)
+      .where(sql`ask_thread_id is not null`),
   ],
 );
 

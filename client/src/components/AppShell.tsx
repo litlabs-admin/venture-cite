@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { spineTitleFor, pageTourFor } from "@/lib/spineStages";
 import { BrandLogo } from "@/components/BrandLogo";
 import { TestModeBanner, TrialBanner, TrialGate } from "@/components/TrialGate";
+import { focusAskComposer } from "@/lib/askComposerFocus";
+import { ASK_OPEN_WINDOW_EVENT } from "@/lib/askWindow";
 
 // ─── AppShell ────────────────────────────────────────────────────────────────
 // The one persistent three-zone shell (nav rail / context bar + canvas /
@@ -116,7 +118,24 @@ function isFullBleed(location: string) {
   return FULL_BLEED_EXACT.has(location) || FULL_BLEED_PREFIXES.some((p) => location.startsWith(p));
 }
 
-export default function AppShell({ children }: { children: ReactNode }) {
+export default function AppShell({
+  children,
+  chrome = "full",
+}: {
+  children: ReactNode;
+  // "full" (default) is byte-identical to this component's previous
+  // behaviour - every one of the 34 existing routes is unaffected. "rail"
+  // is for /agent only (docs/ask-feature/07-integration-and-hardening.md
+  // §3.1): it skips the context bar and inspector zones (Ask builds its own
+  // top bar and drawer) and, critically, does NOT mount EducationAssistant -
+  // that pill is `fixed bottom-6 right-6`, which would otherwise sit on top
+  // of the Ask composer. Not a true 74px icon-only rail (01-trakkr-
+  // teardown.md's measured Trakkr width) - this reuses the existing 200px
+  // Sidebar rather than building a second nav component; documented
+  // deviation, matching how sub-1280px layout is already "ours, not
+  // Trakkr's" elsewhere in the Ask docs.
+  chrome?: "full" | "rail";
+}) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [inspector, setInspector] = useState<InspectorPayload | null>(null);
   const location = useRouterState({ select: (s) => s.location.pathname });
@@ -128,18 +147,37 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const search = useSearch({ strict: false });
   const [cmdkOpen, setCmdkOpen] = useState(false);
 
-  // Global Cmd/Ctrl+K → command palette. Mounted here so it's live on every
-  // authenticated route. Different key from the sidebar's Cmd/Ctrl+B, so the
-  // two shortcuts don't collide.
+  // Global Cmd/Ctrl+K → the Ask window (CommandPalette.tsx). Mounted here so
+  // it's live on every authenticated route. Different key from the
+  // sidebar's Cmd/Ctrl+B, so the two shortcuts don't collide.
+  //
+  // On /agent itself the Ask window would open on top of the page it
+  // already represents, so ⌘K focuses that page's composer instead
+  // (askComposerFocus.ts) - the same split the sidebar's Ask pill makes
+  // (Sidebar.tsx).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
-        setCmdkOpen((v) => !v);
+        if (location === "/agent") {
+          focusAskComposer();
+        } else {
+          setCmdkOpen((v) => !v);
+        }
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, [location]);
+
+  // The sidebar's Ask pill (Sidebar.tsx) - same window it would otherwise
+  // need this component's own state for.
+  useEffect(() => {
+    function onOpen() {
+      setCmdkOpen(true);
+    }
+    window.addEventListener(ASK_OPEN_WINDOW_EVENT, onOpen);
+    return () => window.removeEventListener(ASK_OPEN_WINDOW_EVENT, onOpen);
   }, []);
 
   const isXlUp = useIsXlUp();
@@ -166,7 +204,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const activeTab = typeof search.tab === "string" ? search.tab : null;
   const title = shellTitleFor(location, activeTab);
   const ownsContextBar = title !== null;
-  const fullBleed = isFullBleed(location);
+  // chrome="rail" (Ask's /agent) always renders full-bleed: it builds its
+  // own three-column layout and top bar, so the shell's padded max-width
+  // canvas and context bar would only get in the way.
+  const fullBleed = isFullBleed(location) || chrome === "rail";
   // Exactly one presentation is live at a time. Below xl the overlay Sheet
   // owns it; at xl+ the inline aside does. Never both - see useIsXlUp above.
   const showInlineInspector = ownsContextBar && inspector !== null && isXlUp;
@@ -359,9 +400,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </Sheet>
         )}
 
-        <div className="print:hidden">
-          <EducationAssistant />
-        </div>
+        {/* Not mounted under chrome="rail" - its trigger is `fixed bottom-6
+            right-6`, which would sit on top of the Ask composer
+            (07-integration-and-hardening.md §3.1). */}
+        {chrome === "full" && (
+          <div className="print:hidden">
+            <EducationAssistant />
+          </div>
+        )}
 
         <CommandPalette open={cmdkOpen} onOpenChange={setCmdkOpen} />
       </div>

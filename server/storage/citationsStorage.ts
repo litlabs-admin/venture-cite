@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, gte, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gte, inArray, isNotNull } from "drizzle-orm";
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import {
@@ -106,6 +106,22 @@ export const citationsStorage = {
       .from(schema.geoRankings)
       .where(and(...conditions))
       .orderBy(desc(schema.geoRankings.checkedAt));
+  },
+
+  async getDistinctCitingOutletUrls(ids: string[], sinceDate?: Date): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const conditions = [
+      inArray(schema.geoRankings.brandPromptId, ids),
+      isNotNull(schema.geoRankings.citingOutletUrl),
+    ];
+    if (sinceDate) conditions.push(gte(schema.geoRankings.checkedAt, sinceDate));
+    const rows = await db
+      .selectDistinct({ citingOutletUrl: schema.geoRankings.citingOutletUrl })
+      .from(schema.geoRankings)
+      .where(and(...conditions));
+    return rows
+      .map((r) => r.citingOutletUrl)
+      .filter((url): url is string => url !== null && url !== "");
   },
 
   async getPromptCitationCounts(

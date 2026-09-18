@@ -107,6 +107,19 @@ export const MODELS = {
   // agent tasks, geo-signals, community posts, etc.). Bump this if you
   // need a stronger model for side features.
   misc: OPENAI_MINI_SNAPSHOT,
+
+  // ── Ask (agent workspace) ──────────────────────────────────────────
+  // Its OWN entry, deliberately - round-2 decision 6. It happens to hold
+  // the same slug as openrouterClient.ts's CHATBOT_MODEL today; that is a
+  // coincidence, not a shared constant. Changing the AI Tutor's model must
+  // never change Ask's, and the reverse - do not "simplify" this into an
+  // alias of CHATBOT_MODEL. See docs/ask-feature/07-integration-and-hardening.md
+  // §0 (independence) for why the two stay separate end to end.
+  ask: "anthropic/claude-sonnet-4.5",
+  // Cheap follow-up-chip generation after an Ask answer (04 §3.5, §9) - a
+  // small, capped-output call that does not need Sonnet's tool-calling
+  // strength.
+  askFollowups: OPENAI_MINI_SNAPSHOT,
 } as const;
 
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";

@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createRequire } from "node:module";
 import pino, { type LoggerOptions } from "pino";
 
 // Per-request context propagated through async stacks. The HTTP middleware
@@ -214,16 +215,52 @@ const baseOptions: LoggerOptions = {
   },
 };
 
+// A serialized error (this file's own `err` serializer above, or pino's
+// stock one) as one compact line, not pino-pretty's default rendering.
+//
+// Verified directly (not assumed): even a bare `pino({transport:{target:
+// "pino-pretty"}})`, with none of this file's own customization, renders an
+// `err` field as `{"type":...,"message":...,"stack":<raw unindented
+// multi-line block>}` - a JSON-shaped preamble wrapped around an unquoted
+// stack trace, for every single warn/error log in the app. That mixed
+// format, not this file's own serializer, is what read as "the logs...
+// return json type, very hard to read." This keeps the error's type and
+// message on one line and appends only the single most relevant stack
+// frame - enough to jump to the call site without a wall of text per line.
+function prettifyErr(value: unknown): string {
+  if (!value || typeof value !== "object") return String(value);
+  const { name, message, stack } = value as { name?: string; message?: string; stack?: unknown };
+  const label = name && message ? `${name}: ${message}` : String(message ?? name ?? value);
+  const frame =
+    typeof stack === "string"
+      ? stack
+          .split("\n")
+          .slice(1)
+          .map((l) => l.trim())
+          .find((l) => l.length > 0)
+      : undefined;
+  return frame ? `${label}\n        ${frame}` : label;
+}
+
 // In development, pretty-print to stdout for readability. In production,
 // emit JSON lines so log aggregators (Datadog, Better Stack, etc.) can
 // parse fields directly.
 //
-// The pretty transport is built inside a try/catch, and that is load-bearing
-// rather than defensive habit. `transport.target` is resolved by pino from a
-// STRING at runtime, which no bundler can trace - so a bundle that includes
-// this branch but not pino-pretty throws at module load, not at first log.
-// This module is imported by the SSR entry, so that throw took down every
-// route with an opaque 500: the marketing pages, /health, everything.
+// This builds the pino-pretty STREAM directly (`require`d synchronously,
+// same thread) rather than through pino's own `transport: { target:
+// "pino-pretty" }` shorthand, which used to run it in a worker thread.
+// `customPrettifiers.err` above is a FUNCTION, and pino's transport
+// mechanism structuredClone()s its options across that thread boundary to
+// hand them to the worker - a function value fails that clone outright
+// (verified: `DataCloneError`), so a custom prettifier is only reachable
+// this way, in-thread. Fine for a dev-only logger: pino-pretty formatting
+// is cheap, and this whole branch never runs in production (guarded below).
+//
+// The require is still inside a try/catch, and that is load-bearing rather
+// than defensive habit. A bundle that includes this branch but not
+// pino-pretty throws at module load, not at first log. This module is
+// imported by the SSR entry, so that throw took down every route with an
+// opaque 500: the marketing pages, /health, everything.
 //
 // It reached production because `process.env.NODE_ENV` is inlined by the
 // bundler at BUILD time. The Vercel build ran `vite build` without
@@ -234,20 +271,21 @@ const baseOptions: LoggerOptions = {
 // Both halves are fixed, but the guard alone is not enough to rely on: a
 // logging backend must never be able to take the application down. Losing
 // colour in the terminal is an acceptable failure; losing the site is not.
+const require = createRequire(import.meta.url);
+
 function createLogger() {
   if (isProd) return pino(baseOptions);
   try {
-    return pino({
-      ...baseOptions,
-      transport: {
-        target: "pino-pretty",
-        options: {
-          colorize: true,
-          translateTime: "SYS:HH:MM:ss",
-          ignore: "pid,hostname,service,env",
-        },
-      },
+    const pinoPretty = require("pino-pretty") as (
+      opts: Record<string, unknown>,
+    ) => NodeJS.WritableStream;
+    const stream = pinoPretty({
+      colorize: true,
+      translateTime: "SYS:HH:MM:ss",
+      ignore: "pid,hostname,service,env",
+      customPrettifiers: { err: prettifyErr },
     });
+    return pino(baseOptions, stream);
   } catch {
     // pino-pretty unavailable (bundled runtime, pruned install). Fall back
     // to structured JSON on stdout - still fully usable, just not pretty.

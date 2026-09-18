@@ -44,6 +44,12 @@ const CONFIGS: Record<string, BucketConfig> = {
   "scan-wikipedia": { capacity: 10, refillPerSec: 1 / 20 },
   "generate-faqs": { capacity: 10, refillPerSec: 1 / 20 },
   "discover-keywords": { capacity: 10, refillPerSec: 1 / 20 },
+  // Ask run starts (04-implementation-plan.md §5). Burst protection ONLY -
+  // the real per-tier cap is server/ask/budget.ts's ASK_RUNS_PER_HOUR. This
+  // bucket exists to stop a double-click or a scripted hammer from queuing
+  // several runs in the same second before that hourly check would ever see
+  // them; capacity 5 / refill 1 per 10s ≈ 6/min burst ceiling.
+  "ask-run": { capacity: 5, refillPerSec: 1 / 10 },
   // Kept for backwards compatibility - anywhere still passing
   // "manual-discovery" gets the same generous shape as the per-feature
   // buckets above. Should be removable after a grep confirms no callers.

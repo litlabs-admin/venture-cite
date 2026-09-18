@@ -1,3 +1,9 @@
+// A deploy platform injects DATABASE_URL directly; local dev keeps it in
+// .env, which nothing loads otherwise for a standalone script (server/app.ts
+// does this same import, but that's not in this script's import chain).
+// First, before any import that reads process.env at load time.
+import "dotenv/config";
+
 import { selectDatabaseMetadataAuditTarget } from "./databaseMetadataAuditTarget";
 
 const REQUIRED_CONFIRMATION = "venturecite-read-only";

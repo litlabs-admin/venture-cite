@@ -118,6 +118,98 @@ export default tseslint.config(
     },
   },
 
+  // Ask/Tutor independence (docs/ask-feature/07-integration-and-hardening.md
+  // §0). Ask and the AI Tutor share no tables, budget, routes, components or
+  // prompts. These two blocks enforce that boundary in both directions so
+  // neither product can silently start depending on the other's internals.
+  // Platform libraries (ssrf, llmPricing, modelConfig, ownership,
+  // SafeMarkdown, agent_tasks/outbox_commands via @shared/schema) belong to
+  // neither product and are not restricted here.
+  {
+    files: [
+      "server/ask/**/*.ts",
+      "server/routes/ask.ts",
+      "client/src/components/ask/**/*.tsx",
+      "client/src/hooks/useAskRun.ts",
+      "client/src/hooks/useAskThreads.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/chatbotKnowledge*",
+                "**/chatbotBudget*",
+                "**/chatbotStorage*",
+                "**/routes/assistant*",
+                "**/hooks/useChatbot*",
+                "**/components/chatbot/**",
+                "**/components/EducationAssistant*",
+                "**/lib/openChatbotPrompt*",
+              ],
+              message:
+                "Ask may not import AI Tutor modules - see docs/ask-feature/07-integration-and-hardening.md §0 (independence decision). Duplicate the small amount of logic you need instead.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "server/routes/assistant.ts",
+      "server/lib/chatbot*.ts",
+      "server/storage/chatbotStorage.ts",
+      "client/src/hooks/useChatbot.ts",
+      "client/src/components/chatbot/**/*.tsx",
+      "client/src/components/EducationAssistant.tsx",
+      "client/src/lib/openChatbotPrompt.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/server/ask/**",
+                "**/routes/ask*",
+                "**/hooks/useAskRun*",
+                "**/hooks/useAskThreads*",
+                "**/components/ask/**",
+              ],
+              message:
+                "The AI Tutor may not import Ask modules - see docs/ask-feature/07-integration-and-hardening.md §0 (independence decision).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // server/ask/** must stay testable against a scripted ModelClient with
+  // zero HTTP (07 §7, "the fake model") - importing express here would mean
+  // the loop can no longer run without a live request/response pair.
+  {
+    files: ["server/ask/**/*.ts"],
+    ignores: ["server/ask/stream.ts"], // the one file whose job IS the Express Response type
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "express",
+              message:
+                "server/ask/** must stay testable against a scripted ModelClient with no HTTP - keep Express types out of the loop/tools/context modules. server/routes/ask.ts is where request/response belongs.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Tests - Vitest globals + relaxed rules
   {
     files: ["tests/**/*.{ts,tsx}", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
