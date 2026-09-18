@@ -140,6 +140,19 @@ export async function approveAction(taskId: string, userId: string): Promise<Ask
         providerName: "internal",
         providerOperation: "ask_run_citation_check",
       });
+    } else if (task.taskType === "remember_fact") {
+      await outbox.enqueueInTransaction(tx, {
+        kind: "ask.remember_fact",
+        idempotencyKey: `ask-remember-fact:${taskId}`,
+        aggregateType: "ask_action",
+        aggregateId: taskId,
+        userId,
+        brandId: task.brandId,
+        payload: { kind: "ask.remember_fact", taskId },
+        maxAttempts: 5,
+        providerName: "internal",
+        providerOperation: "ask_remember_fact",
+      });
     } else {
       throw new ActionConflictError(`Action kind '${task.taskType}' cannot be approved`);
     }
@@ -205,6 +218,19 @@ export async function undoAction(taskId: string, userId: string): Promise<AskAct
         maxAttempts: 5,
         providerName: "internal",
         providerOperation: "ask_cancel_citation_check",
+      });
+    } else if (task.taskType === "remember_fact") {
+      await outbox.enqueueInTransaction(tx, {
+        kind: "ask.forget_fact",
+        idempotencyKey: `ask-forget-fact:${taskId}`,
+        aggregateType: "ask_action",
+        aggregateId: taskId,
+        userId,
+        brandId: task.brandId,
+        payload: { kind: "ask.forget_fact", taskId },
+        maxAttempts: 5,
+        providerName: "internal",
+        providerOperation: "ask_forget_fact",
       });
     }
   });

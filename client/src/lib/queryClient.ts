@@ -29,6 +29,30 @@ export function isApiError(err: unknown): err is ApiError {
   return err instanceof ApiError;
 }
 
+// Extracted from client/src/pages/settings.tsx's own local copy so the Ask
+// business-context forms (BusinessBriefTab, MemoryTab, PreferencesTab) don't
+// each need a fourth copy. settings.tsx keeps its own for now - out of this
+// change's scope to touch.
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    const body = err.body as { error?: string } | null | undefined;
+    if (body && typeof body === "object" && typeof body.error === "string") {
+      return body.error;
+    }
+    return err.message.replace(/^\d+:\s*/, "") || fallback;
+  }
+  if (err instanceof Error) return err.message.replace(/^\d+:\s*/, "") || fallback;
+  return fallback;
+}
+
+export function apiErrorCode(err: unknown): string | undefined {
+  if (err instanceof ApiError) {
+    const body = err.body as { code?: string } | null | undefined;
+    if (body && typeof body === "object" && typeof body.code === "string") return body.code;
+  }
+  return undefined;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const raw = await res.text();

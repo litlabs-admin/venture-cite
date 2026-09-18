@@ -61,6 +61,18 @@ export const outboxCommandPayloadSchema = z.discriminatedUnion("kind", [
     kind: z.literal("ask.cancel_citation_check"),
     taskId: identifier,
   }),
+  // Memory action-card kinds (business-context.md's Memory tab, decision 5).
+  // A learned memory is proposed as a card and only written to ask_memories
+  // once approved - the same "propose -> queue -> execute" shape as every
+  // other Ask action, not a special case.
+  z.object({
+    kind: z.literal("ask.remember_fact"),
+    taskId: identifier,
+  }),
+  z.object({
+    kind: z.literal("ask.forget_fact"),
+    taskId: identifier,
+  }),
 ]);
 
 export type OutboxCommandPayload = z.infer<typeof outboxCommandPayloadSchema>;

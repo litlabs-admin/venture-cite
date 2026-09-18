@@ -8,7 +8,17 @@
 //   POST   /api/ask/threads/:threadId/restore   un-archive
 //   POST   /api/ask/threads/:threadId/run       SSE-streaming agent run
 //   GET    /api/ask/suggestions                 palette + empty-state questions
-//   GET    /api/ask/context                     assembled brief for the drawer
+//   GET    /api/ask/context                     brand context for the drawer (legacy shape)
+//   GET    /api/ask/drawer                      "What I know" drawer summary (brief + memories + prefs)
+//   GET    /api/ask/brief                        business brief (business-context.md)
+//   PUT    /api/ask/brief                        save/accept the brief
+//   POST   /api/ask/brief/generate               draft the two website-sourced fields
+//   GET    /api/ask/memories                     shared brand memory list
+//   POST   /api/ask/memories                     add a memory
+//   PATCH  /api/ask/memories/:id                 edit a memory
+//   POST   /api/ask/memories/:id/forget          soft-delete a memory
+//   GET    /api/ask/preferences                  this user's private answer preferences
+//   PUT    /api/ask/preferences                  save preferences
 //   GET    /api/ask/actions                     action cards for a brand (sidebar counts)
 //   POST   /api/ask/actions/:id/approve
 //   POST   /api/ask/actions/:id/dismiss
@@ -50,7 +60,7 @@ import {
   insertAskMessage,
   insertAskSteps,
 } from "../ask/storage";
-import { assembleAskContext } from "../ask/context";
+import { assembleAskContext, assemblePersonalContextBlock } from "../ask/context";
 import { runAskLoop } from "../ask/loop";
 import { generateFollowups } from "../ask/followups";
 import { openAskSse } from "../ask/stream";
@@ -67,6 +77,26 @@ import {
 import { WORK_KINDS } from "@shared/ask/constants";
 import { ASK_SUGGESTION_PALETTE } from "@shared/ask/suggestions";
 import { env } from "../env";
+import {
+  readBrief,
+  saveBrief,
+  storeWebsiteDraft,
+  markScrapeRunning,
+  BriefConflictError,
+} from "../ask/briefStorage";
+import { generateWebsiteBriefDraft } from "../ask/briefWebsiteDraft";
+import { saveAskBriefSchema } from "@shared/ask/brief";
+import {
+  listMemories,
+  countMemories,
+  createMemory,
+  updateMemory,
+  forgetMemory,
+  MemoryNotFoundError,
+} from "../ask/memoryStorage";
+import { createAskMemorySchema, updateAskMemorySchema } from "@shared/ask/memory";
+import { readPreferences, savePreferences } from "../ask/preferencesStorage";
+import { saveAskPreferencesSchema } from "@shared/ask/preferences";
 
 const uuidSchema = z.string().uuid();
 
@@ -76,6 +106,9 @@ const runRequestSchema = z.object({
 
 const createThreadSchema = z.object({
   brandId: z.string().optional().nullable(),
+  // "Just for one conversation" (Your preferences tab). Optional: every
+  // other thread-creation call site (palette, "+ New thread") omits it.
+  temporaryInstructions: z.string().trim().max(2000).optional().nullable(),
 });
 
 const renameThreadSchema = z.object({
@@ -164,7 +197,11 @@ export function setupAskRoutes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({ success: false, error: "Invalid request" });
         }
-        const thread = await createAskThread(user.id, parsed.data.brandId ?? null);
+        const thread = await createAskThread(
+          user.id,
+          parsed.data.brandId ?? null,
+          parsed.data.temporaryInstructions ?? null,
+        );
         res.json({ success: true, data: { thread } });
       } catch (error) {
         sendError(res, error, "Failed to create thread");
@@ -206,7 +243,12 @@ export function setupAskRoutes(app: Express): void {
         res.json({
           success: true,
           data: {
-            thread: { id: thread.id, title: thread.title, brandId: thread.brandId },
+            thread: {
+              id: thread.id,
+              title: thread.title,
+              brandId: thread.brandId,
+              temporaryInstructions: thread.temporaryInstructions,
+            },
             messages: messages.map((m) => ({
               id: m.id,
               role: m.role,
@@ -445,6 +487,270 @@ export function setupAskRoutes(app: Express): void {
     }),
   );
 
+  // ------------------------------ Drawer summary ------------------------------
+
+  // "What I know" drawer's Memory tab (business-context.md). One round trip
+  // for everything the drawer shows: brief status line, a handful of recent
+  // memories, and whether preferences are set - each already has its own
+  // full-page endpoint below; this exists so opening the drawer doesn't fire
+  // three requests.
+  app.get(
+    "/api/ask/drawer",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brandId = typeof req.query.brandId === "string" ? req.query.brandId : undefined;
+        if (!brandId) return res.status(400).json({ success: false, error: "brandId required" });
+        const brand = await requireBrand(brandId, user.id);
+        const [brief, memories, preferences] = await Promise.all([
+          readBrief(brand),
+          listMemories(brandId, 5),
+          readPreferences(user.id),
+        ]);
+        const totalMemories = await countMemories(brandId);
+        res.json({
+          success: true,
+          data: {
+            brief: { status: brief.status, hasAnyContent: brief.hasAnyContent },
+            memories,
+            memoryCount: totalMemories,
+            hasPreferences: !!(
+              preferences.tone ||
+              preferences.language ||
+              preferences.answerLength
+            ),
+          },
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to load drawer");
+      }
+    }),
+  );
+
+  // ------------------------------ Business brief ------------------------------
+
+  app.get(
+    "/api/ask/brief",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brandId = typeof req.query.brandId === "string" ? req.query.brandId : undefined;
+        if (!brandId) return res.status(400).json({ success: false, error: "brandId required" });
+        const brand = await requireBrand(brandId, user.id);
+        const brief = await readBrief(brand);
+        res.json({ success: true, data: { brief } });
+      } catch (error) {
+        sendError(res, error, "Failed to load brief");
+      }
+    }),
+  );
+
+  app.put(
+    "/api/ask/brief",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const parsed = saveAskBriefSchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res
+            .status(400)
+            .json({ success: false, error: parsed.error.issues[0]?.message ?? "Invalid brief" });
+        }
+        const brand = await requireBrand(parsed.data.brandId, user.id);
+        const brief = await saveBrief(brand, user.id, parsed.data);
+        res.json({ success: true, data: { brief } });
+      } catch (error) {
+        if (error instanceof BriefConflictError) {
+          return res
+            .status(409)
+            .json({ success: false, error: error.message, code: "brief_conflict" });
+        }
+        sendError(res, error, "Failed to save brief");
+      }
+    }),
+  );
+
+  // Generates the website-sourced draft (Products and services / Markets and
+  // audiences + quotes). Synchronous - a homepage fetch plus one LLM call,
+  // capped well under the request timeout - rather than SSE, since this is a
+  // single short-lived operation, not a multi-step run. markScrapeRunning
+  // makes a second concurrent click a no-op instead of a duplicate scrape.
+  app.post(
+    "/api/ask/brief/generate",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brandId = typeof req.body?.brandId === "string" ? req.body.brandId : undefined;
+        if (!brandId) return res.status(400).json({ success: false, error: "brandId required" });
+        const brand = await requireBrand(brandId, user.id);
+        if (!brand.website) {
+          return res.json({ success: true, data: { started: false, reason: "no_website" } });
+        }
+        const started = await markScrapeRunning(brandId);
+        if (!started) {
+          return res.json({ success: true, data: { started: false, reason: "already_running" } });
+        }
+        try {
+          const draft = await generateWebsiteBriefDraft(brand.website);
+          await storeWebsiteDraft(brandId, {
+            draftProductsServices: draft.productsServices,
+            draftMarketsAudiences: draft.marketsAudiences,
+            sources: draft.sources,
+            scrapeStatus: "ready",
+          });
+        } catch (err) {
+          logger.warn({ err, brandId }, "ask.brief.generate: draft generation failed");
+          await storeWebsiteDraft(brandId, {
+            draftProductsServices: null,
+            draftMarketsAudiences: null,
+            sources: [],
+            scrapeStatus: "failed",
+          });
+        }
+        const [freshBrand] = await db
+          .select()
+          .from(schema.brands)
+          .where(eq(schema.brands.id, brandId))
+          .limit(1);
+        const brief = await readBrief(freshBrand);
+        res.json({ success: true, data: { started: true, brief } });
+      } catch (error) {
+        sendError(res, error, "Failed to generate brief draft");
+      }
+    }),
+  );
+
+  // ------------------------------- Memory --------------------------------
+
+  app.get(
+    "/api/ask/memories",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brandId = typeof req.query.brandId === "string" ? req.query.brandId : undefined;
+        if (!brandId) return res.status(400).json({ success: false, error: "brandId required" });
+        await requireBrand(brandId, user.id);
+        const memories = await listMemories(brandId);
+        res.json({ success: true, data: { memories } });
+      } catch (error) {
+        sendError(res, error, "Failed to load memories");
+      }
+    }),
+  );
+
+  app.post(
+    "/api/ask/memories",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const parsed = createAskMemorySchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res
+            .status(400)
+            .json({ success: false, error: parsed.error.issues[0]?.message ?? "Invalid memory" });
+        }
+        await requireBrand(parsed.data.brandId, user.id);
+        const memory = await createMemory({
+          brandId: parsed.data.brandId,
+          type: parsed.data.type,
+          content: parsed.data.content,
+          origin: "manual",
+          createdBy: user.id,
+        });
+        res.json({ success: true, data: { memory } });
+      } catch (error) {
+        sendError(res, error, "Failed to save memory");
+      }
+    }),
+  );
+
+  app.patch(
+    "/api/ask/memories/:id",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const idParse = uuidSchema.safeParse(req.params.id);
+        const brandId = typeof req.body?.brandId === "string" ? req.body.brandId : undefined;
+        if (!idParse.success || !brandId) {
+          return res.status(404).json({ success: false, error: "Memory not found" });
+        }
+        await requireBrand(brandId, user.id);
+        const parsed = updateAskMemorySchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({ success: false, error: "Invalid memory update" });
+        }
+        const memory = await updateMemory(idParse.data, brandId, parsed.data);
+        res.json({ success: true, data: { memory } });
+      } catch (error) {
+        if (error instanceof MemoryNotFoundError) {
+          return res.status(404).json({ success: false, error: "Memory not found" });
+        }
+        sendError(res, error, "Failed to update memory");
+      }
+    }),
+  );
+
+  app.post(
+    "/api/ask/memories/:id/forget",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const idParse = uuidSchema.safeParse(req.params.id);
+        const brandId = typeof req.body?.brandId === "string" ? req.body.brandId : undefined;
+        if (!idParse.success || !brandId) {
+          return res.status(404).json({ success: false, error: "Memory not found" });
+        }
+        await requireBrand(brandId, user.id);
+        await forgetMemory(idParse.data, brandId);
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to forget memory");
+      }
+    }),
+  );
+
+  // ---------------------------- Preferences ------------------------------
+
+  app.get(
+    "/api/ask/preferences",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const preferences = await readPreferences(user.id);
+        res.json({ success: true, data: { preferences } });
+      } catch (error) {
+        sendError(res, error, "Failed to load preferences");
+      }
+    }),
+  );
+
+  app.put(
+    "/api/ask/preferences",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const parsed = saveAskPreferencesSchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({ success: false, error: "Invalid preferences" });
+        }
+        const preferences = await savePreferences(user.id, parsed.data);
+        res.json({ success: true, data: { preferences } });
+      } catch (error) {
+        sendError(res, error, "Failed to save preferences");
+      }
+    }),
+  );
+
   // ------------------------------- Actions --------------------------------
 
   app.get(
@@ -520,7 +826,12 @@ async function runOneAskTurn(input: {
   res: import("express").Response;
   user: { id: string };
   tier: Tier;
-  thread: { id: string; brandId: string | null; title: string };
+  thread: {
+    id: string;
+    brandId: string | null;
+    title: string;
+    temporaryInstructions?: string | null;
+  };
   brand: import("@shared/schema").Brand;
   message: string;
 }): Promise<void> {
@@ -551,7 +862,7 @@ async function runOneAskTurn(input: {
   // the insert and the history fetch together means either can resolve
   // first, so "drop the last row" would have been wrong exactly as often as
   // it was right.
-  const [userMessageRow, priorMessages, context] = await Promise.all([
+  const [userMessageRow, priorMessages, context, personalBlock] = await Promise.all([
     insertAskMessage({
       threadId: thread.id,
       userId: user.id,
@@ -561,7 +872,14 @@ async function runOneAskTurn(input: {
     }),
     getAskThreadMessages(thread.id, 21),
     assembleAskContext(brand),
+    // PERSONAL context (preferences + this thread's "Just for one
+    // conversation" override) - assembled and appended separately from the
+    // shared context above, per context.ts's own documented boundary.
+    assemblePersonalContextBlock(user.id, thread.temporaryInstructions ?? null),
   ]);
+  const systemPrompt = personalBlock
+    ? `${context.systemPrompt}\n\n${personalBlock}`
+    : context.systemPrompt;
 
   // Title/touch are writes nothing downstream reads back, so they run
   // fire-and-forget rather than adding their own latency to the critical
@@ -592,7 +910,7 @@ async function runOneAskTurn(input: {
         threadId: thread.id,
         messageId: pendingMessageId,
         userMessage: message,
-        systemPrompt: context.systemPrompt,
+        systemPrompt,
         coreCompetitors: context.coreCompetitors,
         trackedPromptIds: context.trackedPromptIds,
         hero: context.hero,

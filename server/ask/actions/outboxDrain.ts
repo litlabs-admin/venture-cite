@@ -91,6 +91,8 @@ export async function runAskOutboxDrain(options: DrainOptions): Promise<AskOutbo
     "ask.untrack_prompt": adapterModule.createAskUntrackPromptHandler(),
     "ask.run_citation_check": adapterModule.createAskRunCitationCheckHandler(),
     "ask.cancel_citation_check": adapterModule.createAskCancelCitationCheckHandler(),
+    "ask.remember_fact": adapterModule.createAskRememberFactHandler(),
+    "ask.forget_fact": adapterModule.createAskForgetFactHandler(),
   } as const;
   const drain = createAskOutboxDrain({
     now: Date.now,

@@ -48,7 +48,7 @@ export function createProposeActionTool(extra: {
     label: "Preparing suggestion",
     category: "suggestion",
     description:
-      "Proposes a concrete action for the user to approve or dismiss - e.g. tracking a new prompt, or re-running a citation check. This does NOT execute anything; it creates a card the user must approve first. Only call this when you have a specific, well-justified action in mind.",
+      "Proposes a concrete action for the user to approve or dismiss - e.g. tracking a new prompt, re-running a citation check, or remembering a durable fact about the brand (kind='remember_fact', params={type, content}) that should inform every future answer. This does NOT execute anything; it creates a card the user must approve first. Only call remember_fact for something worth keeping permanently - a stated constraint, a named audience, a point of difference, a brand fact, or a topic to track - never for a one-off detail that only matters to this answer.",
     input: inputSchema,
     costHint: "cheap",
     async run(ctx: AskToolContext, input: Input): Promise<AskToolResult<Output>> {

@@ -76,6 +76,9 @@ export async function buildUserExport(userId: string): Promise<Record<string, un
     brandPrompts,
     auditLogs,
     askThreads,
+    askBusinessBriefs,
+    askMemories,
+    askUserPreferences,
   ] = await Promise.all([
     byBrand(schema.articles) as Promise<Array<typeof schema.articles.$inferSelect>>,
     byBrand(schema.competitors),
@@ -94,6 +97,13 @@ export async function buildUserExport(userId: string): Promise<Record<string, un
     // runAccountPurgeJobImpl (server/scheduler.ts) and the FK definitions
     // in shared/schema/ask.ts.
     db.select().from(schema.askThreads).where(eq(schema.askThreads.userId, userId)),
+    // Business-context tables (migration 0128). Brand-scoped, so byBrand
+    // covers export; deletion needs no code either - both cascade from
+    // brands.id ON DELETE CASCADE, which itself cascades from users.id.
+    byBrand(schema.askBusinessBriefs),
+    byBrand(schema.askMemories),
+    // User-scoped (one row per user), cascades from users.id directly.
+    db.select().from(schema.askUserPreferences).where(eq(schema.askUserPreferences.userId, userId)),
   ]);
 
   // geoRankings keys off article_id (not brand_id) - second-pass query.
@@ -130,6 +140,9 @@ export async function buildUserExport(userId: string): Promise<Record<string, un
     auditLogs,
     askThreads,
     askMessages,
+    askBusinessBriefs,
+    askMemories,
+    askUserPreferences,
   };
 }
 

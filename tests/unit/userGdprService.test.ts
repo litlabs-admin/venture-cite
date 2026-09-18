@@ -108,6 +108,9 @@ describe("buildUserExport", () => {
     queueSelect([]); // brandPrompts
     queueSelect([{ id: "audit-1", userId: "user-1" }]); // auditLogs
     queueSelect([]); // askThreads (Ask's own tables - see shared/schema/ask.ts)
+    queueSelect([]); // askBusinessBriefs (migration 0128)
+    queueSelect([]); // askMemories (migration 0128)
+    queueSelect([]); // askUserPreferences (migration 0128)
     queueSelect([{ id: "rank-1", articleId: "art-1" }]); // geoRankings
 
     const data = await buildUserExport("user-1");
@@ -125,6 +128,9 @@ describe("buildUserExport", () => {
     // §0) - exported alongside everything else, never chatbot_*.
     expect(data.askThreads).toEqual([]);
     expect(data.askMessages).toEqual([]);
+    expect(data.askBusinessBriefs).toEqual([]);
+    expect(data.askMemories).toEqual([]);
+    expect(data.askUserPreferences).toEqual([]);
     expect(data.schemaVersion).toBe(1);
   });
 
@@ -133,6 +139,10 @@ describe("buildUserExport", () => {
     queueSelect([]); // userBrands - empty
     queueSelect([]); // auditLogs
     queueSelect([]); // askThreads - also unconditional (queried by user_id, not byBrand)
+    // askBusinessBriefs/askMemories are byBrand (short-circuit with no
+    // brands, same as articles/competitors/etc below) - no queueSelect
+    // needed. askUserPreferences is unconditional, like askThreads.
+    queueSelect([]); // askUserPreferences
 
     const data = await buildUserExport("user-1");
 
@@ -141,6 +151,9 @@ describe("buildUserExport", () => {
     expect(data.geoRankings).toEqual([]);
     expect(data.askThreads).toEqual([]);
     expect(data.askMessages).toEqual([]);
+    expect(data.askBusinessBriefs).toEqual([]);
+    expect(data.askMemories).toEqual([]);
+    expect(data.askUserPreferences).toEqual([]);
   });
 });
 

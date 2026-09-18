@@ -1,6 +1,9 @@
 // New-thread empty state (01-trakkr-teardown.md §2.5): date, time-of-day
-// greeting, status line, and numbered "Explore your visibility" questions.
+// greeting, status line, an inbox row for an unreviewed business brief, and
+// numbered "Explore your visibility" questions.
 import { useMemo } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { FileText } from "lucide-react";
 
 function greetingForNow(): string {
   const hour = new Date().getHours();
@@ -14,12 +17,19 @@ export function AskEmptyState({
   hasScore,
   questions,
   onPick,
+  briefReadyForReview,
 }: {
   brandName: string;
   hasScore: boolean;
   questions: string[];
   onPick: (text: string) => void;
+  // True once a website-sourced draft exists and nothing has been saved yet
+  // (useAskBrief's brief.status === "draft" && brief.hasAnyContent) - "A
+  // starting business brief is ready from your website" (01-trakkr-teardown
+  // .md §2.5's inbox row).
+  briefReadyForReview?: boolean;
 }) {
+  const navigate = useNavigate();
   const dateLabel = useMemo(
     () =>
       new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }),
@@ -35,6 +45,19 @@ export function AskEmptyState({
       <p className="mb-8 text-body text-vc-tertiary">
         {hasScore ? "Ask about your AI visibility." : "Model scores are not available yet."}
       </p>
+
+      {briefReadyForReview && (
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/agent/context", search: { tab: "brief" } })}
+          className="mb-6 flex w-full items-center gap-2.5 rounded-md border border-vc-default bg-vc-surface px-3 py-2.5 text-left transition-colors hover:bg-vc-hover animate-fade-in-up motion-reduce:animate-none"
+        >
+          <FileText className="h-4 w-4 shrink-0 text-vc-accent" />
+          <span className="text-caption text-vc-secondary">
+            A starting business brief is ready from your website.
+          </span>
+        </button>
+      )}
 
       {questions.length > 0 && (
         <div className="text-left">

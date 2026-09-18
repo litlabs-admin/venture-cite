@@ -9,11 +9,12 @@
 // OWN message text - never to fetched page text. This is the real control
 // against prompt injection; the untrusted-content delimiter in
 // server/ask/prompt.ts is defence in depth only.
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import * as schema from "@shared/schema";
 import { TRACKED_PROMPTS_CAP } from "@shared/constants";
 import type { ActionKind, ReversibilityCheck } from "@shared/ask/actions";
+import { ASK_MEMORY_TYPES, askMemoryContentSchema } from "@shared/ask/memory";
 
 export type ValidateResult =
   | { ok: true; title: string; inputEcho: string; params: Record<string, string> }
@@ -104,6 +105,38 @@ async function validateRunCitationCheck(
   };
 }
 
+// Expected propose_action input for kind='remember_fact':
+// { type: AskMemoryType, content: string }. Free text (07 §6.1's table: "Free
+// text (title, rationale) - model-authored, rendered as text only, never
+// executed") - the memory's content is never an executable parameter, so it
+// needs no database trace, only shape and length validation.
+async function validateRememberFact(
+  _ctx: { brandId: string; userMessage: string },
+  input: unknown,
+): Promise<ValidateResult> {
+  const rawType = (input as any)?.type;
+  const type =
+    typeof rawType === "string" && (ASK_MEMORY_TYPES as readonly string[]).includes(rawType)
+      ? rawType
+      : null;
+  if (!type) {
+    return { ok: false, reason: `propose_action(remember_fact) requires a valid type` };
+  }
+  const contentResult = askMemoryContentSchema.safeParse((input as any)?.content);
+  if (!contentResult.success) {
+    return { ok: false, reason: "propose_action(remember_fact) requires non-empty content" };
+  }
+  const content = contentResult.data;
+  const truncatedTitle = content.length > 60 ? `${content.slice(0, 57)}...` : content;
+
+  return {
+    ok: true,
+    title: `Remember: "${truncatedTitle}"`,
+    inputEcho: content,
+    params: { type, content },
+  };
+}
+
 export const ACTION_KIND_DEFS: Record<ActionKind, ActionKindDef> = {
   track_prompt: {
     kind: "track_prompt",
@@ -155,6 +188,23 @@ export const ACTION_KIND_DEFS: Record<ActionKind, ActionKindDef> = {
         return { ok: true };
       }
       return { ok: false, reason: "Run has already started" };
+    },
+  },
+  remember_fact: {
+    kind: "remember_fact",
+    kindLabel: "Remember",
+    validate: validateRememberFact,
+    isReversible: async (task) => {
+      if (task.status !== "completed") return { ok: false, reason: "Not yet completed" };
+      const memoryId = task.artifactId;
+      if (!memoryId) return { ok: false, reason: "No memory reference on this task" };
+      const [row] = await db
+        .select()
+        .from(schema.askMemories)
+        .where(and(eq(schema.askMemories.id, memoryId), isNull(schema.askMemories.forgottenAt)))
+        .limit(1);
+      if (!row) return { ok: false, reason: "Already forgotten" };
+      return { ok: true };
     },
   },
 };

@@ -41,6 +41,11 @@ const stubs = vi.hoisted(() => ({
   getAskThreadMessages: vi.fn(async () => []),
   insertAskMessage: vi.fn(async () => ({ id: "assistant-message-id" })),
   insertAskSteps: vi.fn(async () => undefined),
+  // Business-context personal layer (server/ask/context.ts's
+  // assemblePersonalContextBlock) - appended alongside assembleAskContext at
+  // the /run route's call site. Empty string: no preferences/temporary
+  // instructions to layer on in this fixture.
+  assemblePersonalContextBlock: vi.fn(async () => ""),
   assembleAskContext: vi.fn(async () => ({
     systemPrompt: "system",
     coreCompetitors: [],
@@ -145,6 +150,7 @@ vi.mock("../../server/ask/storage", () => ({
 }));
 vi.mock("../../server/ask/context", () => ({
   assembleAskContext: stubs.assembleAskContext,
+  assemblePersonalContextBlock: stubs.assemblePersonalContextBlock,
 }));
 vi.mock("../../server/ask/loop", () => ({
   runAskLoop: stubs.runAskLoop,

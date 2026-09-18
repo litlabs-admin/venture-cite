@@ -13,6 +13,11 @@ import { storage } from "../storage";
 import { loadBrandGenerationContext, renderFactsBlock } from "../lib/brandGenerationContext";
 import { getDashboardHero } from "../services/dashboardVisibility";
 import { ASK_IDENTITY } from "./prompt";
+import { readAcceptedBriefLayers } from "./briefStorage";
+import { listActiveMemoriesForContext } from "./memoryStorage";
+import { readPreferences } from "./preferencesStorage";
+import { ASK_ANSWER_LENGTH_LABELS, ASK_PREFERENCE_TONE_LABELS } from "@shared/ask/preferences";
+import { ASK_MEMORY_TYPE_LABELS, type AskMemoryType } from "@shared/ask/memory";
 
 export type AskRunContext = {
   systemPrompt: string;
@@ -110,6 +115,48 @@ function renderTrackedPromptsBlock(prompts: BrandPrompt[]): string {
   }`;
 }
 
+// Layer 4b: the business brief's fields with no home on `brands` - goals,
+// current priorities, people/capacity, constraints. Only rendered once the
+// brief is ACCEPTED (readAcceptedBriefLayers returns null for a draft or a
+// brand with none), matching the "stays separate until you choose Save
+// brief" rule already enforced by briefStorage.ts's own read path.
+//
+// "Explicit beats inferred, unconditionally" (04-implementation-plan.md
+// §3.6): these are the brand's OWN stated constraints, so they are framed as
+// authoritative and placed to outrank the shared-memory layer that follows
+// it, not just by prompt order but by the words used ("The brand has stated
+// these directly" vs memory's "may be outdated").
+function renderBriefLayer(
+  layers: {
+    goals: string | null;
+    currentPriorities: string | null;
+    peopleCapacity: string | null;
+    constraints: string | null;
+  } | null,
+): string {
+  if (!layers) return "";
+  const lines = [
+    layers.goals ? `Goals: ${layers.goals}` : null,
+    layers.currentPriorities ? `Current priorities: ${layers.currentPriorities}` : null,
+    layers.peopleCapacity ? `People and capacity: ${layers.peopleCapacity}` : null,
+    layers.constraints ? `Constraints (always respect these): ${layers.constraints}` : null,
+  ].filter(Boolean);
+  if (lines.length === 0) return "";
+  return `# Business brief - stated directly by the brand's own team (authoritative; this outranks anything in Shared memory below)\n${lines.join("\n")}`;
+}
+
+// Layer 7: shared brand memory (business-context.md Memory tab). Ordered
+// oldest-to-newest is fine here - there is no ranking yet, and the layer's
+// own framing already tells the model these are lower-priority than an
+// explicit brief constraint above.
+function renderMemoryLayer(memories: Array<{ type: AskMemoryType; content: string }>): string {
+  if (memories.length === 0) return "";
+  const lines = memories
+    .map((m) => `- (${ASK_MEMORY_TYPE_LABELS[m.type]}) ${m.content}`)
+    .join("\n");
+  return `# Shared memory - facts the team has saved or the Agent has learned from past conversations. Useful context, but a stated Business brief constraint always wins over one of these if they conflict\n${lines}`;
+}
+
 function renderMeasurementState(hero: Awaited<ReturnType<typeof getDashboardHero>>): string {
   if (hero.totalChecks === 0) {
     return "No completed citation-check runs yet. Do not state a visibility score or citation rate - say measurement has not started.";
@@ -122,12 +169,15 @@ function renderMeasurementState(hero: Awaited<ReturnType<typeof getDashboardHero
 }
 
 export async function assembleAskContext(brand: Brand): Promise<AskRunContext> {
-  const [genContext, coreCompetitors, hero, trackedPrompts] = await Promise.all([
-    loadBrandGenerationContext(brand.id),
-    storage.getCompetitors(brand.id, { tier: "core" }),
-    getDashboardHero(brand, null),
-    storage.getBrandPromptsByBrandId(brand.id).catch(() => [] as BrandPrompt[]),
-  ]);
+  const [genContext, coreCompetitors, hero, trackedPrompts, briefLayers, memories] =
+    await Promise.all([
+      loadBrandGenerationContext(brand.id),
+      storage.getCompetitors(brand.id, { tier: "core" }),
+      getDashboardHero(brand, null),
+      storage.getBrandPromptsByBrandId(brand.id).catch(() => [] as BrandPrompt[]),
+      readAcceptedBriefLayers(brand.id).catch(() => null),
+      listActiveMemoriesForContext(brand.id).catch(() => []),
+    ]);
 
   const factsBlock = genContext ? renderFactsBlock(genContext.facts) : "";
 
@@ -157,6 +207,8 @@ export async function assembleAskContext(brand: Brand): Promise<AskRunContext> {
     `# Declared competitors (the brand's own stated rivals - treat this as ground truth for "who do we compete with", separate from whichever names AI engines happen to cite)\n${competitorLines}`, // layer 5
     renderTrackedPromptsBlock(trackedPrompts), // layer 5b
     `# Current measurement state\n${renderMeasurementState(hero)}`, // layer 6
+    renderBriefLayer(briefLayers), // layer 4b - goals/priorities/capacity/constraints, accepted only
+    renderMemoryLayer(memories), // layer 7 - shared memory
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -167,4 +219,44 @@ export async function assembleAskContext(brand: Brand): Promise<AskRunContext> {
     trackedPromptIds: trackedPrompts.map((p) => p.id),
     hero,
   };
+}
+
+// Layers 8-9: PERSONAL context - private user preferences and a per-thread
+// "Just for one conversation" override. Deliberately NOT part of
+// assembleAskContext above: that function is the one that would ever feed a
+// SHARED export (a future handoff, a teammate-visible summary), and rule 5
+// in 01-trakkr-teardown.md §5 ("private layers never leave the user") is
+// enforced here as a function boundary, not a runtime check someone has to
+// remember. server/routes/ask.ts calls this SEPARATELY and appends its
+// result to assembleAskContext's systemPrompt only for the one user running
+// the one turn - never returned to, or read by, anything else.
+//
+// "Preferences govern form, not facts" (01 §5 rule 3): the wording below
+// asks the model to change HOW it writes, never to treat a preference as new
+// information about the brand.
+export async function assemblePersonalContextBlock(
+  userId: string,
+  temporaryInstructions: string | null,
+): Promise<string> {
+  const prefs = await readPreferences(userId).catch(() => null);
+  const parts: string[] = [];
+
+  if (prefs && (prefs.tone || prefs.language || prefs.answerLength)) {
+    const lines = [
+      prefs.tone ? `Tone: ${ASK_PREFERENCE_TONE_LABELS[prefs.tone]}` : null,
+      prefs.language ? `Answer in: ${prefs.language}` : null,
+      prefs.answerLength ? `Answer length: ${ASK_ANSWER_LENGTH_LABELS[prefs.answerLength]}` : null,
+    ].filter(Boolean);
+    parts.push(
+      `# This user's answer preferences (private to them - change ONLY how you write, never what you claim)\n${lines.join("\n")}`,
+    );
+  }
+
+  if (temporaryInstructions && temporaryInstructions.trim().length > 0) {
+    parts.push(
+      `# Temporary instructions for this conversation only (set once at thread start; never remember this beyond this thread)\n${temporaryInstructions.trim()}`,
+    );
+  }
+
+  return parts.join("\n\n");
 }

@@ -50,6 +50,7 @@ export async function listAskThreads(
     userId: r.user_id as string,
     brandId: (r.brand_id as string | null) ?? null,
     title: r.title as string,
+    temporaryInstructions: (r.temporary_instructions as string | null) ?? null,
     createdAt: new Date(r.created_at as string),
     updatedAt: new Date(r.updated_at as string),
     archivedAt: r.archived_at ? new Date(r.archived_at as string) : null,
@@ -61,8 +62,16 @@ export async function listAskThreads(
 export async function createAskThread(
   userId: string,
   brandId: string | null,
+  // "Just for one conversation" (business-context.md's Your preferences
+  // tab): set once at creation, read every turn of THIS thread by
+  // context.ts's assemblePersonalContextBlock, never promoted into
+  // ask_memories.
+  temporaryInstructions: string | null = null,
 ): Promise<schema.AskThread> {
-  const [row] = await db.insert(schema.askThreads).values({ userId, brandId }).returning();
+  const [row] = await db
+    .insert(schema.askThreads)
+    .values({ userId, brandId, temporaryInstructions })
+    .returning();
   return row;
 }
 

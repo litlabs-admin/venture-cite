@@ -70,7 +70,9 @@ describe("toolDefinitionsForModel", () => {
     const props = def.function.parameters.properties as Record<string, unknown>;
     expect(props.kind).toMatchObject({
       type: "string",
-      enum: ["track_prompt", "queue_article", "run_citation_check"],
+      // remember_fact: business-context.md's Memory tab, decision 5 - a
+      // learned memory is proposed as a card through this same tool.
+      enum: ["track_prompt", "queue_article", "run_citation_check", "remember_fact"],
     });
   });
 

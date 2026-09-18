@@ -34,6 +34,13 @@ export const MODELS = {
   // brand profile from a website URL.
   brandAutofill: ANALYSIS_MODEL,
 
+  // ── Ask business brief (business-context.md) ──────────────────────
+  // server/ask/briefWebsiteDraft.ts - drafts the two website-sourced brief
+  // fields (products/services, markets/audiences) plus a verbatim quote per
+  // field. Same tier as brandAutofill: it is the same class of task
+  // (structured extraction from a fetched page), just a narrower schema.
+  askBriefDraft: ANALYSIS_MODEL,
+
   // ── AI Keyword Research (keyword-research page) ───────────────────
   // /api/keyword-research/discover - generates 12–15 scored keywords.
   keywordResearch: OPENAI_MINI_SNAPSHOT,

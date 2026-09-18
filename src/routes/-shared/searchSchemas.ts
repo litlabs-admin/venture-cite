@@ -175,3 +175,18 @@ export const askSearchSchema = z
     q: z.string().optional().catch(undefined),
   })
   .passthrough();
+
+/** `/agent/context` (Business context). `tab` selects the active tab -
+ *  Business brief / Memory / Your preferences / Handoffs - and stays in the
+ *  URL so any tab can be linked to directly (the drawer's "Open brief" and
+ *  "Manage memory and sources" links rely on this). Unset or unrecognised
+ *  falls back to "brief" client-side, not here - rule 2 above means an
+ *  invalid value already resolves to undefined, and the page's own default
+ *  is a plainer place to express "brief is the landing tab" than a z.enum
+ *  default that would silently swallow a typo'd tab name into the same
+ *  fallback. */
+export const askContextSearchSchema = z
+  .object({
+    tab: z.string().optional().catch(undefined),
+  })
+  .passthrough();

@@ -54,6 +54,7 @@ import { Route as AppWelcomeRouteImport } from './routes/_app/welcome'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as WebhooksSplatRouteImport } from './routes/webhooks/$'
 import { Route as AppAdminScrapeRouteImport } from './routes/_app/admin.scrape'
+import { Route as AppAgentContextRouteImport } from './routes/_app/agent_.context'
 import { Route as AppContentArticleIdRouteImport } from './routes/_app/content.$articleId'
 import { Route as AppPromptsIndexRouteImport } from './routes/_app/prompts.index'
 import { Route as AppPromptsPromptIdRouteImport } from './routes/_app/prompts.$promptId'
@@ -285,6 +286,11 @@ const AppAdminScrapeRoute = AppAdminScrapeRouteImport.update({
   path: '/admin/scrape',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAgentContextRoute = AppAgentContextRouteImport.update({
+  id: '/agent_/context',
+  path: '/agent/context',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppContentArticleIdRoute = AppContentArticleIdRouteImport.update({
   id: '/$articleId',
   path: '/$articleId',
@@ -362,6 +368,7 @@ export interface FileRoutesByFullPath {
   '/api/$': typeof ApiSplatRoute
   '/webhooks/$': typeof WebhooksSplatRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
+  '/agent/context': typeof AppAgentContextRoute
   '/content/$articleId': typeof AppContentArticleIdRoute
   '/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
   '/prompts/': typeof AppPromptsIndexRoute
@@ -413,6 +420,7 @@ export interface FileRoutesByTo {
   '/api/$': typeof ApiSplatRoute
   '/webhooks/$': typeof WebhooksSplatRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
+  '/agent/context': typeof AppAgentContextRoute
   '/content/$articleId': typeof AppContentArticleIdRoute
   '/prompts': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
@@ -466,6 +474,7 @@ export interface FileRoutesById {
   '/api/$': typeof ApiSplatRoute
   '/webhooks/$': typeof WebhooksSplatRoute
   '/_app/admin/scrape': typeof AppAdminScrapeRouteWithChildren
+  '/_app/agent_/context': typeof AppAgentContextRoute
   '/_app/content/$articleId': typeof AppContentArticleIdRoute
   '/_app/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
   '/_app/prompts/': typeof AppPromptsIndexRoute
@@ -520,6 +529,7 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/webhooks/$'
     | '/admin/scrape'
+    | '/agent/context'
     | '/content/$articleId'
     | '/prompts/$promptId'
     | '/prompts/'
@@ -571,6 +581,7 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/webhooks/$'
     | '/admin/scrape'
+    | '/agent/context'
     | '/content/$articleId'
     | '/prompts'
     | '/admin/scrape/$runId'
@@ -623,6 +634,7 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/webhooks/$'
     | '/_app/admin/scrape'
+    | '/_app/agent_/context'
     | '/_app/content/$articleId'
     | '/_app/prompts/$promptId'
     | '/_app/prompts/'
@@ -960,6 +972,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminScrapeRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/agent_/context': {
+      id: '/_app/agent_/context'
+      path: '/agent/context'
+      fullPath: '/agent/context'
+      preLoaderRoute: typeof AppAgentContextRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/content/$articleId': {
       id: '/_app/content/$articleId'
       path: '/$articleId'
@@ -1093,6 +1112,7 @@ interface AppRouteChildren {
   AppVerifyEmailRoute: typeof AppVerifyEmailRoute
   AppWelcomeRoute: typeof AppWelcomeRoute
   AppAdminScrapeRoute: typeof AppAdminScrapeRouteWithChildren
+  AppAgentContextRoute: typeof AppAgentContextRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -1132,6 +1152,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppVerifyEmailRoute: AppVerifyEmailRoute,
   AppWelcomeRoute: AppWelcomeRoute,
   AppAdminScrapeRoute: AppAdminScrapeRouteWithChildren,
+  AppAgentContextRoute: AppAgentContextRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

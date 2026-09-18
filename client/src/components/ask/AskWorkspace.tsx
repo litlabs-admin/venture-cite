@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { PanelLeftClose, PanelLeft, Plus, Brain, Clock } from "lucide-react";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { apiRequest } from "@/lib/queryClient";
 import { useAskThreads } from "@/hooks/useAskThreads";
@@ -18,11 +18,20 @@ import { ASK_FOCUS_COMPOSER_EVENT } from "@/lib/askComposerFocus";
 import { AskActionFilterBar, type AskActionFilter } from "./AskActionFilterBar";
 import type { AskActionCard as AskActionCardType } from "@shared/ask/actions";
 import { ASK_SUGGESTION_PALETTE } from "@shared/ask/suggestions";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AskContextDrawer, ASK_CONTEXT_DRAWER_TOOLTIP } from "./AskContextDrawer";
+import { useAskBrief } from "@/hooks/useAskBrief";
+import { cn } from "@/lib/utils";
 
 type ThreadDetailResponse = {
   success: boolean;
   data: {
-    thread: { id: string; title: string; brandId: string | null };
+    thread: {
+      id: string;
+      title: string;
+      brandId: string | null;
+      temporaryInstructions: string | null;
+    };
     messages: Array<{
       id: string;
       role: "user" | "assistant";
@@ -59,6 +68,7 @@ export function AskWorkspace() {
 
   const [collapsed, setCollapsed] = useState(false);
   const [filter, setFilter] = useState<AskActionFilter>("all");
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const threadIdFromUrl = (() => {
     const raw = (search as Record<string, unknown>).threadId;
@@ -121,6 +131,12 @@ export function AskWorkspace() {
     enabled: !!activeThreadId,
   });
 
+  // "Just for one conversation" (Your preferences tab) - surfaced as a
+  // small badge under the thread title, since nothing else on this page
+  // shows that a thread is running under a temporary override.
+  const activeThreadTemporaryInstructions =
+    threadDetail.data?.data.thread.temporaryInstructions ?? null;
+
   useEffect(() => {
     // Never while a run is live: the GET below reflects what was persisted
     // BEFORE this turn (a brand-new thread's first turn persists nothing
@@ -169,6 +185,9 @@ export function AskWorkspace() {
     queryKey: [`/api/dashboard/hero/${selectedBrandId}`],
     enabled: !!selectedBrandId,
   });
+
+  const { brief } = useAskBrief(selectedBrandId ?? null);
+  const briefReadyForReview = brief?.status === "draft" && brief.hasAnyContent;
 
   const actionsQuery = useQuery<{ success: boolean; data: { cards: AskActionCardType[] } }>({
     queryKey: ["/api/ask/actions", selectedBrandId],
@@ -246,7 +265,73 @@ export function AskWorkspace() {
           <p className="truncate text-caption font-medium text-vc-primary">
             {threads.find((t) => t.id === activeThreadId)?.title ?? "New thread"}
           </p>
+          {activeThreadTemporaryInstructions && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex shrink-0 items-center gap-1 rounded-full bg-vc-accent-subtle px-2 py-0.5 text-data font-medium text-vc-accent animate-fade-in motion-reduce:animate-none">
+                    <Clock className="h-3 w-3" />
+                    Temporary instructions active
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  {activeThreadTemporaryInstructions}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
+          {/* Top-right controls (business-context.md): Business context,
+              + (new thread), and the brain icon opening the "What I know"
+              drawer. */}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/agent/context", search: { tab: "brief" } })}
+              className="rounded-md px-2.5 py-1.5 text-caption font-medium text-vc-secondary transition-colors hover:bg-vc-hover hover:text-vc-primary"
+            >
+              Business context
+            </button>
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleNewThread}
+                    aria-label="New thread"
+                    className="rounded-md p-1.5 text-vc-tertiary transition-colors hover:bg-vc-hover hover:text-vc-primary"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">New thread</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerOpen(true)}
+                    aria-label={ASK_CONTEXT_DRAWER_TOOLTIP}
+                    className={cn(
+                      "rounded-md p-1.5 transition-colors hover:bg-vc-hover",
+                      drawerOpen ? "text-vc-accent" : "text-vc-tertiary hover:text-vc-primary",
+                    )}
+                  >
+                    <Brain className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{ASK_CONTEXT_DRAWER_TOOLTIP}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
+
+        <AskContextDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          brandId={selectedBrandId ?? null}
+          brandName={brandName}
+        />
 
         <div className="flex-1 overflow-y-auto px-6 py-6">
           {/* Content column caps at ~790px and centres in the space right of
@@ -269,6 +354,7 @@ export function AskWorkspace() {
                 hasScore={!!heroQuery.data?.data.visibilityScore}
                 questions={ASK_SUGGESTION_PALETTE.map((s) => s.text)}
                 onPick={handleSend}
+                briefReadyForReview={briefReadyForReview}
               />
             ) : (
               messages.map((m) =>

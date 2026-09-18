@@ -7,9 +7,24 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Target, Loader2, Check, Undo2 } from "lucide-react";
+import { Target, FileText, RefreshCw, Brain, Loader2, Check, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AskActionCard as AskActionCardType } from "@shared/ask/actions";
+import type { AskActionCard as AskActionCardType, ActionKind } from "@shared/ask/actions";
+import {
+  ACTION_KIND_DONE_LABEL,
+  ACTION_KIND_UNDO_LABEL,
+  ACTION_KIND_APPROVE_LABEL,
+} from "@shared/ask/actions";
+
+// Per-kind leading icon. remember_fact reuses the same Brain glyph as the
+// top bar's "What I know" control - same underlying concept, one visual
+// vocabulary.
+const ACTION_KIND_ICON: Record<ActionKind, typeof Target> = {
+  track_prompt: Target,
+  queue_article: FileText,
+  run_citation_check: RefreshCw,
+  remember_fact: Brain,
+};
 
 export function AskActionCard({ card }: { card: AskActionCardType }) {
   const [expanded, setExpanded] = useState(false);
@@ -34,15 +49,19 @@ export function AskActionCard({ card }: { card: AskActionCardType }) {
   });
 
   const isPending = approve.isPending || dismiss.isPending || undo.isPending;
+  const Icon = ACTION_KIND_ICON[card.kind] ?? Target;
+  const doneLabel = ACTION_KIND_DONE_LABEL[card.kind] ?? "Done";
+  const undoLabel = ACTION_KIND_UNDO_LABEL[card.kind] ?? "Undo";
+  const approveLabel = ACTION_KIND_APPROVE_LABEL[card.kind] ?? "Add to queue";
 
   return (
-    <div className="mb-3 rounded-md border border-vc-default bg-vc-surface">
+    <div className="mb-3 rounded-md border border-vc-default bg-vc-surface animate-fade-in-up motion-reduce:animate-none">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
         className="flex w-full items-center gap-2 px-3 py-2 text-left"
       >
-        <Target className="h-4 w-4 shrink-0 text-vc-tertiary" />
+        <Icon className="h-4 w-4 shrink-0 text-vc-tertiary" />
         <span className="text-caption font-medium text-vc-primary">{card.kindLabel}</span>
         <span
           className={cn(
@@ -91,7 +110,7 @@ export function AskActionCard({ card }: { card: AskActionCardType }) {
                 }}
               >
                 {approve.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                Add to queue
+                {approveLabel}
               </Button>
               <Button
                 size="sm"
@@ -109,7 +128,7 @@ export function AskActionCard({ card }: { card: AskActionCardType }) {
           {card.status === "done" && (
             <div className="flex w-full items-center justify-between">
               <span className="flex items-center gap-1 text-caption text-positive">
-                <Check className="h-3 w-3" /> Tracking
+                <Check className="h-3 w-3" /> {doneLabel}
               </span>
               <Button
                 size="sm"
@@ -122,7 +141,7 @@ export function AskActionCard({ card }: { card: AskActionCardType }) {
                 }}
               >
                 <Undo2 className="mr-1 h-3 w-3" />
-                Untrack
+                {undoLabel}
               </Button>
               {!card.isReversible && card.undoDisabledReason && (
                 <span className="sr-only">{card.undoDisabledReason}</span>

@@ -125,6 +125,74 @@ export function createAskRunCitationCheckHandler(): OutboxCommandHandler {
   };
 }
 
+export function createAskRememberFactHandler(): OutboxCommandHandler {
+  return async ({ command }) => {
+    const payload = command.payload as Extract<
+      typeof command.payload,
+      { kind: "ask.remember_fact" }
+    >;
+    const [task] = await db
+      .select()
+      .from(schema.agentTasks)
+      .where(and(eq(schema.agentTasks.id, payload.taskId), eq(schema.agentTasks.status, "queued")))
+      .limit(1);
+    if (!task || !task.brandId) {
+      // Not claimable: already completed by a retried delivery, or the
+      // task was somehow removed. Nothing to do is a successful outcome for
+      // an at-least-once handler.
+      logger.info({ taskId: payload.taskId }, "ask.remember_fact: task no longer claimable");
+      return { providerReference: `ask-remember-fact:${payload.taskId}:skipped` };
+    }
+    const input = (task.inputData ?? {}) as { type?: string; content?: string };
+    const { createMemory } = await import("../memoryStorage");
+    const memory = await createMemory({
+      brandId: task.brandId,
+      type: (input.type ?? "business_context") as any,
+      content: input.content ?? task.taskDescription ?? "",
+      origin: "learned",
+      createdBy: task.decidedBy,
+      sourceThreadId: task.askThreadId,
+      sourceMessageId: task.askMessageId,
+    });
+    await db
+      .update(schema.agentTasks)
+      .set({
+        status: "completed",
+        completedAt: new Date(),
+        artifactType: "ask_memory",
+        artifactId: memory.id,
+        outputData: { success: true, action: "memory_remembered", memoryId: memory.id },
+      })
+      .where(and(eq(schema.agentTasks.id, payload.taskId), eq(schema.agentTasks.status, "queued")));
+    return { providerReference: `ask-remember-fact:${payload.taskId}` };
+  };
+}
+
+export function createAskForgetFactHandler(): OutboxCommandHandler {
+  return async ({ command }) => {
+    const payload = command.payload as Extract<typeof command.payload, { kind: "ask.forget_fact" }>;
+    const [task] = await db
+      .select()
+      .from(schema.agentTasks)
+      .where(eq(schema.agentTasks.id, payload.taskId))
+      .limit(1);
+    if (!task || !task.brandId || !task.artifactId) {
+      logger.info({ taskId: payload.taskId }, "ask.forget_fact: nothing to forget - no-op");
+      return { providerReference: `ask-forget-fact:${payload.taskId}:skipped` };
+    }
+    // forgetMemory is itself idempotent (memoryStorage.ts) - forgetting an
+    // already-forgotten memory is a safe no-op, satisfying the "every
+    // inverse executor must tolerate 'nothing to undo'" rule (07 §2).
+    const { forgetMemory } = await import("../memoryStorage");
+    await forgetMemory(task.artifactId, task.brandId);
+    await db
+      .update(schema.agentTasks)
+      .set({ status: "reversed", reversedAt: new Date() })
+      .where(eq(schema.agentTasks.id, payload.taskId));
+    return { providerReference: `ask-forget-fact:${payload.taskId}` };
+  };
+}
+
 export function createAskCancelCitationCheckHandler(): OutboxCommandHandler {
   return async ({ command }) => {
     const payload = command.payload as Extract<
