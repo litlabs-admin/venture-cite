@@ -8,7 +8,11 @@ import path from "path";
 import type { PoolClient } from "pg";
 import { pool } from "../db";
 import { logger } from "./logger";
-import { checksumMigration, classifyMigrationChecksum } from "./migrationChecksums";
+import {
+  checksumMigration,
+  classifyMigrationChecksum,
+  equivalentMigrationChecksums,
+} from "./migrationChecksums";
 import { isCustomOrmPreviewLedgerMode } from "./migrationLedgerPolicy";
 
 const APPLY_LOCK_KEY = 0x564d_4944; // "VMID" - distinct from app-level locks
@@ -224,6 +228,7 @@ export async function applyMigrations(
         filename: migration.filename,
         appliedChecksum: appliedByFilename.get(migration.filename),
         currentChecksum: migration.checksum,
+        equivalentChecksums: equivalentMigrationChecksums(migration.sqlText),
       });
 
       if (checksumState === "verified") {
