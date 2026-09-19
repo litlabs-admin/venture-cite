@@ -66,6 +66,25 @@ describe("checkPromptShape", () => {
   });
 });
 
+// Measured 2026-09-19: service-business nouns get named vendor shortlists on
+// Gemini and ChatGPT. Before this, 15 of 24 onboarding prompts for a PR agency
+// were dropped as no_category_noun.
+describe("checkPromptShape service-business category nouns", () => {
+  it.each([
+    "best pr agencies for technology product launches",
+    "top public relations firms for early stage startups",
+    "leading marketing consultancies for b2b saas growth",
+  ])("accepts %s", (prompt) => {
+    expect(checkPromptShape(prompt)).toBeNull();
+  });
+
+  it("still rejects a listicle opener with no category noun at all", () => {
+    expect(checkPromptShape("best public relations for early stage startups")).toBe(
+      "no_category_noun",
+    );
+  });
+});
+
 describe("restoreProperNouns", () => {
   it("restores a competitor name split across two words", () => {
     expect(restoreProperNouns("compare cognigy vs kore ai platforms", ["Cognigy", "Kore.ai"])).toBe(

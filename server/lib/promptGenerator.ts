@@ -5,7 +5,7 @@ import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
 import { renderCompetitorBlock } from "./brandGenerationContext";
 import { makeBrandNameFilter } from "./brandNameFilter";
-import { checkPromptShape, restoreProperNouns } from "./promptShape";
+import { CATEGORY_NOUNS, checkPromptShape, restoreProperNouns } from "./promptShape";
 import { TRACKED_PROMPTS_CAP } from "@shared/constants";
 import type { Brand, BrandFactSheet } from "@shared/schema";
 
@@ -87,7 +87,7 @@ STEP 2. Generate EXACTLY ${count} prompts in this EXACT form - every one, no exc
 - No question mark. Never a question word (what/how/why/which/when/where/who/is/are/do/does/should/can/will) as the first word. No first-person words (i/me/my/our/we/us/your/you).
 - 5 to 12 words total.
 - Starts with one of: "best", "top", "top rated", "leading", "compare", "compare leading", "best alternatives to".
-- Contains a BROAD PLURAL product-category noun (platforms, tools, software, solutions, agents, vendors, providers, companies, systems, services, apps, suites) that at least 8 real vendors compete in - too narrow a category noun starves the answer of enough vendors to list.
+- Contains a BROAD PLURAL product-category noun (${CATEGORY_NOUNS.join(", ")}) that at least 8 real vendors compete in - too narrow a category noun starves the answer of enough vendors to list.
 - Then a "for <use case, buyer segment, or scale>" qualifier.
 - EXCEPTION: "best alternatives to <competitor>" is already a complete, valid form on its own. Do NOT bolt on another category noun after the competitor name.
   GOOD: "best alternatives to PolyAI for enterprise call center workflows"

@@ -66,7 +66,8 @@ const OPENERS = [
   "compare",
 ];
 
-const CATEGORY_NOUNS = [
+/** Also interpolated into the generator prompts, so what they ask for and what this accepts stay one list. */
+export const CATEGORY_NOUNS = [
   "platforms",
   "tools",
   "software",
@@ -84,6 +85,15 @@ const CATEGORY_NOUNS = [
   // the assistant answer with named products. Without this the rule rejects
   // a measured, working prompt.
   "alternatives",
+  // Service businesses. Measured 2026-09-19 on Gemini and ChatGPT: "best pr
+  // agencies for technology product launches", "top public relations firms
+  // for early stage startups" and "leading marketing consultancies for b2b
+  // saas growth" each came back as a named vendor shortlist (10-23 entries,
+  // 6 of 6 answers). Without these, 15 of 24 onboarding prompts for a PR
+  // agency were dropped as no_category_noun.
+  "agencies",
+  "firms",
+  "consultancies",
 ];
 
 const ABSTRACT_QUALIFIERS = [
