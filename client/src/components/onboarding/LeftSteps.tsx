@@ -429,11 +429,11 @@ export function BrandStep({
               <p className="text-caption leading-relaxed text-vc-secondary">
                 {profile.description}
               </p>
-              <div className="flex gap-1.5">
-                <span className="inline-flex h-[22px] items-center rounded-full bg-vc-muted px-2 text-label text-vc-secondary">
+              <div className="flex flex-wrap gap-1.5">
+                <span className="inline-flex min-h-[22px] max-w-full items-center rounded-md py-0.5 bg-vc-muted px-2 text-label text-vc-secondary">
                   {profile.industry}
                 </span>
-                <span className="inline-flex h-[22px] items-center rounded-full bg-vc-muted px-2 text-label text-vc-secondary">
+                <span className="inline-flex min-h-[22px] max-w-full items-center rounded-md bg-vc-muted px-2 py-0.5 text-label text-vc-secondary">
                   {profile.descriptor}
                 </span>
               </div>

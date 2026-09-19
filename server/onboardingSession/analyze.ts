@@ -11,8 +11,9 @@
 // WriteLoadingLines: a second, separate, small/fast LLM call - never folded
 // into the same request as AnalyzeBrand, so the four lines can render before
 // the heavier profile call resolves.
+import OpenAI from "openai";
 import { z } from "zod";
-import { getOpenrouterClient } from "../lib/factAgent/v2/openrouterClient";
+import { attachAiLogger } from "../lib/aiLogger";
 import { MODELS } from "../lib/modelConfig";
 import { CATEGORY_NOUNS, checkPromptShape } from "../lib/promptShape";
 import {
@@ -57,11 +58,11 @@ RULES
 - Ground every field in the page text. If the page does not support a field, return the emptiest reasonable value rather than inventing one.
 - Never invent a URL, a customer name, a funding round, or a metric.`;
 
-// Competitors come from a separate call that is handed the full URL and asked
-// from the model's own knowledge of the market. Grounding them in the page
-// text (the old way) found only companies the site happened to mention, which
-// for most sites is none, so the model guessed from the page's wording.
-const COMPETITORS_SYSTEM_PROMPT = `You are a market analyst. Given a company's website address, list the real, currently operating companies a buyer would evaluate INSTEAD of this one: direct competitors selling the same kind of product or service to the same kind of buyer, at a similar scale. Use what you know about this company and its market. Only include companies you are confident exist. Never include the company itself or its own products. Order most direct first, up to 10. Return JSON only: { "competitors": [{ "name": string, "domain": string }] } where domain is the bare domain (no protocol, no path).`;
+// Competitors come from a separate call that is handed the full URL and live
+// web search (OpenAI's web_search tool, see findCompetitors).
+// Without search the model guessed from the brand name alone: featherhq.com,
+// an AI agent platform, came back with Deel, Rippling and Gusto.
+const COMPETITORS_SYSTEM_PROMPT = `You are a market analyst. Given a company's website address, list the real, currently operating companies a buyer would evaluate INSTEAD of this one: direct competitors selling the same kind of product or service to the same kind of buyer, at a similar scale. First search the web to find out what this company actually sells and who it sells to - do not guess from the name. Then search for its direct competitors. Only include companies you are confident exist. Never include the company itself or its own products. Order most direct first, up to 10. Return JSON only: { "competitors": [{ "name": string, "domain": string }] } where domain is the bare domain (no protocol, no path).`;
 
 const LOADING_LINES_SYSTEM_PROMPT = `You write four short loading-screen lines for a website analysis tool. Given a domain and its page text, return JSON only: { "lines": [string, string, string, string] }. Each line is a specific, concrete observation or action about THIS site (not generic filler like "Analyzing your website..."), under 90 characters, present progressive tense ("Reading...", "Checking...", "Mapping..."). Ground every line in the page text - never invent facts.`;
 
@@ -102,28 +103,33 @@ function bareDomain(value: string): string {
     .replace(/\/.*$/, "");
 }
 
-export async function findCompetitors(
-  client: NonNullable<ReturnType<typeof getOpenrouterClient>>,
-  domain: string,
-): Promise<Competitors> {
-  const completion = await client.chat.completions.create(
+// GPT models go to OpenAI's own API, never through OpenRouter (owner's rule,
+// 2026-09-19). The Responses API's web_search tool is what lets Luna look
+// the company up instead of guessing from its name.
+// Same model as MODELS.brandAutofill, without its OpenRouter `openai/` prefix.
+const LUNA = "gpt-5.6-luna";
+let openaiClient: OpenAI | null = null;
+function getOpenAIClient(): OpenAI {
+  if (!process.env.OPENAI_API_KEY) throw new Error("AI service is not configured");
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 1 });
+    attachAiLogger(openaiClient);
+  }
+  return openaiClient;
+}
+
+export async function findCompetitors(domain: string): Promise<Competitors> {
+  const response = await getOpenAIClient().responses.create(
     {
-      model: MODELS.brandAutofill,
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: COMPETITORS_SYSTEM_PROMPT },
-        { role: "user", content: `Website: https://${domain}` },
-      ],
-      // Luna reasons before it answers; a small budget is spent entirely on
-      // reasoning and returns empty content. 4000 matches the profile call.
-      max_tokens: 4000,
+      model: LUNA,
+      tools: [{ type: "web_search" }],
+      instructions: COMPETITORS_SYSTEM_PROMPT,
+      input: `Website: https://${domain}`,
     },
-    { signal: AbortSignal.timeout(25_000) },
+    { signal: AbortSignal.timeout(40_000) },
   );
-  const { competitors } = competitorsResponseSchema.parse(
-    parseJsonObject(completion.choices[0]?.message?.content),
-  );
+  const content = response.output_text;
+  const { competitors } = competitorsResponseSchema.parse(parseJsonObject(content));
   const own = bareDomain(domain);
   const seen = new Set<string>([own]);
   const deduped = competitors
@@ -144,17 +150,16 @@ export async function findCompetitors(
 }
 
 export const analyzeBrand: AnalyzeBrand = async ({ domain, pageText }) => {
-  const client = getOpenrouterClient();
-  if (!client) throw new Error("AI service is not configured");
+  const client = getOpenAIClient();
 
   // Both calls run at once; Promise.all also keeps a failed competitor call
   // from surfacing as an unhandled rejection when the profile call fails first.
   const [completion, competitors] = await Promise.all([
     client.chat.completions.create(
       {
-        model: MODELS.brandAutofill,
+        model: LUNA,
+        // Reasoning models reject sampling params on OpenAI's API.
         response_format: { type: "json_object" },
-        temperature: 0.4,
         messages: [
           { role: "system", content: ANALYZE_SYSTEM_PROMPT },
           {
@@ -162,11 +167,11 @@ export const analyzeBrand: AnalyzeBrand = async ({ domain, pageText }) => {
             content: `Website domain: ${domain}\n\nWebsite content:\n${pageText}`,
           },
         ],
-        max_tokens: 4000,
+        max_completion_tokens: 4000,
       },
       { signal: AbortSignal.timeout(25_000) },
     ),
-    findCompetitors(client, domain),
+    findCompetitors(domain),
   ]);
 
   const raw = parseJsonObject(completion.choices[0]?.message?.content);
@@ -191,8 +196,7 @@ export const analyzeBrand: AnalyzeBrand = async ({ domain, pageText }) => {
 };
 
 export const writeLoadingLines: WriteLoadingLines = async ({ domain, pageText }) => {
-  const client = getOpenrouterClient();
-  if (!client) throw new Error("AI service is not configured");
+  const client = getOpenAIClient();
 
   const completion = await client.chat.completions.create(
     {
@@ -203,7 +207,7 @@ export const writeLoadingLines: WriteLoadingLines = async ({ domain, pageText })
         { role: "system", content: LOADING_LINES_SYSTEM_PROMPT },
         { role: "user", content: `Domain: ${domain}\n\nPage text:\n${pageText.slice(0, 3000)}` },
       ],
-      max_tokens: 500,
+      max_completion_tokens: 500,
     },
     { signal: AbortSignal.timeout(10_000) },
   );
