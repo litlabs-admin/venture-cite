@@ -18,6 +18,7 @@ import type { TrackedContentUrl } from "@shared/schema";
 import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
 import { isRunStaleSinceLastProgress } from "./lib/citationReconciliation";
 import { buildCitationContext } from "./lib/citationContextFormat";
+import { resolveGroundingRedirects } from "./lib/groundingRedirect";
 
 // Bound on automatic (cron / auto_onboarding) citation run CREATION, per
 // brand, per rolling window. Deliberately enforced here - where the row is
@@ -396,7 +397,14 @@ export async function runPlatformCitationCheck(
     });
   }
   const responseText = chatResponse.choices[0]?.message?.content || "";
-  const structuredCitations = extractStructuredCitations(chatResponse);
+  // Single point where citation URLs come out of a provider response. Some
+  // engines (Gemini via OpenRouter grounding) return a Google redirect shim
+  // instead of the real page - resolve it here, before anything downstream
+  // (structuredCitations itself, citedUrls, citingOutletUrl,
+  // classifySourceType, computeAuthorityScore) reads these URLs.
+  const structuredCitations = await resolveGroundingRedirects(
+    extractStructuredCitations(chatResponse),
+  );
   // Observability: when web grounding silently returns zero citations
   // (e.g. an engine rejected our plugins/tools extension, or upstream
   // grounding is offline) we want it in the logs at WARN - not
