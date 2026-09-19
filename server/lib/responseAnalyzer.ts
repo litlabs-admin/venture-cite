@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MODELS } from "./modelConfig";
-import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { lunaParams } from "./lunaParams";
+import { getOpenAIClient } from "./openaiClient";
 import { parseLLMJson, LLMParseError } from "./llmParse";
 import { logger } from "./logger";
 import { matchEntity, type TrackedEntity as MatcherEntity } from "./brandMatcher";
@@ -121,9 +122,9 @@ export async function analyzeResponse(params: {
   };
 
   if (!responseText || responseText.length < 40) return emptyResult;
-  const client = getOpenrouterClient();
+  const client = getOpenAIClient();
   if (!client) {
-    logger.warn("responseAnalyzer: OPENROUTER_API_KEY missing - skipping analysis");
+    logger.warn("responseAnalyzer: OPENAI_API_KEY missing - skipping analysis");
     return emptyResult;
   }
 
@@ -145,7 +146,6 @@ Respond with JSON only.`;
   try {
     const completion = await client.chat.completions.create({
       model: ANALYZER_MODEL,
-      temperature: 0,
       response_format: { type: "json_object" },
       // 2026-08-25: bumped from 1400. Brand-dense responses (e.g. "list
       // the top PR agencies for X") name 10-15+ brands; each needs its own
@@ -160,7 +160,7 @@ Respond with JSON only.`;
       // ~150-char context + 3 citedUrls + JSON punctuation) ≈ 4000 tokens
       // of actual content, so 6000 leaves ~50% margin instead of landing
       // right back at the edge.
-      max_tokens: 6000,
+      ...lunaParams(6000),
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMsg },

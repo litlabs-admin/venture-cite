@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.hoisted(() => {
   process.env.OPENROUTER_API_KEY = "test-key";
+  process.env.OPENAI_API_KEY = "test-key";
 });
 
 const { storageMock, completionMock, analyzeMock, detectMock } = vi.hoisted(() => ({
@@ -50,6 +51,13 @@ vi.mock("../../server/lib/brandMatcher", () => ({
 vi.mock("openai", () => ({
   default: class OpenAI {
     chat = { completions: { create: completionMock } };
+    // ChatGPT goes through the Responses API; reuse the chat stub's text.
+    responses = {
+      create: async (params: unknown) => {
+        const r = await completionMock(params);
+        return { output_text: r?.choices?.[0]?.message?.content ?? "", output: [], usage: {} };
+      },
+    };
   },
 }));
 

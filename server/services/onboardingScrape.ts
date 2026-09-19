@@ -19,7 +19,7 @@ import { scrapeLogoUrl } from "../lib/logoScraper";
 import { extractPageContent, extractBodyText } from "../lib/pageText";
 import { downloadAndStoreLogo } from "../lib/logoStorage";
 import crypto from "crypto";
-import { getOpenrouterClient } from "../lib/factAgent/v2/openrouterClient";
+import { getOpenAIClient } from "../lib/openaiClient";
 import {
   BRAND_PROFILE_SYSTEM_PROMPT,
   brandProfileSchema,
@@ -27,6 +27,7 @@ import {
   type BrandProfile,
 } from "../lib/brandProfilePrompt";
 import { MODELS } from "../lib/modelConfig";
+import { lunaParams } from "../lib/lunaParams";
 
 export type ScrapeEvent = Record<string, unknown>;
 
@@ -111,13 +112,12 @@ export async function runOnboardingBrandScrape(
   let llmFailed = false;
 
   const callBrandLLM = async (context: string): Promise<BrandProfile> => {
-    const client = getOpenrouterClient();
+    const client = getOpenAIClient();
     if (!client) throw new Error("AI service is not configured");
     const completion = await client.chat.completions.create(
       {
         model: MODELS.brandAutofill,
         response_format: { type: "json_object" },
-        temperature: 0.3,
         messages: [
           { role: "system", content: BRAND_PROFILE_SYSTEM_PROMPT },
           { role: "user", content: context },
@@ -132,7 +132,7 @@ export async function runOnboardingBrandScrape(
         // "sometimes it fills the form, sometimes every field is
         // blank" on content-rich sites. Headroom is cheap; a silent
         // blank confirm screen is not.
-        max_tokens: 3000,
+        ...lunaParams(3000),
       },
       // This call had no timeout at all, so a hung provider held the
       // request open until the platform killed the whole function -

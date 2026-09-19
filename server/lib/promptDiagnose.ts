@@ -1,6 +1,7 @@
 import { storage } from "../storage";
 import { MODELS } from "./modelConfig";
-import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { lunaParams } from "./lunaParams";
+import { getOpenAIClient } from "./openaiClient";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import { safeParseJson } from "./safeParseJson";
 import { buildPromptScoreHistory, resolvePoints } from "./promptScoreHistory";
@@ -268,7 +269,7 @@ export async function diagnosePrompt(brand: Brand, prompt: BrandPrompt): Promise
     return { ...base, narrativeError: "This prompt has not been checked yet." };
   }
 
-  const client = getOpenrouterClient();
+  const client = getOpenAIClient();
   if (!client) return { ...base, narrativeError: "AI analysis is not configured." };
 
   try {
@@ -305,7 +306,6 @@ export async function diagnosePrompt(brand: Brand, prompt: BrandPrompt): Promise
       {
         model: MODELS.promptSetHealth,
         response_format: DIAGNOSE_RESPONSE_FORMAT,
-        temperature: 0.3,
         messages: [
           {
             role: "system",
@@ -341,7 +341,7 @@ ${sourceLines}
 Diagnose this question as JSON.`,
           },
         ],
-        max_tokens: 1200,
+        ...lunaParams(1200),
       },
       { signal: AbortSignal.timeout(LLM_CALL_TIMEOUT_MS) },
     );

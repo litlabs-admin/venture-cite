@@ -51,8 +51,8 @@ vi.mock("../../server/lib/ssrf", () => ({ safeFetchText: safeFetchTextMock }));
 vi.mock("../../server/lib/pageText", () => ({
   extractPageContent: (text: string) => ({ text }),
 }));
-vi.mock("../../server/lib/factAgent/v2/openrouterClient", () => ({
-  getOpenrouterClient: openrouterMock,
+vi.mock("../../server/lib/openaiClient", () => ({
+  getOpenAIClient: openrouterMock,
 }));
 vi.mock("../../server/lib/logger", () => ({
   logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },

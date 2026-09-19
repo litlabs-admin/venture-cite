@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { storage } from "../storage";
 import { MODELS } from "./modelConfig";
+import { lunaParams } from "./lunaParams";
 import { parseLLMJson, LLMParseError } from "./llmParse";
 import { logger } from "./logger";
-import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { getOpenAIClient } from "./openaiClient";
 import { relevanceForRank } from "./competitorRelevance";
 import type { Brand } from "@shared/schema";
 import { RAW_RESPONSE_DELIMITER as RAW_DELIM } from "./citationContextFormat";
@@ -87,8 +88,8 @@ export async function discoverCompetitors(brandId: string): Promise<number> {
     logger.info({ brandId }, "competitorDiscovery: brand is soft-deleted - skipping");
     return 0;
   }
-  if (!process.env.OPENROUTER_API_KEY) {
-    logger.warn({ brandId }, "competitorDiscovery: OPENROUTER_API_KEY missing - skipping");
+  if (!process.env.OPENAI_API_KEY) {
+    logger.warn({ brandId }, "competitorDiscovery: OPENAI_API_KEY missing - skipping");
     return 0;
   }
 
@@ -175,13 +176,12 @@ async function inferCompetitorsFromProfile(
   brand: Brand,
   factDigest: string,
 ): Promise<{ category: string | null; competitors: DiscoveredCompetitor[] }> {
-  const client = getOpenrouterClient();
+  const client = getOpenAIClient();
   if (!client) return { category: null, competitors: [] };
   const completion = await client.chat.completions.create({
     model: MODELS.competitorDiscovery,
-    temperature: 0.2,
     response_format: { type: "json_object" },
-    max_tokens: 1400,
+    ...lunaParams(1400),
     messages: [
       {
         role: "system",
@@ -274,17 +274,14 @@ async function mineCompetitorsFromCitations(brand: Brand): Promise<DiscoveredCom
 
   if (!responseBlob) return [];
 
-  const client = getOpenrouterClient();
+  const client = getOpenAIClient();
   if (!client) return [];
-  // MODELS.competitorDiscovery (openai/gpt-5.6-luna) is cheaper on input
-  // and equal on output vs the prior gpt-4o-mini: $0.10/$0.60 per 1M vs
-  // $0.15/$0.60 per 1M, verified against the live OpenRouter model list.
-  // Do not "optimise" this back to gpt-4o-mini - that would cost more.
+  // MODELS.competitorDiscovery is Luna, on OpenAI directly (pricing in
+  // server/lib/llmPricing.ts).
   const completion = await client.chat.completions.create({
     model: MODELS.competitorDiscovery,
-    temperature: 0.2,
     response_format: { type: "json_object" },
-    max_tokens: 800,
+    ...lunaParams(800),
     messages: [
       {
         role: "system",

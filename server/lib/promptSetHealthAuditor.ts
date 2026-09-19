@@ -1,6 +1,7 @@
 import { storage } from "../storage";
 import { MODELS } from "./modelConfig";
-import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { lunaParams } from "./lunaParams";
+import { getOpenAIClient } from "./openaiClient";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import { safeParseJson } from "./safeParseJson";
 import { tokenize, jaccard } from "./suggestionGenerator";
@@ -68,8 +69,8 @@ async function callSetHealthLLM(
   duplicatePairs: DuplicatePair[],
   scoreByPromptId: Map<string, number | null>,
 ): Promise<LLMVerdict | null> {
-  const client = getOpenrouterClient();
-  if (!client) throw new Error("OPENROUTER_API_KEY not configured");
+  const client = getOpenAIClient();
+  if (!client) throw new Error("OPENAI_API_KEY not configured");
 
   const promptList = tracked
     .map((p) => {
@@ -88,7 +89,6 @@ async function callSetHealthLLM(
     {
       model: MODELS.promptSetHealth,
       response_format: SET_HEALTH_RESPONSE_FORMAT,
-      temperature: 0.3,
       messages: [
         {
           role: "system",
@@ -115,7 +115,7 @@ ${promptList}${dupeBlock}
 Audit this set as JSON.`,
         },
       ],
-      max_tokens: 900,
+      ...lunaParams(900),
     },
     { signal: AbortSignal.timeout(LLM_CALL_TIMEOUT_MS) },
   );
@@ -157,7 +157,7 @@ export async function runPromptSetHealthAudit(brandId: string): Promise<PromptSe
   );
   const scoreByPromptId = new Map(history.map((h) => [h.promptId, h.score]));
 
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     return storage.createSetHealthRun({
       brandId,
       score: null,

@@ -28,7 +28,7 @@ import { analyzeResponse, type TrackedEntity } from "../server/lib/responseAnaly
 
 const RAW_DELIM = "||| RAW_RESPONSE |||";
 
-// openai/gpt-5.6-luna via OpenRouter, per openrouter.ai/api/v1/models.
+// gpt-5.6-luna via OpenAI directly, per developers.openai.com/api/docs/models/gpt-5.6-luna.
 // NOTE: modelConfig.ts's comment says $0.10/$0.60 - that comment is stale by 2x.
 const IN_RATE = 0.2 / 1_000_000;
 const OUT_RATE = 1.2 / 1_000_000;

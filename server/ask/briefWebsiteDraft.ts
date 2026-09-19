@@ -11,8 +11,9 @@
 // evidence of itself) applied to brief generation instead of action cards.
 import { safeFetchText } from "../lib/ssrf";
 import { extractPageContent } from "../lib/pageText";
-import { getOpenrouterClient } from "../lib/factAgent/v2/openrouterClient";
+import { getOpenAIClient } from "../lib/openaiClient";
 import { MODELS } from "../lib/modelConfig";
+import { lunaParams } from "../lib/lunaParams";
 import { logger } from "../lib/logger";
 import type { AskBriefSource } from "@shared/ask/brief";
 
@@ -72,7 +73,7 @@ export async function generateWebsiteBriefDraft(website: string): Promise<DraftB
       ?.replace(/\s+/g, " ")
       .trim() || website;
 
-  const client = getOpenrouterClient();
+  const client = getOpenAIClient();
   if (!client) return empty;
 
   let raw: string | null = null;
@@ -81,8 +82,7 @@ export async function generateWebsiteBriefDraft(website: string): Promise<DraftB
       {
         model: MODELS.askBriefDraft,
         response_format: { type: "json_object" },
-        temperature: 0.2,
-        max_tokens: 800,
+        ...lunaParams(800),
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: `--- PAGE TEXT (${pageTitle || website}) ---\n${page.text}` },

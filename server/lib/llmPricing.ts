@@ -153,7 +153,7 @@ const PRICING_PER_1K_TOKENS_CENTS: Record<string, { in: number; out: number }> =
   "deepseek/deepseek-v4-flash": { in: 0.014, out: 0.028 }, // $0.14 / $0.28 per 1M
   "x-ai/grok-4.3": { in: 0.125, out: 0.25 }, // $1.25 / $2.50 per 1M
   // Analysis tier - brand profile, competitor discovery, prompt generation.
-  "openai/gpt-5.6-luna": { in: 0.01, out: 0.06 }, // $0.10 / $0.60 per 1M
+  "gpt-5.6-luna": { in: 0.02, out: 0.12 }, // $0.20 / $1.20 per 1M, OpenAI direct (docs 2026-09-19)
   // OpenAI web-search chat model used for the ChatGPT citation check.
   "gpt-4o-mini-search-preview": { in: 0.015, out: 0.06 },
 };

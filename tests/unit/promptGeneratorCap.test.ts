@@ -35,8 +35,8 @@ const storageStubs = vi.hoisted(() => ({
 vi.mock("../../server/storage", () => ({ storage: storageStubs }));
 
 const createCompletion = vi.hoisted(() => vi.fn());
-vi.mock("../../server/lib/factAgent/v2/openrouterClient", () => ({
-  getOpenrouterClient: () => ({ chat: { completions: { create: createCompletion } } }),
+vi.mock("../../server/lib/openaiClient", () => ({
+  getOpenAIClient: () => ({ chat: { completions: { create: createCompletion } } }),
 }));
 
 import { TRACKED_PROMPTS_CAP } from "@shared/constants";
@@ -77,10 +77,10 @@ function completionWith(prompts: string[]) {
 }
 
 describe("prompt generation respects the tracked cap", () => {
-  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalKey = process.env.OPENAI_API_KEY;
 
   beforeEach(() => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.OPENAI_API_KEY = "test-key";
     vi.clearAllMocks();
     storageStubs.getRecentArticlesByBrandId.mockResolvedValue([]);
     storageStubs.getBrandFacts.mockResolvedValue([]);
@@ -94,8 +94,8 @@ describe("prompt generation respects the tracked cap", () => {
   });
 
   afterEach(() => {
-    if (originalKey === undefined) delete process.env.OPENROUTER_API_KEY;
-    else process.env.OPENROUTER_API_KEY = originalKey;
+    if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalKey;
   });
 
   it("never persists more tracked prompts than the cap", async () => {

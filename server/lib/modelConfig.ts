@@ -2,10 +2,10 @@
 // them up. Keep the keys grouped by feature page so it's obvious where each
 // value is used.
 //
-// Most non-citation features call OpenAI directly. The three ANALYSIS_MODEL
-// features go through OpenRouter. Citation features call 5 of 6 platforms
-// through OpenRouter (Claude, Gemini, Perplexity, DeepSeek, Grok); the
-// ChatGPT citation check stays on the direct OpenAI client.
+// GPT models (the gpt-4o-mini snapshot and Luna) call OpenAI directly.
+// Citation features call 5 of 6 platforms through OpenRouter (Claude,
+// Gemini, Perplexity, DeepSeek, Grok); the ChatGPT citation check calls
+// OpenAI's Responses API with its web_search tool.
 //
 // OpenAI models use dated snapshots so bumping the
 // `openai` SDK package can't silently swap us onto a newer model that
@@ -23,10 +23,11 @@ const OPENAI_MINI_SNAPSHOT = "gpt-4o-mini-2024-07-18";
 // label becomes an extraction hint, the competitor set defines the market,
 // and the prompts are what every citation run measures. On gpt-4o-mini they
 // produced sector words ("Technology"), supplier names as competitors, and
-// off-category questions. This is an OpenRouter slug, so these three calls
-// use getOpenrouterClient(), not the direct OpenAI client.
-// $0.10/$1M in, $0.60/$1M out, 1.05M context.
-const ANALYSIS_MODEL = "openai/gpt-5.6-luna";
+// off-category questions. GPT models go to OpenAI's own API, never OpenRouter,
+// so every ANALYSIS_MODEL call uses getOpenAIClient() and lunaParams()
+// (server/lib/openaiClient.ts). $0.20/$1M in, $1.20/$1M out, 1.05M context,
+// per https://developers.openai.com/api/docs/models/gpt-5.6-luna.
+const ANALYSIS_MODEL = "gpt-5.6-luna";
 
 export const MODELS = {
   // ── Brand Setup (brands page) ─────────────────────────────────────
@@ -70,17 +71,14 @@ export const MODELS = {
   // analysis tier with the rest.
   perceptionScoring: ANALYSIS_MODEL,
   // Competitor discovery - both the profile inference and the
-  // citation-mining pass. Both call sites must use this key: they share
-  // one OpenRouter client, so a bare OpenAI snapshot name would 404.
+  // citation-mining pass. Both call sites use this key.
   competitorDiscovery: ANALYSIS_MODEL,
   // ChatGPT citation check (CITATION_MODELS.ChatGPT below). Was
   // `gpt-4o-mini-search-preview` via the direct OpenAI client - that
   // snapshot was deprecated (404 as of 2026-08-25), which meant every
   // ChatGPT citation check had been silently failing and recording
-  // "not cited". Moved onto the same OpenRouter slug as the other
-  // analysis-tier calls, with the web-search plugin attached
-  // (webSearchTool: true below) since this slug doesn't do its own
-  // retrieval the way search-preview did.
+  // "not cited". Now Luna on OpenAI's Responses API with its web_search
+  // tool (citationChecker.ts, queryOpenAIWithWebSearch).
   citationChatGPT: ANALYSIS_MODEL,
   // The other five platforms go through OpenRouter. Slugs verified
   // against https://openrouter.ai/api/v1/models on 2026-04-16 - edit here
@@ -100,8 +98,7 @@ export const MODELS = {
   // Cross-platform brand-extraction analyzer (server/lib/responseAnalyzer.ts)
   // - runs once per citation-check response, on EVERY platform's answer,
   // extracting every brand it names (tracked or not) with rank/relevance.
-  // Moved from a direct-OpenAI gpt-4o-mini call onto the same OpenRouter
-  // analysis-tier slug as the rest of this file for stronger extraction
+  // Moved from gpt-4o-mini onto the analysis tier for stronger extraction
   // quality, at the user's request.
   citationBrandExtraction: ANALYSIS_MODEL,
 
@@ -136,15 +133,10 @@ export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 // answers with LIVE WEB GROUNDING, queried as itself, deterministically.
 // Slugs + token prices + the facts below verified 2026-05-27 against the
 // OpenAI / OpenRouter model + docs pages.
-//   - ChatGPT: was OpenAI `gpt-4o-mini-search-preview` via the direct
-//     OpenAI client (search-preview models do their own retrieval and
-//     REJECT sampling params). That snapshot was deprecated (404 as of
-//     2026-08-25 - every ChatGPT citation check had been silently
-//     failing and recording "not cited"). Moved onto the same
-//     OpenRouter `openai/gpt-5.6-luna` slug used by the analysis-tier
-//     calls (MODELS.citationChatGPT), same web-search plugin as
-//     Claude/Gemini/DeepSeek/Grok below - this slug has no built-in
-//     retrieval of its own.
+//   - ChatGPT: Luna (MODELS.citationChatGPT) on OpenAI's own Responses API
+//     with the web_search tool. GPT models never go through OpenRouter.
+//     Chat Completions only searches with dedicated search models, and
+//     the old gpt-4o-mini-search-preview snapshot 404s since 2026-08-25.
 //   - Claude / Gemini / DeepSeek / Grok: clean OpenRouter slug + the documented
 //     `plugins:[{id:"web", max_results:5}]` extension on the OpenAI-compatible
 //     chat-completions request. (Per https://openrouter.ai/docs/guides/features/plugins/web-search
@@ -174,11 +166,13 @@ export interface CitationModelConfig {
 // Reading `model`/`pricingModel` from MODELS keeps both in sync: a slug
 // fix applied to MODELS.citationX now reaches the citation runner too.
 export const CITATION_MODELS: Record<string, CitationModelConfig> = {
+  // OpenAI's Responses API with its web_search tool (citationChecker.ts,
+  // queryOpenAIWithWebSearch). Luna rejects temperature.
   ChatGPT: {
-    client: "openrouter",
+    client: "openai",
     model: MODELS.citationChatGPT,
     pricingModel: MODELS.citationChatGPT,
-    supportsTemperature: true,
+    supportsTemperature: false,
     webSearchTool: true,
   },
   Claude: {

@@ -294,8 +294,107 @@ const OPENROUTER_WEB_SEARCH_PLUGIN = {
   max_results: 5,
 };
 
-// Per-platform query. ChatGPT hits OpenAI directly; the other four go through
-// OpenRouter. No simulation fallbacks - if OPENROUTER_API_KEY is missing the
+type EngineAnswer = {
+  responseText: string;
+  rawCitations: string[];
+  tokensIn: number;
+  tokensOut: number;
+};
+
+// ChatGPT: OpenAI's own API. GPT models never go through OpenRouter (owner's
+// rule, 2026-09-19). Web search on a non-search model needs the Responses
+// API's web_search tool; Chat Completions only searches with the dedicated
+// search models. Luna rejects temperature, and its reasoning tokens count
+// against max_output_tokens, so the cap leaves room for both
+// (https://developers.openai.com/api/docs/guides/reasoning).
+// OpenAI appends utm_source=openai to every cited URL. Drop it so stored
+// URLs match the brand's own pages and dedupe against other engines.
+function stripOpenAITracking(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.searchParams.get("utm_source") !== "openai") return url;
+    u.searchParams.delete("utm_source");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+async function queryOpenAIWithWebSearch(
+  model: string,
+  systemMsg: string,
+  prompt: string,
+): Promise<EngineAnswer> {
+  const response = await openaiBreaker.run(() =>
+    openai.responses.create({
+      model,
+      instructions: systemMsg,
+      input: prompt,
+      tools: [{ type: "web_search" }],
+      reasoning: { effort: "low" },
+      max_output_tokens: 8000,
+    }),
+  );
+  const rawCitations: string[] = [];
+  for (const item of response.output) {
+    if (item.type !== "message") continue;
+    for (const part of item.content) {
+      if (part.type !== "output_text") continue;
+      for (const a of part.annotations) {
+        if (a.type === "url_citation") rawCitations.push(stripOpenAITracking(a.url));
+      }
+    }
+  }
+  return {
+    responseText: response.output_text || "",
+    rawCitations,
+    tokensIn: response.usage?.input_tokens ?? 0,
+    tokensOut: response.usage?.output_tokens ?? 0,
+  };
+}
+
+async function queryOpenRouter(
+  cfg: (typeof CITATION_MODELS)[string],
+  systemMsg: string,
+  prompt: string,
+): Promise<EngineAnswer> {
+  const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
+    model: cfg.model,
+    messages: [
+      { role: "system", content: systemMsg },
+      { role: "user", content: prompt },
+    ],
+    // 2026-05-27: bumped from 1500 → 3000. Perplexity Sonar's
+    // grounded responses routinely run 2000+ tokens (answer + inline
+    // citations + the "Sources" tail). 1500 was truncating Sonar's
+    // citation block mid-list, dropping later URLs from
+    // `extractStructuredCitations` and depressing measured citation
+    // rates. 3000 leaves headroom for all five engines without
+    // becoming a runaway cost.
+    max_tokens: 3000,
+  };
+  // Every OpenRouter engine is pinned to 0 so a weekly measurement isn't a
+  // random walk.
+  if (cfg.supportsTemperature) params.temperature = 0;
+  // Live web grounding for OpenRouter models that don't ground natively.
+  // Attach as a top-level `plugins` array (OpenRouter extension) - see
+  // the OPENROUTER_WEB_SEARCH_PLUGIN definition above for the
+  // why-not-tools rationale.
+  if (cfg.webSearchTool) {
+    (params as unknown as { plugins: unknown[] }).plugins = [OPENROUTER_WEB_SEARCH_PLUGIN];
+  }
+  const chatResponse = await openrouterBreaker.run(() =>
+    openrouter!.chat.completions.create(params),
+  );
+  return {
+    responseText: chatResponse.choices[0]?.message?.content || "",
+    rawCitations: extractStructuredCitations(chatResponse),
+    tokensIn: chatResponse.usage?.prompt_tokens ?? 0,
+    tokensOut: chatResponse.usage?.completion_tokens ?? 0,
+  };
+}
+
+// Per-platform query. ChatGPT hits OpenAI directly; the other four go through// OpenRouter. No simulation fallbacks - if OPENROUTER_API_KEY is missing the
 // caller gets a clear context string so the UI can surface it.
 //
 // userId is optional for legacy callers (e.g. ad-hoc /api/citation/check
@@ -357,54 +456,25 @@ export async function runPlatformCitationCheck(
     };
   }
 
-  const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
-    model: cfg.model,
-    messages: [
-      { role: "system", content: systemMsg },
-      { role: "user", content: prompt },
-    ],
-    // 2026-05-27: bumped from 1500 → 3000. Perplexity Sonar's
-    // grounded responses routinely run 2000+ tokens (answer + inline
-    // citations + the "Sources" tail). 1500 was truncating Sonar's
-    // citation block mid-list, dropping later URLs from
-    // `extractStructuredCitations` and depressing measured citation
-    // rates. 3000 leaves headroom for all five engines without
-    // becoming a runaway cost.
-    max_tokens: 3000,
-  };
-  // Search-grounded OpenAI models reject sampling params; every other
-  // engine is pinned to 0 so a weekly measurement isn't a random walk.
-  if (cfg.supportsTemperature) params.temperature = 0;
-  // Live web grounding for OpenRouter models that don't ground natively.
-  // Attach as a top-level `plugins` array (OpenRouter extension) - see
-  // the OPENROUTER_WEB_SEARCH_PLUGIN definition above for the
-  // why-not-tools rationale.
-  if (cfg.webSearchTool) {
-    (params as unknown as { plugins: unknown[] }).plugins = [OPENROUTER_WEB_SEARCH_PLUGIN];
-  }
-
-  const breaker = cfg.client === "openai" ? openaiBreaker : openrouterBreaker;
-  const client = cfg.client === "openai" ? openai : openrouter!;
-  const chatResponse = await breaker.run(() => client.chat.completions.create(params));
+  const { responseText, rawCitations, tokensIn, tokensOut } =
+    cfg.client === "openai"
+      ? await queryOpenAIWithWebSearch(cfg.model, systemMsg, prompt)
+      : await queryOpenRouter(cfg, systemMsg, prompt);
 
   if (userId) {
     await recordSpend({
       userId,
       service: cfg.client,
       model: cfg.pricingModel,
-      tokensIn: chatResponse.usage?.prompt_tokens ?? 0,
-      tokensOut: chatResponse.usage?.completion_tokens ?? 0,
+      tokensIn,
+      tokensOut,
     });
-  }
-  const responseText = chatResponse.choices[0]?.message?.content || "";
-  // Single point where citation URLs come out of a provider response. Some
+  } // Single point where citation URLs come out of a provider response. Some
   // engines (Gemini via OpenRouter grounding) return a Google redirect shim
   // instead of the real page - resolve it here, before anything downstream
   // (structuredCitations itself, citedUrls, citingOutletUrl,
   // classifySourceType, computeAuthorityScore) reads these URLs.
-  const structuredCitations = await resolveGroundingRedirects(
-    extractStructuredCitations(chatResponse),
-  );
+  const structuredCitations = await resolveGroundingRedirects(rawCitations);
   // Observability: when web grounding silently returns zero citations
   // (e.g. an engine rejected our plugins/tools extension, or upstream
   // grounding is offline) we want it in the logs at WARN - not

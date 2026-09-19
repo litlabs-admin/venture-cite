@@ -1,6 +1,7 @@
 import { storage } from "../storage";
 import { MODELS } from "./modelConfig";
-import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { lunaParams } from "./lunaParams";
+import { getOpenAIClient } from "./openaiClient";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import { safeParseJson } from "./safeParseJson";
 import type { Brand, BrandPrompt, PromptAudience } from "@shared/schema";
@@ -48,8 +49,8 @@ type LLMAudience = {
 };
 
 async function callAudienceLLM(brand: Brand, tracked: BrandPrompt[]): Promise<LLMAudience[]> {
-  const client = getOpenrouterClient();
-  if (!client) throw new Error("OPENROUTER_API_KEY not configured");
+  const client = getOpenAIClient();
+  if (!client) throw new Error("OPENAI_API_KEY not configured");
 
   const trackedList = tracked.map((p, i) => `${i}. ${p.prompt}`).join("\n");
 
@@ -57,7 +58,6 @@ async function callAudienceLLM(brand: Brand, tracked: BrandPrompt[]): Promise<LL
     {
       model: MODELS.audienceGeneration,
       response_format: AUDIENCE_RESPONSE_FORMAT,
-      temperature: 0.4,
       messages: [
         {
           role: "system",
@@ -85,7 +85,7 @@ ${trackedList}
 Group these into 2-5 audiences as JSON.`,
         },
       ],
-      max_tokens: 1200,
+      ...lunaParams(1200),
     },
     { signal: AbortSignal.timeout(LLM_CALL_TIMEOUT_MS) },
   );
@@ -105,8 +105,8 @@ Group these into 2-5 audiences as JSON.`,
 export async function generatePromptAudiences(
   brandId: string,
 ): Promise<{ saved: PromptAudience[]; error?: string }> {
-  if (!process.env.OPENROUTER_API_KEY) {
-    return { saved: [], error: "OPENROUTER_API_KEY not configured" };
+  if (!process.env.OPENAI_API_KEY) {
+    return { saved: [], error: "OPENAI_API_KEY not configured" };
   }
 
   const brand = await storage.getBrandById(brandId);

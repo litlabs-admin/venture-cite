@@ -7,7 +7,8 @@
 
 import OpenAI from "openai";
 import { MODELS } from "./modelConfig";
-import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { lunaParams } from "./lunaParams";
+import { getOpenAIClient } from "./openaiClient";
 import { safeParseJson } from "./safeParseJson";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import { RAW_RESPONSE_DELIMITER as RAW_DELIM } from "./citationContextFormat";
@@ -20,7 +21,7 @@ import { RAW_RESPONSE_DELIMITER as RAW_DELIM } from "./citationContextFormat";
 // would equally break any environment that boots the API without an LLM key -
 // a missing key should disable scoring, not the dashboard. `OpenAI` survives
 // here only as the injected-client TYPE for tests; the real call goes through
-// getOpenrouterClient().
+// getOpenAIClient().
 
 const MIN_SNIPPET_CHARS = 80;
 const MAX_SNIPPET_CHARS = 1200;
@@ -262,11 +263,9 @@ export async function scoreBrandPerception({
     .map((e, i) => `[${i + 1}] (${e.platform}): """${e.text}"""`)
     .join("\n\n");
 
-  // PROJECT POLICY: analysis-tier calls go through OpenRouter (see
-  // modelConfig.ts). This module was the last one still on a direct
-  // gpt-4o-mini OpenAI client. `client` is still honoured so the tests can
-  // inject a stub; only the default path moved.
-  const resolved = client ?? getOpenrouterClient();
+  // Analysis-tier calls use Luna on OpenAI's own API (see modelConfig.ts).
+  // `client` is honoured so the tests can inject a stub.
+  const resolved = client ?? getOpenAIClient();
   if (!resolved) {
     return {
       trust: null,
@@ -286,9 +285,8 @@ export async function scoreBrandPerception({
   const completion = await resolved.chat.completions.create(
     {
       model: MODELS.perceptionScoring,
-      temperature: 0,
       response_format: { type: "json_object" },
-      max_tokens: 1400,
+      ...lunaParams(1400),
       messages: [
         {
           role: "system",

@@ -8,7 +8,8 @@ import {
 } from "@shared/schema";
 import { AI_PLATFORMS_ACTIVE } from "@shared/constants";
 import { MODELS } from "./modelConfig";
-import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { lunaParams } from "./lunaParams";
+import { getOpenAIClient } from "./openaiClient";
 import { safeParseJson } from "./safeParseJson";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import { PERCEPTION_AXES, type PerceptionAxis } from "./perceptionScorer";
@@ -107,8 +108,8 @@ export async function judgeEngineAnswers(
   platform: string,
   answers: Array<{ axis: PerceptionAxis; question: string; answer: string }>,
 ): Promise<JudgedAxis[]> {
-  const client = getOpenrouterClient();
-  if (!client) throw new Error("Scoring is not configured (no OpenRouter key).");
+  const client = getOpenAIClient();
+  if (!client) throw new Error("Scoring is not configured (no OpenAI key).");
 
   const block = answers
     .map(
@@ -120,9 +121,8 @@ export async function judgeEngineAnswers(
   const completion = await client.chat.completions.create(
     {
       model: MODELS.perceptionScoring,
-      temperature: 0,
       response_format: JUDGE_RESPONSE_FORMAT,
-      max_tokens: 2000,
+      ...lunaParams(2000),
       messages: [
         {
           role: "system",

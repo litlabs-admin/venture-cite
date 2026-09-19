@@ -1,5 +1,6 @@
 import { MODELS } from "./modelConfig";
-import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { lunaParams } from "./lunaParams";
+import { getOpenAIClient } from "./openaiClient";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import { safeParseJson } from "./safeParseJson";
 import type { Brand } from "@shared/schema";
@@ -40,14 +41,13 @@ export async function generatePhrasings(
   brand: Brand,
   promptText: string,
 ): Promise<{ text: string; rationale: string }[]> {
-  const client = getOpenrouterClient();
-  if (!client) throw new Error("OPENROUTER_API_KEY not configured");
+  const client = getOpenAIClient();
+  if (!client) throw new Error("OPENAI_API_KEY not configured");
 
   const completion = await client.chat.completions.create(
     {
       model: MODELS.promptSetHealth,
       response_format: PHRASING_RESPONSE_FORMAT,
-      temperature: 0.7,
       messages: [
         {
           role: "system",
@@ -66,7 +66,7 @@ Original question: "${promptText}"
 Generate 3-5 alternate phrasings as JSON.`,
         },
       ],
-      max_tokens: 600,
+      ...lunaParams(600),
     },
     { signal: AbortSignal.timeout(LLM_CALL_TIMEOUT_MS) },
   );

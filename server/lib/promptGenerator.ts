@@ -1,8 +1,9 @@
 import { storage } from "../storage";
 import { MODELS } from "./modelConfig";
+import { lunaParams } from "./lunaParams";
 import { logger } from "./logger";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
-import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { getOpenAIClient } from "./openaiClient";
 import { renderCompetitorBlock } from "./brandGenerationContext";
 import { makeBrandNameFilter } from "./brandNameFilter";
 import { CATEGORY_NOUNS, checkPromptShape, restoreProperNouns } from "./promptShape";
@@ -194,8 +195,8 @@ function renderFactSheet(facts: BrandFactSheet[]): string {
 export async function generateBrandPrompts(
   brand: Brand,
 ): Promise<{ saved: any[]; error?: string; generationId?: string }> {
-  if (!process.env.OPENROUTER_API_KEY) {
-    return { saved: [], error: "OPENROUTER_API_KEY not configured" };
+  if (!process.env.OPENAI_API_KEY) {
+    return { saved: [], error: "OPENAI_API_KEY not configured" };
   }
 
   const [recentArticles, facts, competitors] = await Promise.all([
@@ -244,17 +245,15 @@ export async function generateBrandPrompts(
           (shapeAvoid.length > 0
             ? `\n\nWRONG SHAPE (not a lowercase listicle trigger - see the required form above):\n${shapeAvoid.map((p) => `- ${p}`).join("\n")}`
             : "");
-    const client = getOpenrouterClient();
-    if (!client) throw new Error("OPENROUTER_API_KEY not configured");
+    const client = getOpenAIClient();
+    if (!client) throw new Error("OPENAI_API_KEY not configured");
     const completion = await client.chat.completions.create(
       {
         model: MODELS.brandPromptGeneration,
         response_format: PROMPT_RESPONSE_FORMAT,
-        // 0.7 keeps the questions distinct while staying anchored to the fact
-        // sheet; the unset default (1.0) drifts off-grounding into generic
-        // filler. Tune temperature only - not top_p. No frequency/presence
-        // penalties: they'd penalise the repeated JSON structural tokens.
-        temperature: 0.7,
+        // Luna rejects temperature and top_p, so grounding comes from the
+        // prompt alone. No frequency/presence penalties: they'd penalise the
+        // repeated JSON structural tokens.
         messages: [
           { role: "system", content: buildSystemPrompt(count, hasCompetitors) },
           { role: "user", content: userMessage + avoidBlock },
@@ -267,7 +266,7 @@ export async function generateBrandPrompts(
         // prompt, a category and a funnel stage. A truncated body makes
         // safeParseJson return null, which yields ZERO prompts rather than a
         // short list - so this is sized generously on purpose.
-        max_tokens: 400 * count + 1000,
+        ...lunaParams(400 * count + 1000),
       },
       { signal: AbortSignal.timeout(LLM_CALL_TIMEOUT_MS) },
     );

@@ -1,5 +1,5 @@
 // Direct tests for server/onboardingSession/insight.ts. The OpenRouter client
-// is mocked at getOpenrouterClient (server/lib/factAgent/v2/openrouterClient.ts),
+// is mocked at getOpenAIClient (server/lib/factAgent/v2/openrouterClient.ts),
 // the same seam server/ask/briefWebsiteDraft.ts's tests use, so no network or
 // LLM call happens.
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -8,8 +8,8 @@ const openrouterStubs = vi.hoisted(() => ({
   create: vi.fn(),
 }));
 
-vi.mock("../../server/lib/factAgent/v2/openrouterClient", () => ({
-  getOpenrouterClient: () => ({
+vi.mock("../../server/lib/openaiClient", () => ({
+  getOpenAIClient: () => ({
     chat: { completions: { create: openrouterStubs.create } },
   }),
 }));
@@ -141,8 +141,8 @@ describe("buildInsight", () => {
 
   it("throws when the client is not configured", async () => {
     vi.resetModules();
-    vi.doMock("../../server/lib/factAgent/v2/openrouterClient", () => ({
-      getOpenrouterClient: () => null,
+    vi.doMock("../../server/lib/openaiClient", () => ({
+      getOpenAIClient: () => null,
     }));
     const { buildInsight: buildInsightNoClient } =
       await import("../../server/onboardingSession/insight");

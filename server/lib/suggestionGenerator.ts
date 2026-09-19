@@ -1,20 +1,15 @@
 import { storage } from "../storage";
 import { MODELS } from "./modelConfig";
-import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { lunaParams } from "./lunaParams";
+import { getOpenAIClient } from "./openaiClient";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import type { Brand, BrandPrompt } from "@shared/schema";
 
-// This module used to hold its own `new OpenAI({ apiKey: OPENAI_API_KEY })`
-// client pointed at api.openai.com, while sending it
-// MODELS.brandPromptGeneration - which is "openai/gpt-5.6-luna", an OpenRouter
-// ROUTING SLUG that does not exist on OpenAI's own API. Every suggestion call
-// therefore threw, generateSuggestedPrompts() swallowed it into
-// `{ saved: [], error }`, and the feature read as "does nothing".
-//
-// modelConfig.ts says so directly: "This is an OpenRouter slug, so these three
-// calls use getOpenrouterClient(), not the direct OpenAI client."
-// promptGenerator.ts - the sibling that users report as working - follows that
-// rule. This one now does too.
+// The client and the model must agree: MODELS.brandPromptGeneration is the
+// bare OpenAI name "gpt-5.6-luna", which exists only on OpenAI's own API.
+// An earlier version sent the OpenRouter slug "openai/gpt-5.6-luna" to
+// api.openai.com; every call threw and generateSuggestedPrompts() swallowed
+// it into `{ saved: [], error }`.
 
 import { safeParseJson } from "./safeParseJson";
 import { makeBrandNameFilter } from "./brandNameFilter";
@@ -130,14 +125,12 @@ async function callSuggestionLLM(
       ? `\n\nPreviously rejected (too similar to tracked) - avoid these shapes too:\n${avoidList.map((p) => `- ${p}`).join("\n")}`
       : "";
 
-  const client = getOpenrouterClient();
-  if (!client) throw new Error("OPENROUTER_API_KEY not configured");
+  const client = getOpenAIClient();
+  if (!client) throw new Error("OPENAI_API_KEY not configured");
   const completion = await client.chat.completions.create(
     {
       model: MODELS.brandPromptGeneration,
       response_format: SUGGESTION_RESPONSE_FORMAT,
-      // 0.7: distinct-but-grounded (default 1.0 drifts into generic filler).
-      temperature: 0.7,
       messages: [
         {
           role: "system",
@@ -174,7 +167,7 @@ ${articleSummaries.length === 0 ? "(none yet)" : articleSummaries.map((a, i) => 
 Return exactly ${howMany} NEW, distinct questions as JSON.`,
         },
       ],
-      max_tokens: 1200,
+      ...lunaParams(1200),
     },
     { signal: AbortSignal.timeout(LLM_CALL_TIMEOUT_MS) },
   );

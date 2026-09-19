@@ -12,7 +12,7 @@ const stubs = vi.hoisted(() => ({
   downloadAndStoreLogo: vi.fn(),
   extractPageContent: vi.fn(),
   extractBodyText: vi.fn(),
-  getOpenrouterClient: vi.fn(),
+  getOpenAIClient: vi.fn(),
   chatCreate: vi.fn(),
 }));
 
@@ -33,8 +33,8 @@ vi.mock("../../server/lib/pageText", () => ({
   extractBodyText: stubs.extractBodyText,
 }));
 
-vi.mock("../../server/lib/factAgent/v2/openrouterClient", () => ({
-  getOpenrouterClient: stubs.getOpenrouterClient,
+vi.mock("../../server/lib/openaiClient", () => ({
+  getOpenAIClient: stubs.getOpenAIClient,
 }));
 
 vi.mock("../../server/lib/modelConfig", () => ({
@@ -53,7 +53,7 @@ function events(emit: ReturnType<typeof vi.fn>) {
 
 beforeEach(() => {
   for (const s of Object.values(stubs)) s.mockReset();
-  stubs.getOpenrouterClient.mockReturnValue({
+  stubs.getOpenAIClient.mockReturnValue({
     chat: { completions: { create: stubs.chatCreate } },
   });
 });

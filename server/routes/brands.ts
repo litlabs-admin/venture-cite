@@ -15,6 +15,7 @@ import type { Express } from "express";
 import { z } from "zod";
 import { insertBrandSchema, usageLimits, resolveTier } from "@shared/schema";
 import { MODELS } from "../lib/modelConfig";
+import { lunaParams } from "../lib/lunaParams";
 import { safeFetchText } from "../lib/ssrf";
 import { extractPageContent } from "../lib/pageText";
 import { requireUser } from "../lib/ownership";
@@ -23,7 +24,7 @@ import { requestData } from "../data/requestData";
 import { RequestBrandQuotaError } from "../data/requestBrandRepository";
 import { logAudit } from "../lib/audit";
 import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
-import { getOpenrouterClient } from "../lib/factAgent/v2/openrouterClient";
+import { getOpenAIClient } from "../lib/openaiClient";
 import {
   BRAND_PROFILE_SYSTEM_PROMPT,
   brandProfileSchema,
@@ -116,7 +117,7 @@ export function setupBrandRoutes(app: Express): void {
           });
         }
 
-        const analysisClient = getOpenrouterClient();
+        const analysisClient = getOpenAIClient();
         if (!analysisClient) {
           return res.status(503).json({ success: false, error: "AI service is not configured" });
         }
@@ -184,13 +185,12 @@ export function setupBrandRoutes(app: Express): void {
                 },
               ],
               response_format: { type: "json_object" },
-              temperature: 0.3,
               // This call set no max_tokens at all, so it inherited the
               // provider default. Pin it, and pin it high: the sibling call
               // in routes/onboarding.ts was capped at 1200 and measured
               // 895-1209 completion tokens on a real content-rich page, so
               // the cap was truncating the JSON and producing blank forms.
-              max_tokens: 3000,
+              ...lunaParams(3000),
             },
             { signal: AbortSignal.timeout(25000) },
           );

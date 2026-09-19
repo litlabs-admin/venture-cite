@@ -11,10 +11,10 @@
 // WriteLoadingLines: a second, separate, small/fast LLM call - never folded
 // into the same request as AnalyzeBrand, so the four lines can render before
 // the heavier profile call resolves.
-import OpenAI from "openai";
 import { z } from "zod";
-import { attachAiLogger } from "../lib/aiLogger";
+import { getOpenAIClient } from "../lib/openaiClient";
 import { MODELS } from "../lib/modelConfig";
+import { lunaParams } from "../lib/lunaParams";
 import { CATEGORY_NOUNS, checkPromptShape } from "../lib/promptShape";
 import {
   loadingLinesSchema,
@@ -103,30 +103,26 @@ function bareDomain(value: string): string {
     .replace(/\/.*$/, "");
 }
 
-// GPT models go to OpenAI's own API, never through OpenRouter (owner's rule,
-// 2026-09-19). The Responses API's web_search tool is what lets Luna look
-// the company up instead of guessing from its name.
-// Same model as MODELS.brandAutofill, without its OpenRouter `openai/` prefix.
-const LUNA = "gpt-5.6-luna";
-let openaiClient: OpenAI | null = null;
-function getOpenAIClient(): OpenAI {
-  if (!process.env.OPENAI_API_KEY) throw new Error("AI service is not configured");
-  if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 1 });
-    attachAiLogger(openaiClient);
-  }
-  return openaiClient;
+function requireClient() {
+  const client = getOpenAIClient();
+  if (!client) throw new Error("AI service is not configured");
+  return client;
 }
 
+// The Responses API's web_search tool is what lets Luna look the company up
+// instead of guessing from its name.
 export async function findCompetitors(domain: string): Promise<Competitors> {
-  const response = await getOpenAIClient().responses.create(
+  const response = await requireClient().responses.create(
     {
-      model: LUNA,
+      model: MODELS.brandAutofill,
       tools: [{ type: "web_search" }],
+      reasoning: { effort: "low" },
+      max_output_tokens: 8000,
       instructions: COMPETITORS_SYSTEM_PROMPT,
       input: `Website: https://${domain}`,
     },
-    { signal: AbortSignal.timeout(40_000) },
+    // Search plus reasoning runs past the client's default timeout.
+    { signal: AbortSignal.timeout(40_000), timeout: 40_000 },
   );
   const content = response.output_text;
   const { competitors } = competitorsResponseSchema.parse(parseJsonObject(content));
@@ -150,15 +146,14 @@ export async function findCompetitors(domain: string): Promise<Competitors> {
 }
 
 export const analyzeBrand: AnalyzeBrand = async ({ domain, pageText }) => {
-  const client = getOpenAIClient();
+  const client = requireClient();
 
   // Both calls run at once; Promise.all also keeps a failed competitor call
   // from surfacing as an unhandled rejection when the profile call fails first.
   const [completion, competitors] = await Promise.all([
     client.chat.completions.create(
       {
-        model: LUNA,
-        // Reasoning models reject sampling params on OpenAI's API.
+        model: MODELS.brandAutofill,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: ANALYZE_SYSTEM_PROMPT },
@@ -167,7 +162,7 @@ export const analyzeBrand: AnalyzeBrand = async ({ domain, pageText }) => {
             content: `Website domain: ${domain}\n\nWebsite content:\n${pageText}`,
           },
         ],
-        max_completion_tokens: 4000,
+        ...lunaParams(4000),
       },
       { signal: AbortSignal.timeout(25_000) },
     ),
@@ -196,7 +191,7 @@ export const analyzeBrand: AnalyzeBrand = async ({ domain, pageText }) => {
 };
 
 export const writeLoadingLines: WriteLoadingLines = async ({ domain, pageText }) => {
-  const client = getOpenAIClient();
+  const client = requireClient();
 
   const completion = await client.chat.completions.create(
     {
