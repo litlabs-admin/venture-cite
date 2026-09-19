@@ -42,6 +42,7 @@ import {
   detectFactScrapeFailureRate,
 } from "../scheduler";
 import { runTourEventsCleanupJob } from "../lib/tourCleanup";
+import { runOnboardingSessionCleanupJob } from "../onboardingSession/cleanup";
 import { runBrandActivationSweep } from "../lib/brandActivation";
 import { runFactScrapeBackstop } from "../lib/factAgent/v2/factScrapeBackstop";
 import { runFactSheetRefresh } from "../lib/factAgent/v2/runFactSheetRefresh";
@@ -125,6 +126,7 @@ export function setupCronRoutes(app: Express): void {
       // below can legitimately consume the whole budget on a busy tick, and a
       // retention prune that is skipped every day never runs at all.
       await orch.run("tour-events-cleanup", () => runTourEventsCleanupJob());
+      await orch.run("onboarding-session-cleanup", () => runOnboardingSessionCleanupJob());
       await orch.run("detect-fact-scrape-failure", () => detectFactScrapeFailureRate());
       await orch.run("ops-health-check", () => runOpsHealthCheck());
 

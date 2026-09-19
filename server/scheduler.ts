@@ -20,6 +20,7 @@ import { supabaseAdmin } from "./supabase";
 import { startRun } from "./lib/workflowEngine";
 import { tryEmitWeeklyDigestForUser } from "./lib/weeklyDigestEmitter";
 import { runTourEventsCleanupJob } from "./lib/tourCleanup";
+import { runOnboardingSessionCleanupJob } from "./onboardingSession/cleanup";
 import { SCHEDULER_JOB_NAMES } from "./lib/schedulerJobRegistry";
 import { runOpsHealthCheck } from "./lib/opsHealthCheck";
 
@@ -908,6 +909,20 @@ export function initScheduler(): void {
       cronCrashGuard(SCHEDULER_JOB_NAMES.tourEventsCleanup, runTourEventsCleanupJob),
     );
     logger.info({ cron: TOUR_EVENTS_CLEANUP_CRON }, "tour events cleanup scheduled");
+  }
+
+  // Hourly onboarding-session cleanup: deletes expired, unclaimed anonymous
+  // onboarding sessions (24h TTL). Claimed sessions are kept - the brand they
+  // produced points back at them. See onboarding_sessions_unclaimed_expiry_idx
+  // in migrations/0130_onboarding_sessions.sql.
+  const ONBOARDING_SESSION_CLEANUP_CRON =
+    process.env.ONBOARDING_SESSION_CLEANUP_CRON || "0 * * * *";
+  if (cron.validate(ONBOARDING_SESSION_CLEANUP_CRON)) {
+    cron.schedule(
+      ONBOARDING_SESSION_CLEANUP_CRON,
+      cronCrashGuard(SCHEDULER_JOB_NAMES.onboardingSessionCleanup, runOnboardingSessionCleanupJob),
+    );
+    logger.info({ cron: ONBOARDING_SESSION_CLEANUP_CRON }, "onboarding session cleanup scheduled");
   }
 
   // Auto-citation cron - always active, no RESEND_API_KEY needed.

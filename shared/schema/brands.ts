@@ -71,6 +71,9 @@ export const brands = pgTable(
     // other dashboard measurement fires on its own schedule. See
     // migrations/0090_monitor_mentions_default_on.sql.
     monitorMentions: boolean("monitor_mentions").notNull().default(true),
+    // 'own' or 'client' (migration 0129). 'client' marks a brand an agency
+    // account measures for someone else.
+    relationship: text("relationship").default("own").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

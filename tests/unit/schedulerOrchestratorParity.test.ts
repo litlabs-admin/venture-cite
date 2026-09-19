@@ -66,6 +66,7 @@ const stubs = vi.hoisted(() => ({
   deleteExpiredFactScrapeCache: vi.fn(async () => 0),
   deleteExpiredLlmConcurrencySlots: vi.fn(async () => 0),
   deleteOldTourEvents: vi.fn(async () => 0),
+  runOnboardingSessionCleanupJob: vi.fn(async () => undefined),
   detectFactScrapeFailureRate: vi.fn(async () => ({ alerted: 0 })),
   runBrandActivationSweep: vi.fn(async () => ({ processed: 0, total: 0 })),
   runContentCostOutboxDrain: vi.fn(async () => ({
@@ -99,6 +100,9 @@ vi.mock("../../server/scheduler", () => ({
   runWeeklyDigestAggregator: stubs.runWeeklyDigestAggregator,
   runWeeklyReportJob: stubs.runWeeklyReportJob,
   detectFactScrapeFailureRate: stubs.detectFactScrapeFailureRate,
+}));
+vi.mock("../../server/onboardingSession/cleanup", () => ({
+  runOnboardingSessionCleanupJob: stubs.runOnboardingSessionCleanupJob,
 }));
 vi.mock("../../server/lib/citationReconciliation", () => ({
   reconcileOrphanCitationRuns: stubs.reconcileOrphanCitationRuns,

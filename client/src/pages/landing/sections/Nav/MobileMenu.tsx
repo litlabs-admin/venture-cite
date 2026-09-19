@@ -106,7 +106,7 @@ export function MobileMenu() {
                   Sign in
                 </Link>
                 <Link
-                  to="/register"
+                  to="/start"
                   onClick={() => setIsOpen(false)}
                   className="block w-full px-4 py-2.5 text-center text-[14px] font-medium bg-vc-accent text-white rounded hover:bg-vc-accent-hover transition-colors"
                 >

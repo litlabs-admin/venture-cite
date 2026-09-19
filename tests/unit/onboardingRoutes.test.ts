@@ -12,7 +12,11 @@ process.env.OPENAI_API_KEY ??= "test-key";
 process.env.SUPABASE_URL ??= "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY ??= "service-role-test";
 
-const user = { id: "11111111-1111-4111-8111-111111111111", accessTier: "free" };
+const user = {
+  id: "11111111-1111-4111-8111-111111111111",
+  accessTier: "free",
+  onboardingState: { pendingOnboardingSessionId: "22222222-2222-4222-8222-222222222222" },
+};
 
 class TestOwnershipError extends Error {
   status: number;
@@ -23,27 +27,43 @@ class TestOwnershipError extends Error {
   }
 }
 
-const { ownership, onboardingState, onboardingScrape, onboardingActivation, domain, sentry } =
-  vi.hoisted(() => {
-    const ownership = {
-      requireBrand: vi.fn(),
-    };
-    const onboardingState = {
-      applyOnboardingStatePatch: vi.fn(),
-    };
-    const onboardingScrape = {
-      runOnboardingBrandScrape: vi.fn(),
-    };
-    const onboardingActivation = {
-      confirmOnboardingBrand: vi.fn(),
-      retryOnboardingAutopilot: vi.fn(),
-      advanceOnboardingAutopilot: vi.fn(),
-      getOnboardingAutopilotStatus: vi.fn(),
-    };
-    const domain = { validateDomain: vi.fn() };
-    const sentry = { captureAndFlush: vi.fn() };
-    return { ownership, onboardingState, onboardingScrape, onboardingActivation, domain, sentry };
-  });
+const {
+  ownership,
+  onboardingState,
+  onboardingScrape,
+  onboardingActivation,
+  onboardingClaim,
+  domain,
+  sentry,
+} = vi.hoisted(() => {
+  const ownership = {
+    requireBrand: vi.fn(),
+  };
+  const onboardingState = {
+    applyOnboardingStatePatch: vi.fn(),
+  };
+  const onboardingScrape = {
+    runOnboardingBrandScrape: vi.fn(),
+  };
+  const onboardingActivation = {
+    confirmOnboardingBrand: vi.fn(),
+    retryOnboardingAutopilot: vi.fn(),
+    advanceOnboardingAutopilot: vi.fn(),
+    getOnboardingAutopilotStatus: vi.fn(),
+  };
+  const onboardingClaim = { claimOnboardingSession: vi.fn() };
+  const domain = { validateDomain: vi.fn() };
+  const sentry = { captureAndFlush: vi.fn() };
+  return {
+    ownership,
+    onboardingState,
+    onboardingScrape,
+    onboardingActivation,
+    onboardingClaim,
+    domain,
+    sentry,
+  };
+});
 
 vi.mock("../../server/db", () => ({ db: {}, pool: {} }));
 vi.mock("../../server/storage", () => ({ storage: {} }));
@@ -76,6 +96,7 @@ vi.mock("../../server/lib/routesShared", () => ({
 vi.mock("../../server/services/onboardingState", () => onboardingState);
 vi.mock("../../server/services/onboardingScrape", () => onboardingScrape);
 vi.mock("../../server/services/onboardingActivation", () => onboardingActivation);
+vi.mock("../../server/services/onboardingClaim", () => onboardingClaim);
 vi.mock("../../server/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -357,6 +378,93 @@ describe("onboarding routes", () => {
         BRAND_ID,
         user.id,
       );
+    });
+  });
+
+  describe("POST /api/onboarding/claim", () => {
+    const SESSION_ID = "22222222-2222-4222-8222-222222222222";
+
+    it("401s when the caller isn't authenticated", async () => {
+      const res = await request(makeApp(false))
+        .post("/api/onboarding/claim")
+        .send({ sessionId: SESSION_ID });
+      expect(res.status).toBe(401);
+      expect(onboardingClaim.claimOnboardingSession).not.toHaveBeenCalled();
+    });
+
+    it("400s when sessionId is missing or not a UUID", async () => {
+      const res = await request(makeApp())
+        .post("/api/onboarding/claim")
+        .send({ sessionId: "nope" });
+      expect(res.status).toBe(400);
+      expect(onboardingClaim.claimOnboardingSession).not.toHaveBeenCalled();
+    });
+
+    it("404s when the session is not found or not owned by this user", async () => {
+      onboardingClaim.claimOnboardingSession.mockResolvedValue({ kind: "not_found" });
+      const res = await request(makeApp())
+        .post("/api/onboarding/claim")
+        .send({ sessionId: SESSION_ID });
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ success: false, error: "Onboarding session not found" });
+    });
+
+    it("403s with limitReached when the brand quota is full", async () => {
+      onboardingClaim.claimOnboardingSession.mockResolvedValue({
+        kind: "quota_exceeded",
+        message: "Brand limit reached",
+      });
+      const res = await request(makeApp())
+        .post("/api/onboarding/claim")
+        .send({ sessionId: SESSION_ID });
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({
+        success: false,
+        error: "Brand limit reached",
+        limitReached: true,
+      });
+    });
+
+    it("claims and returns the brandId", async () => {
+      onboardingClaim.claimOnboardingSession.mockResolvedValue({
+        kind: "claimed",
+        brandId: "brand-42",
+      });
+      const res = await request(makeApp())
+        .post("/api/onboarding/claim")
+        .send({ sessionId: SESSION_ID });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ success: true, brandId: "brand-42" });
+      expect(onboardingClaim.claimOnboardingSession).toHaveBeenCalledWith(user.id, SESSION_ID);
+    });
+  });
+
+  describe("GET /api/onboarding/pending", () => {
+    it("401s when the caller isn't authenticated", async () => {
+      const res = await request(makeApp(false)).get("/api/onboarding/pending");
+      expect(res.status).toBe(401);
+    });
+
+    it("returns the pending session id from onboarding_state", async () => {
+      const res = await request(makeApp()).get("/api/onboarding/pending");
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        success: true,
+        sessionId: "22222222-2222-4222-8222-222222222222",
+      });
+    });
+
+    it("returns null when there is no pending session", async () => {
+      const app = express();
+      app.use(express.json());
+      app.use((req: any, _res, next) => {
+        req.user = { ...user, onboardingState: {} };
+        next();
+      });
+      setupOnboardingRoutes(app);
+      const res = await request(app).get("/api/onboarding/pending");
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ success: true, sessionId: null });
     });
   });
 });

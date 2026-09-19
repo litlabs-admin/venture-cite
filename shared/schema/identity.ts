@@ -39,6 +39,10 @@ export const users = pgTable("users", {
   // so dismiss state syncs across devices. Keys defined in
   // server/routes/onboarding.ts (see ONBOARDING_FIELDS).
   onboardingState: jsonb("onboarding_state").default({}).notNull(),
+  // 'brand' or 'agency' (migration 0129). An agency owns client brands; its
+  // name is required for 'agency' and null for 'brand' (CHECK constraint).
+  accountKind: text("account_kind").default("brand").notNull(),
+  agencyName: text("agency_name"),
   bufferAccessToken: text("buffer_access_token"),
   // Soft-delete state. Set when the user requests account deletion.
   // - the row stays for the 30-day grace period so an admin can restore

@@ -25,6 +25,7 @@ import { captureAndFlush } from "./lib/sentryReport";
 import { setupUserAccountRoutes } from "./routes/userAccount";
 import { setupUnsubscribeRoutes } from "./routes/unsubscribe";
 import { setupOnboardingRoutes } from "./routes/onboarding";
+import { setupPublicOnboardingRoutes } from "./routes/publicOnboarding";
 import { setupTourRoutes } from "./routes/tours";
 import { setupLogoProxyRoutes } from "./routes/logoProxy";
 import { setupBoardRoutes } from "./routes/board";
@@ -102,6 +103,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Server-side onboarding flag store.
   setupOnboardingRoutes(app);
+  // Anonymous pre-signup onboarding session. Public by prefix
+  // (server/auth.ts's PUBLIC_API_PREFIXES), so it works even though this
+  // call sits after requireAuthForApi above.
+  setupPublicOnboardingRoutes(app);
   setupTourRoutes(app);
 
   // Logo/favicon image proxy - so scraped external images pass CSP.
