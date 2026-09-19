@@ -199,7 +199,7 @@ vi.mock("../../server/lib/routesShared", () => ({
   asyncHandler: (fn: any) => fn,
 }));
 
-const envStub = { ASK_ENABLED: undefined as string | undefined, NODE_ENV: "development" as string };
+const envStub = { NODE_ENV: "development" as string };
 vi.mock("../../server/env", () => ({ env: envStub }));
 
 const { setupAskRoutes } = await import("../../server/routes/ask");
@@ -298,7 +298,6 @@ const TEST_THREAD_ID = "00000000-0000-4000-8000-000000000001";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  envStub.ASK_ENABLED = undefined;
   envStub.NODE_ENV = "development";
   stubs.requireUser.mockReturnValue({ id: "user-1", accessTier: "free" });
   stubs.requireAskThread.mockResolvedValue({
@@ -315,23 +314,9 @@ beforeEach(() => {
   });
 });
 
-describe("Ask feature flag", () => {
-  it("404s every /api/ask/* route when ASK_ENABLED=false", async () => {
-    envStub.ASK_ENABLED = "false";
-    const app = buildApp();
-    const { status } = await callRoute(app, "GET", "/api/ask/threads");
-    expect(status).toBe(404);
-  });
-
-  it("404s in production when ASK_ENABLED is unset", async () => {
+describe("Ask availability", () => {
+  it("is reachable in production with no flag", async () => {
     envStub.NODE_ENV = "production";
-    envStub.ASK_ENABLED = undefined;
-    const app = buildApp();
-    const { status } = await callRoute(app, "GET", "/api/ask/threads");
-    expect(status).toBe(404);
-  });
-
-  it("is reachable in development with no explicit flag", async () => {
     const app = buildApp();
     const { status } = await callRoute(app, "GET", "/api/ask/threads");
     expect(status).toBe(200);

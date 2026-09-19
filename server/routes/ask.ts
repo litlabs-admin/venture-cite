@@ -76,7 +76,6 @@ import {
 } from "../ask/actions/execute";
 import { WORK_KINDS } from "@shared/ask/constants";
 import { ASK_SUGGESTION_PALETTE } from "@shared/ask/suggestions";
-import { env } from "../env";
 import {
   readBrief,
   saveBrief,
@@ -137,26 +136,7 @@ function handleActionError(res: import("express").Response, err: unknown): boole
   return false;
 }
 
-// On by default in every environment except production, where it needs an
-// explicit ASK_ENABLED=true (07 §9's smallest-thing-that-works flag: no
-// general feature-flag system exists in this codebase). ASK_ENABLED=false
-// forces it off anywhere, including development.
-function isAskEnabled(): boolean {
-  if (env.ASK_ENABLED === "false") return false;
-  if (env.ASK_ENABLED === "true") return true;
-  return env.NODE_ENV !== "production";
-}
-
 export function setupAskRoutes(app: Express): void {
-  // 404, never 403, when the flag is off - matching AGENTS.md's anti-
-  // enumeration policy for every other ownership miss in this codebase.
-  app.use("/api/ask", (req, res, next) => {
-    if (!isAskEnabled()) {
-      return res.status(404).json({ success: false, error: "Not found" });
-    }
-    next();
-  });
-
   // ------------------------------ Threads ------------------------------
 
   app.get(

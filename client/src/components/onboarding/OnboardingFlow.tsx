@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useOnboardingSession } from "@/hooks/useOnboardingSession";
 import { validateDomain } from "@shared/validateDomain";
-import type { Profile } from "@shared/onboarding/session";
+import { PROBE_PROMPT_COUNT, type Profile } from "@shared/onboarding/session";
 import { Enter, StepProgress } from "./shared";
 import { WebsiteStep, ScanStep, WhoStep, BrandStep, FirstReadStep, SaveStep } from "./LeftSteps";
 import {
@@ -229,7 +229,7 @@ export function OnboardingFlow({ initialDomain }: { initialDomain?: string }) {
           favicon={favicon}
           probe={session.probe}
           probeError={session.errors.probe ?? null}
-          sources={session.sources}
+          prompts={(session.topics?.flatMap((t) => t.prompts) ?? []).slice(0, PROBE_PROMPT_COUNT)}
           insight={session.insight}
           insightError={session.errors.insight ?? null}
           onContinue={() => setStep(5)}

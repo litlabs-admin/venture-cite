@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   Check,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -442,6 +443,7 @@ export function FirstReadStep({
   favicon,
   probe,
   probeError,
+  prompts,
   insight,
   insightError,
   onContinue,
@@ -450,7 +452,8 @@ export function FirstReadStep({
   favicon: string;
   probe: Probe | null;
   probeError: string | null;
-  sources: Source[] | null;
+  /** The prompts the probe is running, known before its answers arrive. */
+  prompts: string[];
   insight: Insight | null;
   insightError: string | null;
   onContinue: () => void;
@@ -461,37 +464,91 @@ export function FirstReadStep({
   const brandAppearances = tally?.brandNamed ?? 0;
   const totalAnswers = tally?.answers ?? 0;
   const notCited = !!tally && brandAppearances === 0;
+  // Prefer an answer that named the brand; otherwise the first one back.
+  const sample = probe?.results.find((r) => r.brandCited) ?? probe?.results[0] ?? null;
+  const engines = [...new Set(probe?.results.map((r) => r.engine) ?? [])];
+
+  if (probeError) {
+    return (
+      <div className="flex flex-col gap-4">
+        <StepHeading title={`We couldn't check ${brandName} this time`} sub="" />
+        <UnavailableNotice message={probeError} />
+        <Button onClick={onContinue} className="h-10 w-full justify-center">
+          Continue
+        </Button>
+      </div>
+    );
+  }
+
+  if (!probe) {
+    return (
+      <div className="flex flex-col gap-4" data-testid="first-read-pending">
+        <StepHeading
+          title={`Asking AI about ${brandName}`}
+          sub={`Running ${plural(prompts.length || 3, "buyer question")} through Gemini and ChatGPT. This takes under 30 seconds.`}
+        />
+        <div className="overflow-hidden rounded-lg border border-vc-default bg-background">
+          {(prompts.length ? prompts : [null, null, null]).map((prompt, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 border-b border-vc-muted px-4 py-3 last:border-b-0"
+            >
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-vc-tertiary" />
+              {prompt ? (
+                <span className="min-w-0 flex-1 truncate text-caption text-vc-secondary">
+                  {prompt}
+                </span>
+              ) : (
+                <span className="h-3 flex-1 animate-pulse rounded bg-vc-muted" />
+              )}
+              <EngineIcon engine="Gemini" size={14} />
+              <EngineIcon engine="ChatGPT" size={14} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const stagger = (ms: number) => ({
+    animationDelay: `${ms}ms`,
+    animationFillMode: "both" as const,
+  });
+  const reveal =
+    "animate-in fade-in slide-in-from-bottom-1 duration-500 motion-reduce:slide-in-from-bottom-0";
 
   return (
     <div className="flex flex-col gap-4">
       <BrandLine favicon={favicon} domain="" showName={false} />
       <StepHeading
         title={
-          probe
-            ? notCited
-              ? `No engine named ${brandName} in ${plural(promptsTested, "buyer question")}`
-              : `${brandName} was named in ${brandAppearances} of ${plural(totalAnswers, "answer")}`
-            : `Checking how AI answers for ${brandName}`
+          notCited
+            ? `AI didn't cite ${brandName} in ${plural(promptsTested, "buyer question")}`
+            : `${brandName} was named in ${brandAppearances} of ${plural(totalAnswers, "answer")}`
         }
-        sub={tally ? competitorSummary(tally) : "Asking Gemini and ChatGPT three buyer questions."}
+        sub={tally ? competitorSummary(tally) : ""}
       />
 
-      {probeError ? (
-        <UnavailableNotice message={probeError} />
-      ) : !probe ? (
-        <div className="flex flex-col gap-2">
-          <div className="h-24 animate-pulse rounded-lg bg-vc-muted" />
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-vc-default bg-background">
-          <div className="flex items-center justify-between gap-3 border-b border-vc-default px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Favicon src={favicon} size={20} radius={5} />
+      <div
+        className={cn("overflow-hidden rounded-lg border border-vc-default bg-background", reveal)}
+        style={stagger(150)}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-vc-default px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Favicon src={favicon} size={20} radius={5} />
+            <div className="flex min-w-0 flex-col">
               <span className="text-caption font-semibold text-vc-primary">{brandName}</span>
-              <Mono>
-                {brandAppearances} of {totalAnswers} answers
-              </Mono>
+              <span className="text-[11px] text-vc-tertiary">
+                {notCited
+                  ? `Not cited across ${plural(promptsTested, "prompt")}`
+                  : `Named in ${brandAppearances} of ${plural(totalAnswers, "answer")}`}
+              </span>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {engines.map((e) => (
+              <EngineIcon key={e} engine={e} size={14} />
+            ))}
             <span
               className={cn(
                 "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-wide",
@@ -503,57 +560,45 @@ export function FirstReadStep({
               {notCited ? "Not cited" : "Cited"}
             </span>
           </div>
-          {probe.results.map((r, i) => (
-            <div key={i} className="flex items-center gap-3 border-b border-vc-muted px-4 py-2.5">
-              <span className="min-w-0 flex-1 truncate text-caption text-vc-primary">
-                {r.prompt}
-              </span>
-              <EngineIcon engine={r.engine} size={14} />
-              <span
-                className={cn(
-                  "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-wide",
-                  r.brandCited
-                    ? "bg-positive-subtle text-positive"
-                    : "bg-destructive-subtle text-destructive",
-                )}
-              >
-                {r.brandCited ? "Named" : "Not named"}
-              </span>
-            </div>
-          ))}
-          {probe.results[0] ? (
-            <div className="flex flex-col gap-2 p-4">
-              <div className="flex items-center gap-2.5">
-                <Eyebrow>Sample answer</Eyebrow>
-                <EngineIcon engine={probe.results[0].engine} size={14} />
-              </div>
-              <p className="text-caption italic text-vc-secondary">
-                &#8220;{probe.results[0].prompt}&#8221;
-              </p>
-              <div className="rounded-md bg-vc-muted p-2.5 text-caption leading-relaxed text-vc-secondary">
-                {probe.results[0].snippet}&#8230;
-              </div>
-            </div>
-          ) : null}
         </div>
-      )}
+        {sample ? (
+          <div className="flex flex-col gap-2 p-4">
+            <div className="flex items-center gap-2">
+              <Eyebrow>Sample answer</Eyebrow>
+              <EngineIcon engine={sample.engine} size={12} />
+            </div>
+            <p className="text-caption italic text-vc-secondary">&#8220;{sample.prompt}&#8221;</p>
+            <div className="line-clamp-3 rounded-md bg-vc-muted p-2.5 text-caption leading-relaxed text-vc-secondary">
+              {sample.snippet}&#8230;
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {insight ? (
-        <div className="overflow-hidden rounded-lg border border-vc-default bg-background">
+        <div
+          className={cn(
+            "overflow-hidden rounded-lg border border-vc-default bg-background",
+            reveal,
+          )}
+          style={stagger(350)}
+        >
           <button
             type="button"
             onClick={() => setTipOpen((v) => !v)}
-            className="flex w-full items-center justify-between px-4 py-3"
+            className="flex w-full items-center justify-between gap-3 px-4 py-3"
             data-testid="button-toggle-insight"
           >
-            <span className="flex items-center gap-2.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-vc-accent" />
-              <span className="text-caption font-medium text-vc-primary">{insight.headline}</span>
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-vc-accent" />
+              <span className="truncate text-caption font-medium text-vc-primary">
+                {insight.headline}
+              </span>
             </span>
             {tipOpen ? (
-              <ChevronUp className="h-3.5 w-3.5 text-vc-tertiary" />
+              <ChevronUp className="h-3.5 w-3.5 shrink-0 text-vc-tertiary" />
             ) : (
-              <ChevronDown className="h-3.5 w-3.5 text-vc-tertiary" />
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-vc-tertiary" />
             )}
           </button>
           {tipOpen ? (
@@ -569,19 +614,25 @@ export function FirstReadStep({
         </div>
       ) : insightError ? (
         <UnavailableNotice message="We couldn't write a recommendation for this site this time. Your first read above is unaffected." />
-      ) : null}
+      ) : (
+        <div className="flex items-center gap-2.5 rounded-lg border border-vc-default px-4 py-3">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-vc-tertiary" />
+          <span className="text-caption text-vc-tertiary">Writing your first recommendation…</span>
+        </div>
+      )}
 
-      <Button
-        onClick={onContinue}
-        className="h-10 w-full justify-center gap-2"
-        data-testid="button-first-read-continue"
-      >
-        Continue
-      </Button>
+      <div className={cn("flex flex-col gap-2", reveal)} style={stagger(500)}>
+        <Button
+          onClick={onContinue}
+          className="h-10 w-full justify-center gap-2"
+          data-testid="button-first-read-continue"
+        >
+          Continue
+        </Button>
+      </div>
     </div>
   );
 }
-
 // ---------- step 6: save ----------
 export function SaveStep({
   brandName,
