@@ -12,7 +12,8 @@ import { withJobDebounce, shouldRunJob, markJobRan, DEBOUNCE_WINDOWS } from "./l
 import { runMentionScan } from "./lib/runMentionScan";
 import { scanBrandListicles } from "./lib/listicleScanner";
 import { logger } from "./lib/logger";
-import { PAYING_TIERS } from "@shared/schema";
+import { citationScanQuery } from "./lib/payingTiersQuery";
+import { positiveIntEnv } from "./lib/envNumber";
 import { citationRatePct } from "@shared/visibilityMetrics";
 import { logSystemAudit } from "./lib/audit";
 import { supabaseAdmin } from "./supabase";
@@ -190,6 +191,18 @@ async function runWeeklyReportJobImpl(): Promise<{ sent: number; skipped: number
 // isBrandDueForCitation.
 const AUTO_CITATION_CRON = process.env.AUTO_CITATION_CRON || "0 * * * *";
 
+// Per-run cap. Every paying brand is "due" whenever it has gone stale
+// (isBrandDueForCitation) - after an outage or a fix that revives a broken
+// selector query, every one of them is due at once. A brand run is a real
+// LLM spend (every tracked prompt against every platform), so an unbounded
+// tick would burst that spend and the run time across however many brands
+// happen to be overdue. This caps how many the job takes on in one tick;
+// anything left over stays due and is picked up on the next hourly tick.
+const AUTO_CITATION_MAX_BRANDS_PER_RUN = positiveIntEnv(
+  process.env.AUTO_CITATION_MAX_BRANDS_PER_RUN,
+  5,
+);
+
 // Citation cadence is not configurable.
 // Every active brand runs weekly. The auto_citation_* columns remain
 // dormant in the schema but are no longer consulted at the cron layer.
@@ -204,17 +217,15 @@ function isBrandDueForCitation(brand: { lastAutoCitationAt: Date | null }): bool
 
 // Selector for the citation-scan cron: every non-soft-deleted brand,
 // regardless of the legacy autoCitationSchedule/Active flags.
+//
+// Same rule as the activation sweep: only brands whose owner is entitled to
+// work that spends money. A read-only account keeps its data but stops
+// consuming weekly citation runs. See ./lib/payingTiersQuery for why the
+// query is built there rather than inline.
 export async function selectBrandsForCitationScan() {
-  // Same rule as the activation sweep: only brands whose owner is entitled to
-  // work that spends money. A read-only account keeps its data but stops
-  // consuming weekly citation runs.
-  const rows = await db.execute<{ id: string; last_auto_citation_at: Date | null }>(sql`
-    SELECT b.*
-    FROM brands b
-    JOIN users u ON u.id = b.user_id
-    WHERE b.deleted_at IS NULL
-      AND u.access_tier = ANY(${PAYING_TIERS})
-  `);
+  const rows = await db.execute<{ id: string; last_auto_citation_at: Date | null }>(
+    citationScanQuery(),
+  );
   return ((rows as { rows?: unknown[] }).rows ?? []) as (typeof schema.brands.$inferSelect)[];
 }
 
@@ -231,13 +242,32 @@ export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {
 async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
   logger.info("auto-citation job starting");
 
-  // Iterate every non-soft-deleted brand.
-  // unconditionally. Cadence flags are no longer honoured.
+  // Every non-soft-deleted, paying-tier brand, unconditionally - cadence
+  // flags are no longer honoured (see selectBrandsForCitationScan).
   const scheduledBrands = await selectBrandsForCitationScan();
+
+  // Due brands, oldest-run first with never-run (NULL) brands first, capped
+  // at AUTO_CITATION_MAX_BRANDS_PER_RUN. The brands past the cap stay due -
+  // isBrandDueForCitation still says yes for them next tick - so nothing is
+  // lost, it is just spread across ticks.
+  const dueBrands = scheduledBrands.filter(isBrandDueForCitation).sort((a, b) => {
+    const aTime = a.lastAutoCitationAt ? a.lastAutoCitationAt.getTime() : -Infinity;
+    const bTime = b.lastAutoCitationAt ? b.lastAutoCitationAt.getTime() : -Infinity;
+    return aTime - bTime;
+  });
+  const brandsToRun = dueBrands.slice(0, AUTO_CITATION_MAX_BRANDS_PER_RUN);
+  const deferredByCap = dueBrands.length - brandsToRun.length;
+
+  logger.info(
+    { due: dueBrands.length, processing: brandsToRun.length, deferredByCap },
+    `auto-citation: ${dueBrands.length} due, processing ${brandsToRun.length}${
+      deferredByCap > 0 ? `, deferring ${deferredByCap} to next tick (per-run cap)` : ""
+    }`,
+  );
 
   let ranCount = 0;
   let deferred = 0;
-  for (const brand of scheduledBrands) {
+  for (const brand of brandsToRun) {
     if (deadlineMs !== undefined && Date.now() > deadlineMs) {
       // Vercel migration: bail early so the function returns before
       // the platform timeout. Brands not yet processed today retain
@@ -247,7 +277,6 @@ async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
       deferred += 1;
       continue;
     }
-    if (!isBrandDueForCitation(brand)) continue;
 
     try {
       // Skip brands that never seeded tracked prompts - weekly cron should

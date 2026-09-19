@@ -27,11 +27,11 @@
 // what is a scheduling detail, and it keeps every sub-job's bookkeeping in one
 // read and one write.
 
-import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
 import { logger } from "./logger";
-import { PAYING_TIERS } from "@shared/schema";
+import { activationSweepQuery } from "./payingTiersQuery";
+import { positiveIntEnv } from "./envNumber";
 import { captureAndFlush } from "./sentryReport";
 import { discoverCompetitors } from "./competitorDiscovery";
 import { scanBrandListicles } from "./listicleScanner";
@@ -39,6 +39,21 @@ import { runMentionScan } from "./runMentionScan";
 import { runPerceptionScoring } from "./perceptionRun";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Per-run cap, same reasoning as AUTO_CITATION_MAX_BRANDS_PER_RUN in
+// ../scheduler.ts: mentionScan, listicleScan, perception and competitors
+// discovery each spend model calls per brand, and the sweep query above
+// selects every paying brand unconditionally (per-job "is it due" is decided
+// inside populateBrandDashboard's ledger, not here). A brand new enough to
+// have never run any job has all five jobs due at once, so an unbounded tick
+// bursts that spend across however many such brands exist. The query is
+// already ordered by created_at ASC, so capping here just takes the
+// oldest-created brands first; anything past the cap is untouched and stays
+// in the query's result set on the next hourly tick.
+const BRAND_ACTIVATION_MAX_BRANDS_PER_RUN = positiveIntEnv(
+  process.env.BRAND_ACTIVATION_MAX_BRANDS_PER_RUN,
+  5,
+);
 
 // Ordered cheapest-first so a tight deadline still buys the panels that cost
 // nothing in LLM spend. Site health is network-only; the mention and listicle
@@ -203,16 +218,19 @@ export async function runBrandActivationSweep(
   // would make "downgrade instead of lock out" quietly expensive.
   //
   // PAYING_TIERS is the single list; unknown or pending tiers are excluded by
-  // omission, which fails closed.
-  const brands = await db.execute<{ id: string }>(sql`
-    SELECT b.id
-    FROM brands b
-    JOIN users u ON u.id = b.user_id
-    WHERE b.deleted_at IS NULL
-      AND u.access_tier = ANY(${PAYING_TIERS})
-    ORDER BY b.created_at ASC
-  `);
-  const list = (brands as { rows?: Array<{ id: string }> }).rows ?? [];
+  // omission, which fails closed. See ./payingTiersQuery for why the query
+  // is built there rather than inline.
+  const brands = await db.execute<{ id: string }>(activationSweepQuery());
+  const allDue = (brands as { rows?: Array<{ id: string }> }).rows ?? [];
+  const list = allDue.slice(0, BRAND_ACTIVATION_MAX_BRANDS_PER_RUN);
+  const deferredByCap = allDue.length - list.length;
+
+  logger.info(
+    { due: allDue.length, processing: list.length, deferredByCap },
+    `brandActivation: ${allDue.length} due, processing ${list.length}${
+      deferredByCap > 0 ? `, deferring ${deferredByCap} to next tick (per-run cap)` : ""
+    }`,
+  );
 
   let processed = 0;
   for (const b of list) {
