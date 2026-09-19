@@ -25,16 +25,20 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PAYING_TIERS, usageLimits } from "@shared/schema";
 
-const scheduler = readFileSync(
-  fileURLToPath(new URL("../../server/scheduler.ts", import.meta.url)),
+// The query itself lives in server/lib/payingTiersQuery.ts (shared with the
+// brand activation sweep), and scheduler.ts's selectBrandsForCitationScan
+// just calls it - see tests/unit/payingTiersQuery.test.ts for the ANY(...)
+// parameter-binding regression test on that shared module.
+const payingTiersQuery = readFileSync(
+  fileURLToPath(new URL("../../server/lib/payingTiersQuery.ts", import.meta.url)),
   "utf8",
 );
 
-/** The body of selectBrandsForCitationScan, isolated from the rest of the file. */
+/** The body of citationScanQuery, isolated from the rest of the file. */
 function selectorBody(): string {
-  const start = scheduler.indexOf("export async function selectBrandsForCitationScan");
-  expect(start, "selectBrandsForCitationScan not found - has it been renamed?").toBeGreaterThan(-1);
-  const body = scheduler.slice(start, scheduler.indexOf("\n}", start));
+  const start = payingTiersQuery.indexOf("export function citationScanQuery");
+  expect(start, "citationScanQuery not found - has it been renamed?").toBeGreaterThan(-1);
+  const body = payingTiersQuery.slice(start, payingTiersQuery.indexOf("\n}", start));
   // Guard the extraction itself, so the assertions below cannot pass against
   // an empty string.
   expect(body.length).toBeGreaterThan(100);
