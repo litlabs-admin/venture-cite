@@ -1,7 +1,7 @@
 // Orchestrates the six-step anonymous onboarding flow. Mounted by the /start
 // route (src/routes/start.tsx). Drives useOnboardingSession for all
 // server-derived state and keeps only per-step form state locally.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useOnboardingSession } from "@/hooks/useOnboardingSession";
@@ -42,13 +42,6 @@ export function OnboardingFlow({ initialDomain }: { initialDomain?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.sessionId]);
 
-  // Scan ends the instant `profile` arrives (per the data contract: "Scan
-  // ends once profile arrives. The rest keeps running while the user is on
-  // Who and Brand.").
-  useEffect(() => {
-    if (step === 1 && session.profile) setStep(2);
-  }, [step, session.profile]);
-
   // /start?domain=x auto-starts.
   useEffect(() => {
     if (initialDomain && !autoStarted && !session.sessionId) {
@@ -68,6 +61,10 @@ export function OnboardingFlow({ initialDomain }: { initialDomain?: string }) {
     const id = await session.start(v.normalized);
     if (id) setStep(1);
   }
+
+  // Scan ends once the profile is back AND every loading line has had its beat;
+  // the rest of the pipeline keeps running while the user is on Who and Brand.
+  const handleScanDone = useCallback(() => setStep((s) => (s === 1 ? 2 : s)), []);
 
   function handleRetryScan() {
     void handleStartScan();
@@ -176,8 +173,10 @@ export function OnboardingFlow({ initialDomain }: { initialDomain?: string }) {
         <ScanStep
           domain={domain || session.site?.domain || ""}
           loadingLines={session.loadingLines}
+          ready={!!session.profile}
           errorMessage={scanError}
           onRetry={handleRetryScan}
+          onDone={handleScanDone}
         />
       );
       right = <ReadinessPreview site={session.site} readiness={session.readiness} />;

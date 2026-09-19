@@ -1,11 +1,10 @@
 // analyze.ts. Implements AnalyzeBrand and WriteLoadingLines (contracts.ts).
 //
-// AnalyzeBrand: one LLM call returning profile + competitors + topics
-// together, matching the reference's `analyze` endpoint (see the data
-// contract spec, "What the reference does"). Reuses the prompt shape from
+// AnalyzeBrand: two LLM calls in parallel. One reads the page text for the
+// profile and topics; the other is given only the URL and names competitors
+// (see COMPETITORS_SYSTEM_PROMPT). Reuses the prompt shape from
 // server/lib/brandProfilePrompt.ts where it fits, but this call additionally
-// asks for competitors up to 10 (returning the best SHOWN_COMPETITOR_COUNT)
-// and 5 topics of listicle-shaped prompts, which brandProfilePrompt.ts does
+// asks for 5 topics of listicle-shaped prompts, which brandProfilePrompt.ts does
 // not produce - so this module has its own system prompt rather than
 // stretching that one to a shape it wasn't written for.
 //
@@ -31,7 +30,6 @@ const ANALYZE_SYSTEM_PROMPT = `You are a brand analyst preparing an anonymous on
 
 {
   "profile": { "name": string, "industry": string, "descriptor": string, "description": string, "audience": string },
-  "competitors": [{ "name": string, "domain": string }],
   "topics": [{ "topic": string, "prompts": [string, ...] }]
 }
 
@@ -41,9 +39,6 @@ PROFILE
 - descriptor: one short line under a heading, e.g. "PR agency for disruptive tech". Under 80 characters.
 - description: 2-3 sentences. What the product is, who buys it, what it replaces or automates. Banned words: innovative, cutting-edge, solutions, leading provider, empowering, seamless, next-generation, transforming, revolutionize, best-in-class.
 - audience: the specific buyer - a job title or company type and size, not a market.
-
-COMPETITORS
-- Real, currently-operating companies a buyer would evaluate INSTEAD of this one. Only ones you are confident exist. Up to 10, ordered most-relevant first. Give each a real domain (no protocol, no path).
 
 TOPICS
 - Exactly 5 topics. Across all topics, exactly 24 prompts in total (so most topics carry 4-5 prompts).
@@ -62,13 +57,16 @@ RULES
 - Ground every field in the page text. If the page does not support a field, return the emptiest reasonable value rather than inventing one.
 - Never invent a URL, a customer name, a funding round, or a metric.`;
 
+// Competitors come from a separate call that is handed the full URL and asked
+// from the model's own knowledge of the market. Grounding them in the page
+// text (the old way) found only companies the site happened to mention, which
+// for most sites is none, so the model guessed from the page's wording.
+const COMPETITORS_SYSTEM_PROMPT = `You are a market analyst. Given a company's website address, list the real, currently operating companies a buyer would evaluate INSTEAD of this one: direct competitors selling the same kind of product or service to the same kind of buyer, at a similar scale. Use what you know about this company and its market. Only include companies you are confident exist. Never include the company itself or its own products. Order most direct first, up to 10. Return JSON only: { "competitors": [{ "name": string, "domain": string }] } where domain is the bare domain (no protocol, no path).`;
+
 const LOADING_LINES_SYSTEM_PROMPT = `You write four short loading-screen lines for a website analysis tool. Given a domain and its page text, return JSON only: { "lines": [string, string, string, string] }. Each line is a specific, concrete observation or action about THIS site (not generic filler like "Analyzing your website..."), under 90 characters, present progressive tense ("Reading...", "Checking...", "Mapping..."). Ground every line in the page text - never invent facts.`;
 
 const analyzeResponseSchema = z.object({
   profile: profileSchema,
-  competitors: z
-    .array(z.object({ name: z.string().min(1).max(120), domain: z.string().min(1).max(253) }))
-    .max(10),
   topics: z.array(
     z.object({
       topic: z.string().min(1).max(80),
@@ -89,43 +87,92 @@ function parseJsonObject(content: string | null | undefined): unknown {
   }
 }
 
-export const analyzeBrand: AnalyzeBrand = async ({ domain, pageText }) => {
-  const client = getOpenrouterClient();
-  if (!client) throw new Error("AI service is not configured");
+const competitorsResponseSchema = z.object({
+  competitors: z
+    .array(z.object({ name: z.string().min(1).max(120), domain: z.string().min(1).max(253) }))
+    .max(10),
+});
 
+function bareDomain(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.*$/, "");
+}
+
+export async function findCompetitors(
+  client: NonNullable<ReturnType<typeof getOpenrouterClient>>,
+  domain: string,
+): Promise<Competitors> {
   const completion = await client.chat.completions.create(
     {
       model: MODELS.brandAutofill,
       response_format: { type: "json_object" },
-      temperature: 0.4,
+      temperature: 0.2,
       messages: [
-        { role: "system", content: ANALYZE_SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `Website domain: ${domain}\n\nWebsite content:\n${pageText}`,
-        },
+        { role: "system", content: COMPETITORS_SYSTEM_PROMPT },
+        { role: "user", content: `Website: https://${domain}` },
       ],
+      // Luna reasons before it answers; a small budget is spent entirely on
+      // reasoning and returns empty content. 4000 matches the profile call.
       max_tokens: 4000,
     },
     { signal: AbortSignal.timeout(25_000) },
   );
+  const { competitors } = competitorsResponseSchema.parse(
+    parseJsonObject(completion.choices[0]?.message?.content),
+  );
+  const own = bareDomain(domain);
+  const seen = new Set<string>([own]);
+  const deduped = competitors
+    .map((c) => ({ name: c.name.trim(), domain: bareDomain(c.domain) }))
+    .filter((c) => {
+      if (!c.domain || seen.has(c.domain)) return false;
+      seen.add(c.domain);
+      return true;
+    });
+  return competitorsSchema.parse({
+    shown: deduped.slice(0, SHOWN_COMPETITOR_COUNT).map((c) => ({
+      name: c.name,
+      domain: c.domain,
+      faviconUrl: faviconProxyUrl(c.domain),
+    })),
+    totalFound: deduped.length,
+  });
+}
+
+export const analyzeBrand: AnalyzeBrand = async ({ domain, pageText }) => {
+  const client = getOpenrouterClient();
+  if (!client) throw new Error("AI service is not configured");
+
+  // Both calls run at once; Promise.all also keeps a failed competitor call
+  // from surfacing as an unhandled rejection when the profile call fails first.
+  const [completion, competitors] = await Promise.all([
+    client.chat.completions.create(
+      {
+        model: MODELS.brandAutofill,
+        response_format: { type: "json_object" },
+        temperature: 0.4,
+        messages: [
+          { role: "system", content: ANALYZE_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `Website domain: ${domain}\n\nWebsite content:\n${pageText}`,
+          },
+        ],
+        max_tokens: 4000,
+      },
+      { signal: AbortSignal.timeout(25_000) },
+    ),
+    findCompetitors(client, domain),
+  ]);
 
   const raw = parseJsonObject(completion.choices[0]?.message?.content);
   const parsed = analyzeResponseSchema.parse(raw);
 
   const profile = profileSchema.parse(parsed.profile);
-
-  const dedupedCompetitors = parsed.competitors.filter(
-    (c, i, arr) => arr.findIndex((o) => o.domain.toLowerCase() === c.domain.toLowerCase()) === i,
-  );
-  const competitors: Competitors = competitorsSchema.parse({
-    shown: dedupedCompetitors.slice(0, SHOWN_COMPETITOR_COUNT).map((c) => ({
-      name: c.name,
-      domain: c.domain,
-      faviconUrl: faviconProxyUrl(c.domain),
-    })),
-    totalFound: dedupedCompetitors.length,
-  });
 
   // The listicle shape is a deterministic gate, not just a request - the
   // same rule server/lib/promptGenerator.ts enforces for the authenticated

@@ -2,7 +2,7 @@
 // step, matching build2.py's left_* functions and the reference PNGs
 // (Website / Scan / Who / Brand / FirstRead / Save states).
 import { competitorSummary, plural, tallyProbe } from "./probeTally";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Globe,
   Mail,
@@ -103,16 +103,23 @@ export function WebsiteStep({
 }
 
 // ---------- step 2: scan ----------
+const SCAN_LINE_MS = 1800;
+
 export function ScanStep({
   domain,
   loadingLines,
+  ready,
   errorMessage,
   onRetry,
+  onDone,
 }: {
   domain: string;
   loadingLines: string[] | null;
+  /** The profile has arrived, so the scan can finish once every line has shown. */
+  ready: boolean;
   errorMessage: string | null;
   onRetry: () => void;
+  onDone: () => void;
 }) {
   const lines = loadingLines ?? [
     "Reading your homepage",
@@ -120,6 +127,28 @@ export function ScanStep({
     "Mapping competitors",
     "Writing buyer questions",
   ];
+  // Lines before `active` are done, `active` is working, the rest wait. Each
+  // line gets its own beat so the user can read what is happening; the last
+  // one keeps spinning until the profile is actually back.
+  const [active, setActive] = useState(0);
+  const allDone = ready && active >= lines.length;
+
+  useEffect(() => {
+    if (errorMessage) return;
+    if (active < lines.length - 1 || (ready && active === lines.length - 1)) {
+      const timer = setTimeout(() => setActive((a) => a + 1), SCAN_LINE_MS);
+      return () => clearTimeout(timer);
+    }
+  }, [active, ready, lines.length, errorMessage]);
+
+  useEffect(() => {
+    if (!allDone) return;
+    const timer = setTimeout(onDone, 600);
+    return () => clearTimeout(timer);
+  }, [allDone, onDone]);
+
+  const pct = Math.min(100, Math.round(((active + (ready ? 0 : 0.5)) / lines.length) * 100));
+
   return (
     <div className="flex flex-col gap-6">
       <StepHeading
@@ -136,31 +165,52 @@ export function ScanStep({
       ) : (
         <>
           <div className="rounded-lg border border-vc-default bg-background">
-            {lines.map((line, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-2.5",
-                  i < lines.length - 1 && "border-b border-vc-muted",
-                )}
-              >
-                <span className="h-3.5 w-3.5 shrink-0 animate-pulse rounded-full border border-vc-default" />
-                <span className="truncate text-caption text-vc-secondary">{line}</span>
-              </div>
-            ))}
+            {lines.map((line, i) => {
+              const state = i < active ? "done" : i === active ? "working" : "todo";
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2.5 transition-opacity duration-300",
+                    i < lines.length - 1 && "border-b border-vc-muted",
+                    state === "todo" && "opacity-40",
+                  )}
+                >
+                  {state === "done" ? (
+                    <Check className="h-3.5 w-3.5 shrink-0 text-positive animate-in zoom-in-50 duration-200" />
+                  ) : state === "working" ? (
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-vc-accent" />
+                  ) : (
+                    <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-vc-default" />
+                  )}
+                  <span
+                    className={cn(
+                      "truncate text-caption",
+                      state === "working" ? "font-medium text-vc-primary" : "text-vc-secondary",
+                    )}
+                  >
+                    {line}
+                  </span>
+                </div>
+              );
+            })}
           </div>
           <div className="flex flex-col gap-2">
             <div className="h-[3px] overflow-hidden rounded-sm bg-vc-default">
-              <div className="h-full w-2/3 animate-pulse rounded-sm bg-vc-accent transition-[width]" />
+              <div
+                className="h-full rounded-sm bg-vc-accent transition-[width] duration-700 ease-out"
+                style={{ width: `${pct}%` }}
+              />
             </div>
-            <p className="text-caption text-vc-tertiary">Usually under 15 seconds.</p>
+            <p className="text-caption text-vc-tertiary">
+              {allDone ? "Done." : `Step ${Math.min(active + 1, lines.length)} of ${lines.length}`}
+            </p>
           </div>
         </>
       )}
     </div>
   );
 }
-
 // ---------- step 3: who ----------
 function AudienceOption({
   title,
