@@ -30,6 +30,8 @@
 // proves the job body genuinely does not run without it, not just that the
 // return value happens to look right.
 import { describe, it, expect, vi, beforeEach } from "vitest";
+// These tests exercise the job body, so the owner's off switch (server/lib/paidJobSwitch.ts) is turned on.
+process.env.AUTO_CITATION_ENABLED = "true";
 
 process.env.OPENAI_API_KEY ||= "test-key";
 process.env.OPENROUTER_API_KEY ||= "test-key";

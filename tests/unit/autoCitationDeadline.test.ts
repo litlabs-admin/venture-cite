@@ -13,6 +13,8 @@
 // it.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+// These tests exercise the job body, so the owner's off switch (server/lib/paidJobSwitch.ts) is turned on.
+process.env.AUTO_CITATION_ENABLED = "true";
 
 process.env.OPENAI_API_KEY ||= "test-key";
 process.env.OPENROUTER_API_KEY ||= "test-key";

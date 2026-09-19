@@ -32,6 +32,7 @@ import { storage } from "../storage";
 import { logger } from "./logger";
 import { activationSweepQuery } from "./payingTiersQuery";
 import { positiveIntEnv } from "./envNumber";
+import { isPaidJobEnabled } from "./paidJobSwitch";
 import { captureAndFlush } from "./sentryReport";
 import { discoverCompetitors } from "./competitorDiscovery";
 import { scanBrandListicles } from "./listicleScanner";
@@ -209,6 +210,13 @@ async function runJob(
 export async function runBrandActivationSweep(
   deadlineMs?: number,
 ): Promise<{ processed: number; total: number }> {
+  // Off unless BRAND_ACTIVATION_ENABLED=true (./paidJobSwitch.ts). This gates
+  // the scheduled sweep only: a new brand's own activation at the end of
+  // onboarding calls populateBrandDashboard directly and still runs.
+  if (!isPaidJobEnabled("BRAND_ACTIVATION")) {
+    logger.info("brand activation sweep: skipped, BRAND_ACTIVATION_ENABLED is not true");
+    return { processed: 0, total: 0 };
+  }
   // Only brands whose owner is actually entitled to work that costs money.
   //
   // Read-only accounts (a cancelled trial, a subscription that failed) keep

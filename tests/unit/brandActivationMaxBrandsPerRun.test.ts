@@ -12,6 +12,8 @@
 // without needing to import this module's dependency graph.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+// These tests exercise the job body, so the owner's off switch (server/lib/paidJobSwitch.ts) is turned on.
+process.env.BRAND_ACTIVATION_ENABLED = "true";
 
 process.env.BRAND_ACTIVATION_MAX_BRANDS_PER_RUN = "5";
 

@@ -14,6 +14,7 @@ import { validateDomain } from "@shared/validateDomain";
 import { sessionAnswersSchema } from "@shared/onboarding/session";
 import { admitSession, getSession, setAnswers } from "../onboardingSession/store";
 import { runSessionPipeline } from "../onboardingSession/pipeline";
+import { onboardingIpSalt } from "../onboardingSession/ipSalt";
 
 const SSE_POLL_INTERVAL_MS = 700;
 const SSE_HEARTBEAT_MS = 15_000;
@@ -21,20 +22,9 @@ const SSE_HEARTBEAT_MS = 15_000;
 const createSessionBodySchema = z.object({ domain: z.string().min(1).max(253) });
 const sessionIdSchema = z.string().uuid();
 
-/**
- * Salted SHA-256 of the client IP - never the raw address. Salted with an
- * existing server secret (SESSION_SECRET, same fallback chain
- * unsubscribeToken.ts uses for EMAIL_UNSUBSCRIBE_SECRET) so the hash can't be
- * reversed or rainbow-tabled from the ip_hash column alone.
- */
+/** Salted SHA-256 of the client IP - never the raw address. Salt: ../onboardingSession/ipSalt. */
 function hashIp(ip: string): string {
-  const secret = process.env.SESSION_SECRET;
-  // A known salt makes ip_hash reversible by brute force over the IPv4 space.
-  if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error("SESSION_SECRET must be set to hash onboarding client IPs");
-  }
-  const salt = secret || "onboarding-session-dev-salt";
-  return crypto.createHash("sha256").update(`${salt}:${ip}`).digest("hex");
+  return crypto.createHash("sha256").update(`${onboardingIpSalt()}:${ip}`).digest("hex");
 }
 
 function clientIp(req: Request): string {

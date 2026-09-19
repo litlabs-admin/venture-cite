@@ -14,6 +14,7 @@ import { scanBrandListicles } from "./lib/listicleScanner";
 import { logger } from "./lib/logger";
 import { citationScanQuery } from "./lib/payingTiersQuery";
 import { positiveIntEnv } from "./lib/envNumber";
+import { isPaidJobEnabled } from "./lib/paidJobSwitch";
 import { citationRatePct } from "@shared/visibilityMetrics";
 import { logSystemAudit } from "./lib/audit";
 import { supabaseAdmin } from "./supabase";
@@ -231,6 +232,11 @@ export async function selectBrandsForCitationScan() {
 }
 
 export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {
+  // Off unless AUTO_CITATION_ENABLED=true (server/lib/paidJobSwitch.ts).
+  if (!isPaidJobEnabled("AUTO_CITATION")) {
+    logger.info("auto-citation: skipped, AUTO_CITATION_ENABLED is not true");
+    return;
+  }
   // Window is 45min against an hourly cadence - a genuine hourly tick still
   // runs; a second trigger in the same hour does not.
   await withJobDebounce("auto-citation", DEBOUNCE_WINDOWS["auto-citation"], () =>
