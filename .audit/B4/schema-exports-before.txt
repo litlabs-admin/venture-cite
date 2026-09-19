@@ -5,6 +5,13 @@ Analytics
 ApiCost
 Article
 ArticleRevision
+AskBusinessBriefRow
+AskMemoryRow
+AskMessage
+AskStep
+AskThread
+AskUsage
+AskUserPreferencesRow
 AuditLog
 BetaInviteCode
 BofuContent
@@ -49,6 +56,13 @@ InsertAnalytics
 InsertApiCost
 InsertArticle
 InsertArticleRevision
+InsertAskBusinessBriefRow
+InsertAskMemoryRow
+InsertAskMessage
+InsertAskStep
+InsertAskThread
+InsertAskUsage
+InsertAskUserPreferencesRow
 InsertAuditLog
 InsertBetaInviteCode
 InsertBofuContent
@@ -115,6 +129,7 @@ LlmConcurrencySlot
 LlmJob
 MetricsHistory
 NotificationPreference
+OnboardingSession
 OutboxCommand
 PAYING_TIERS
 PLAN_PRICE_CENTS
@@ -148,6 +163,13 @@ analytics
 apiCosts
 articleRevisions
 articles
+askBusinessBriefs
+askMemories
+askMessages
+askSteps
+askThreads
+askUsage
+askUserPreferences
 auditLogs
 betaInviteCodes
 bofuContent
@@ -236,6 +258,7 @@ llmConcurrencySlots
 llmJobs
 metricsHistory
 notificationPreferences
+onboardingSessions
 outboxCommands
 promptAudiences
 promptGenerations
