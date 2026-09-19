@@ -54,7 +54,7 @@ export function Nav() {
                 and placement instead: this is h-9/13px, the hero CTA is
                 h-11/16px. */}
             <Link
-              to="/register"
+              to="/start"
               className="h-9 px-4 bg-vc-accent text-white text-[13px] font-medium rounded hover:bg-vc-accent-hover transition-colors duration-150 inline-flex items-center"
             >
               Get started

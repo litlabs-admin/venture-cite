@@ -1,16 +1,18 @@
 import type { Express, RequestHandler } from "express";
+import { z } from "zod";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { supabaseAdmin } from "./supabase";
 import { supabaseAuth } from "./lib/supabaseAuth";
 import { db } from "./db";
 import { users } from "@shared/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { waitUntil } from "@vercel/functions";
 import { Sentry } from "./instrument";
 import { logger, requestContext } from "./lib/logger";
 import { authRateKey } from "./lib/authRateKey";
 import { isPasswordLeaked } from "./lib/leakedPassword";
 import { validatePassword } from "@shared/passwordPolicy";
+import { PENDING_SESSION_KEY } from "@shared/onboarding/session";
 import { maybeTickActiveRunsForUser } from "./lib/workflowEngine";
 import { sendWelcomeEmail } from "./lib/welcomeEmail";
 
@@ -249,10 +251,16 @@ const PUBLIC_API_ROUTES = new Set<string>([
   "GET /api/internal/kpis",
 ]);
 
+// Anonymous onboarding runs before sign-up (server/routes/publicOnboarding.ts).
+// Its paths carry a session id, so an exact-match entry above cannot list them.
+// Every route under this prefix must validate its own input and rate limit.
+const PUBLIC_API_PREFIXES = ["/api/public/onboarding/"] as const;
+
 export const requireAuthForApi: RequestHandler = (req, res, next) => {
   if (!req.path.startsWith("/api/")) return next();
   const key = `${req.method} ${req.path}`;
   if (PUBLIC_API_ROUTES.has(key)) return next();
+  if (PUBLIC_API_PREFIXES.some((prefix) => req.path.startsWith(prefix))) return next();
   return isAuthenticated(req, res, next);
 };
 
@@ -383,10 +391,25 @@ export function __resetResendVerificationStateForTests(): void {
 export function setupAuth(app: Express) {
   app.post("/api/auth/register", registerRateLimit, async (req, res) => {
     try {
-      const { email, password, firstName, lastName } = req.body ?? {};
+      const { email, password, firstName, lastName, onboardingSessionId } = req.body ?? {};
 
       if (!email || !password) {
         return res.status(400).json({ success: false, error: "Email and password are required" });
+      }
+
+      // Onboarding claim handoff: an anonymous onboarding session id, saved
+      // onto the new user so /welcome can claim it after checkout. Validated
+      // as a UUID at this boundary - an invalid value is dropped rather than
+      // failing registration, since claim later 404s on an unknown id anyway.
+      let pendingOnboardingSessionId: string | undefined;
+      if (onboardingSessionId !== undefined) {
+        const parsedSessionId = z.string().uuid().safeParse(onboardingSessionId);
+        if (!parsedSessionId.success) {
+          return res
+            .status(400)
+            .json({ success: false, error: "onboardingSessionId must be a UUID" });
+        }
+        pendingOnboardingSessionId = parsedSessionId.data;
       }
       // Server-side strength enforcement (the trust boundary - the client
       // checklist is bypassable). Same shared policy the UI renders, so the
@@ -495,6 +518,30 @@ export function setupAuth(app: Express) {
       }
 
       await sendSignupEmail();
+
+      // Stash the pending onboarding session id so /welcome can claim it
+      // once this account clears email verification and checkout (see
+      // "Sign-up and claim" in the onboarding data contract). Best-effort:
+      // a write failure here must not fail registration - the account
+      // already exists, and a lost session id just falls back to the
+      // domain step, not to a broken account.
+      if (pendingOnboardingSessionId) {
+        try {
+          await db
+            .update(users)
+            .set({
+              onboardingState: sql`COALESCE(${users.onboardingState}, '{}'::jsonb) || ${JSON.stringify(
+                { [PENDING_SESSION_KEY]: pendingOnboardingSessionId },
+              )}::jsonb`,
+            })
+            .where(eq(users.id, created.user.id));
+        } catch (err) {
+          logger.warn(
+            { err, userId: created.user.id },
+            "auth: register failed to store pending onboarding session id",
+          );
+        }
+      }
 
       res.json({
         success: true,

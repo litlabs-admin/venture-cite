@@ -92,17 +92,24 @@ describe("ActivationPanel - a failing status check surfaces a retry, not a perma
 // Part 2: welcome.tsx - a failed /api/brands must not read as "confirmed
 // zero brands" and silently show the create-a-brand form.
 // ---------------------------------------------------------------------
+const navigateMock = vi.hoisted(() => vi.fn());
 vi.mock("@tanstack/react-router", () => ({
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigateMock,
 }));
 
 vi.mock("@/lib/authStore", () => ({
   getAccessToken: async () => null,
 }));
 
+// `pending.data` is what the page's queryFn returns: the body parsed with
+// pendingResponseSchema, i.e. `{ sessionId }`. This mock once used a nested
+// `{ data: { sessionId } }` shape the server never sent, which let a page that
+// never claimed anything pass these tests.
 const queryState = vi.hoisted(() => ({
   brands: { data: undefined as unknown, isLoading: false, isError: false, isSuccess: false },
+  pending: { data: { sessionId: null } as unknown, isLoading: false, isError: false },
 }));
+const claimMutate = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { queryKey: readonly unknown[] }) => {
@@ -116,12 +123,20 @@ vi.mock("@tanstack/react-query", () => ({
         refetch: vi.fn(),
       };
     }
-    // autopilot-status query - inert while scene is "input" in every test
+    if (key === "/api/onboarding/pending") {
+      return {
+        data: queryState.pending.data,
+        isLoading: queryState.pending.isLoading,
+        isError: queryState.pending.isError,
+        refetch: vi.fn(),
+      };
+    }
+    // autopilot-status query - inert while scene is "checking" in every test
     // below (`enabled` is computed by the real component, but this stub
     // doesn't honor it - a call with no data at all is a safe default).
     return { data: undefined, isError: false, refetch: vi.fn() };
   },
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useMutation: () => ({ mutate: claimMutate, isPending: false }),
   useQueryClient: () => ({ invalidateQueries: vi.fn(), refetchQueries: vi.fn() }),
 }));
 
@@ -133,34 +148,71 @@ vi.mock("@/lib/queryClient", () => ({
 const { default: Welcome } = await import("@/pages/welcome");
 
 describe("Welcome - a failed brand check is not the same as zero brands", () => {
-  it("shows a loading state, not the create-a-brand form, while the check is in flight", () => {
+  it("shows a loading state, not a redirect, while the check is in flight", () => {
     queryState.brands = { data: undefined, isLoading: true, isError: false, isSuccess: false };
     render(<Welcome />);
-    expect(screen.queryByText("Let's establish your brand")).toBeNull();
-    expect(screen.queryByTestId("input-website")).toBeNull();
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it("shows a distinct, retryable error - not the onboarding form - when /api/brands fails", () => {
+  it("shows a distinct, retryable error - not a redirect - when /api/brands fails", () => {
     queryState.brands = { data: undefined, isLoading: false, isError: true, isSuccess: false };
     render(<Welcome />);
 
-    // Before the fix: `brandCount` fell back to `0` here exactly like a
-    // genuinely brand-less account, so this rendered the ordinary
-    // onboarding form with no indication anything had failed.
-    expect(screen.queryByText("Let's establish your brand")).toBeNull();
-    expect(screen.queryByTestId("input-website")).toBeNull();
+    // Before the fix (carried into the /start-redesign): `brandCount` must
+    // not fall back to `0` here exactly like a genuinely brand-less
+    // account, which would otherwise redirect to /start with no indication
+    // anything had failed.
+    expect(navigateMock).not.toHaveBeenCalled();
     expect(screen.getByText(/couldn't check your account/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy();
   });
 
-  it("still shows the ordinary onboarding form once /api/brands confirms zero brands", () => {
+  it("sends the user to /start once /api/brands confirms zero brands and there is no pending session", () => {
     queryState.brands = {
       data: { success: true, data: [] },
       isLoading: false,
       isError: false,
       isSuccess: true,
     };
+    queryState.pending = { data: { sessionId: null }, isLoading: false, isError: false };
     render(<Welcome />);
-    expect(screen.getByTestId("input-website")).toBeTruthy();
+    expect(navigateMock).toHaveBeenCalledWith({ to: "/start" });
+  });
+
+  // Seen live 2026-09-19: a verified user with a pending session logged in,
+  // the page misread the response, and they were sent back to step 1.
+  it("claims the pending session instead of redirecting when one exists", () => {
+    claimMutate.mockClear();
+    navigateMock.mockClear();
+    queryState.brands = {
+      data: { success: true, data: [] },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+    };
+    queryState.pending = {
+      data: { sessionId: "22222222-2222-4222-8222-222222222222" },
+      isLoading: false,
+      isError: false,
+    };
+    render(<Welcome />);
+    expect(claimMutate).toHaveBeenCalledWith("22222222-2222-4222-8222-222222222222");
+    expect(navigateMock).not.toHaveBeenCalledWith({ to: "/start" });
+  });
+
+  it("shows an error, not a redirect to /start, when the pending check fails", () => {
+    claimMutate.mockClear();
+    navigateMock.mockClear();
+    queryState.brands = {
+      data: { success: true, data: [] },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+    };
+    queryState.pending = { data: undefined, isLoading: false, isError: true };
+    render(<Welcome />);
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(claimMutate).not.toHaveBeenCalled();
+    expect(screen.getByText(/couldn't check for your saved setup/i)).toBeTruthy();
   });
 });

@@ -56,7 +56,8 @@ function ArrowRightIcon({ className }: { className?: string }) {
 // input -> disabled submit), not an animation start state, so it's wired
 // here as live logic rather than rendered as a permanently-disabled button.
 // VentureCite has no live domain-capture backend yet, so submission simply
-// routes to /register - same destination as every other CTA on this page.
+// routes to /start (with the entered domain prefilled via ?domain=) - same
+// destination as every other CTA on this page.
 //
 // This is the page's terminal conversion CTA - the same job Hero's form does
 // at the top of the page - so it gets the solid --accent tier rather than the
@@ -69,7 +70,8 @@ export function DomainCaptureForm() {
       className="relative flex items-center bg-vc-surface border border-vc-default rounded hover:border-vc-accent/40 focus-within:border-vc-accent focus-within:ring-2 focus-within:ring-vc-accent/10 transition-all duration-200 p-1"
       onSubmit={(e) => {
         e.preventDefault();
-        window.location.href = "/register";
+        const trimmed = domain.trim();
+        window.location.href = trimmed ? `/start?domain=${encodeURIComponent(trimmed)}` : "/start";
       }}
     >
       <label htmlFor="landing-closing-domain" className="sr-only">

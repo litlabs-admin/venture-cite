@@ -18,6 +18,7 @@ export const SCHEDULER_JOB_NAMES = {
   accountPurge: "account-purge",
   brandPurge: "brand-purge",
   tourEventsCleanup: "tour-events-cleanup",
+  onboardingSessionCleanup: "onboarding-session-cleanup",
   autoCitation: "auto-citation",
   brandActivation: "brand-activation",
   detectFactScrapeFailure: "detect-fact-scrape-failure",

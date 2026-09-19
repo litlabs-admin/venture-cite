@@ -68,6 +68,18 @@ const structuralChecks = [
           where granted.rolname = 'venturecite_entity_request'
             and membership.set_option`,
   },
+  {
+    description: "venturecite_request can read and write the agency columns (migration 0129)",
+    // One privilege per call: a comma list returns true if ANY privilege is held.
+    sql: `select 1
+          from (values
+            ('public.users', 'account_kind', 'SELECT'), ('public.users', 'account_kind', 'UPDATE'),
+            ('public.users', 'agency_name', 'SELECT'), ('public.users', 'agency_name', 'UPDATE'),
+            ('public.brands', 'relationship', 'SELECT'), ('public.brands', 'relationship', 'INSERT'),
+            ('public.brands', 'relationship', 'UPDATE')
+          ) as wanted(tbl, col, priv)
+          having bool_and(has_column_privilege('venturecite_request', tbl, col, priv))`,
+  },
 ];
 
 const client = new pg.Client({ connectionString, ssl: false });

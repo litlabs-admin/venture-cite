@@ -4,14 +4,13 @@
 // If a selector here stops matching, fix it HERE, not in individual specs.
 
 export const SEL = Object.freeze({
-  // Auth pages - verified present in client/src/pages/login.tsx and register.tsx
+  // Auth pages - verified present in client/src/pages/login.tsx. /register
+  // (client/src/pages/register.tsx) is deleted - it's a redirect to /start
+  // now (src/routes/_app/register.tsx) - so the form-field selectors that
+  // used to target it are gone too.
   emailInput: '[data-testid="input-email"]',
   passwordInput: '[data-testid="input-password"]',
   loginButton: '[data-testid="button-login"]',
-  firstNameInput: '[data-testid="input-first-name"]',
-  lastNameInput: '[data-testid="input-last-name"]',
-  confirmPasswordInput: '[data-testid="input-confirm-password"]',
-  registerButton: '[data-testid="button-register"]',
   forgotPasswordLink: '[data-testid="link-forgot-password"]',
   registerLink: '[data-testid="link-register"]',
   loginLink: '[data-testid="link-login"]',

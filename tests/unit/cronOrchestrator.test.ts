@@ -39,6 +39,7 @@ const stubs = vi.hoisted(() => ({
   // Both jobs also run in the in-process scheduler on Render. The orchestrator
   // tests stub them because this suite exercises the HTTP trigger in isolation.
   deleteOldTourEvents: vi.fn(async () => 0),
+  runOnboardingSessionCleanupJob: vi.fn(async () => undefined),
   detectFactScrapeFailureRate: vi.fn(async () => ({ alerted: 0 })),
   runBrandActivationSweep: vi.fn(async () => ({ processed: 0, total: 0 })),
   runContentCostOutboxDrain: vi.fn(async () => ({
@@ -85,6 +86,9 @@ vi.mock("../../server/scheduler", () => ({
   runWeeklyDigestAggregator: stubs.runWeeklyDigestAggregator,
   runWeeklyReportJob: stubs.runWeeklyReportJob,
   detectFactScrapeFailureRate: stubs.detectFactScrapeFailureRate,
+}));
+vi.mock("../../server/onboardingSession/cleanup", () => ({
+  runOnboardingSessionCleanupJob: stubs.runOnboardingSessionCleanupJob,
 }));
 vi.mock("../../server/lib/citationReconciliation", () => ({
   reconcileOrphanCitationRuns: stubs.reconcileOrphanCitationRuns,

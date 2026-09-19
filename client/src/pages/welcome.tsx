@@ -1,61 +1,36 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Lock,
-  Search,
-  FileText,
   CheckCircle,
   RefreshCw,
   AlertTriangle,
   X as XIcon,
-  Plus,
-  ArrowRight,
   Loader2,
   Circle,
   RotateCcw,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { claimResponseSchema, pendingResponseSchema } from "@shared/onboarding/session";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { getAccessToken } from "@/lib/authStore";
-import { validateDomain } from "@shared/validateDomain";
 import { cn } from "@/lib/utils";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
-type Scene = "input" | "scraping" | "confirm" | "activating";
-
-type LogEntry = { icon?: string; message: string; ts: number };
-
-type Competitor = { name: string; domain: string; description?: string };
-
-type ScrapedData = {
-  brandName: string;
-  companyName: string;
-  industry: string;
-  description: string;
-  tone: string;
-  products: string[];
-  keyValues: string[];
-  uniqueSellingPoints: string[];
-  targetAudience: string;
-  brandVoice: string;
-  nameVariations: string[];
-  logoUrl: string | null;
-  competitors: Competitor[];
-};
-
-type SseEvent = {
-  type: "log" | "result" | "error" | "end";
-  icon?: string;
-  message?: string;
-  data?: any;
-  reason?: string;
-};
+// ---------------------------------------------------------------------------
+// Post-login claim screen. Replaces the pre-account domain/scrape/confirm
+// scenes (docs/superpowers/specs/2026-09-18-onboarding-data-contract.md,
+// "Sign-up and claim") - that whole flow now runs anonymously, before
+// sign-up, at /start (src/routes/start.tsx, client/src/components/onboarding).
+//
+// This page's only job once a user lands here is:
+//   1. GET /api/onboarding/pending - did they come from the anonymous flow?
+//   2. If so, POST /api/onboarding/claim {sessionId} and show the SAME
+//      ActivationPanel progress screen the old confirm flow used - claim
+//      kicks off the same server-side autopilot, so the polling contract is
+//      unchanged.
+//   3. If not (no pending session, and no brands yet), send them to /start -
+//      there is nothing left for this page to render pre-claim.
+type Scene = "checking" | "activating" | "error";
 
 // Server-driven activation pipeline state. The autopilot runs the phases
 // strictly in order - FactSheet kernel first, then prompts grounded in
@@ -76,73 +51,6 @@ type AutopilotData = {
   progress: { promptsGenerated?: number; citationsRun?: number; citationsTotal?: number } | null;
   error: string | null;
 };
-
-const LOG_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  search: Search,
-  file: FileText,
-  check: CheckCircle,
-  refresh: RefreshCw,
-  warn: AlertTriangle,
-};
-
-function pickIcon(name?: string) {
-  if (!name) return Search;
-  const key = name.toLowerCase();
-  if (key.includes("search")) return Search;
-  if (key.includes("file") || key.includes("doc")) return FileText;
-  if (key.includes("check") || key.includes("done") || key.includes("success")) return CheckCircle;
-  if (key.includes("refresh") || key.includes("retry") || key.includes("sync")) return RefreshCw;
-  if (key.includes("warn") || key.includes("alert") || key.includes("error")) return AlertTriangle;
-  return LOG_ICONS[key] || Search;
-}
-
-function initialsOf(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase() || "")
-    .join("");
-}
-
-function splitCsv(s: string): string[] {
-  return s
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
-
-function useDebounced<T>(value: T, delay = 300): T {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const h = setTimeout(() => setV(value), delay);
-    return () => clearTimeout(h);
-  }, [value, delay]);
-  return v;
-}
-
-// Quiet enter: opacity + 6px settle, exponential ease, honoring
-// prefers-reduced-motion (collapses to an 80ms opacity fade, no move).
-function Reveal({ children, className }: { children: React.ReactNode; className?: string }) {
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    const r = requestAnimationFrame(() => setShown(true));
-    return () => cancelAnimationFrame(r);
-  }, []);
-  return (
-    <div
-      className={cn(
-        "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-opacity motion-reduce:duration-75",
-        shown
-          ? "opacity-100 translate-y-0"
-          : "opacity-0 translate-y-1.5 motion-reduce:translate-y-0",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Activation pipeline model - the single source of progress truth.
@@ -181,87 +89,144 @@ function activeIndexFor(status: AutopilotStatus): number {
   }
 }
 
+// Quiet enter: opacity + 6px settle, exponential ease, honoring
+// prefers-reduced-motion (collapses to an 80ms opacity fade, no move).
+function Reveal({ children, className }: { children: React.ReactNode; className?: string }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const r = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(r);
+  }, []);
+  return (
+    <div
+      className={cn(
+        "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-opacity motion-reduce:duration-75",
+        shown
+          ? "opacity-100 translate-y-0"
+          : "opacity-0 translate-y-1.5 motion-reduce:translate-y-0",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function Welcome() {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const rqClient = useQueryClient();
 
-  const [scene, setScene] = useState<Scene>("input");
-  const [domain, setDomain] = useState("");
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [scrapedData, setScrapedData] = useState<ScrapedData | null>(null);
-  const [logoBroken, setLogoBroken] = useState(false);
-  const [scrapeError, setScrapeError] = useState<string | null>(null);
-
-  // Confirm-scene editable state
-  const [editName, setEditName] = useState("");
-  const [editIndustry, setEditIndustry] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editTargetAudience, setEditTargetAudience] = useState("");
-  const [editBrandVoice, setEditBrandVoice] = useState("");
-  const [editProducts, setEditProducts] = useState<string[]>([]);
-  const [editKeyValues, setEditKeyValues] = useState<string[]>([]);
-  const [editUsps, setEditUsps] = useState<string[]>([]);
-  const [editCompetitors, setEditCompetitors] = useState<Competitor[]>([]);
-  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
-  const [submitting, setSubmitting] = useState(false);
+  const [scene, setScene] = useState<Scene>("checking");
+  const [newBrandId, setNewBrandId] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  // The claim response only returns a brandId (see shared/onboarding/session.ts
+  // claimResponseSchema) - it doesn't carry back the brand's name, so this
+  // panel uses the same generic fallback ActivationPanel has always shown
+  // pre-name-resolution.
+  const claimBrandName = "your brand";
 
   // Arriving straight from Stripe Checkout. The tier was granted by a webhook
   // while the customer was still on Stripe's domain, so the cached /api/auth/me
   // here is from before they had a plan - the trial banner and every limit
   // read off it would be a step behind for the whole session.
-  //
-  // ponytail: one invalidate, no polling. The webhook lands in about a second
-  // and the next step is typing a domain and waiting ~10s for the scrape, so
-  // there is no realistic window where this is still stale by the time it
-  // matters. If confirm ever does race it, the 403 handler below catches it.
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has("checkout")) return;
     void rqClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
   }, [rqClient]);
 
   // A returning customer who reactivates lands here too, and they already have
-  // brands - this page is first-run only, so send them to the app rather than
-  // asking them to set up a brand they set up months ago. Scoped to the input
-  // scene so it can never fire over a run in progress.
+  // brands - this page is claim-only, so send them straight to the app.
   //
   // A failed `/api/brands` must NOT read the same as "confirmed zero
-  // brands" - `data` stays `undefined` on error, which used to make
+  // brands" - `data` stays `undefined` on error, which would otherwise make
   // `brandCount` fall back to 0 exactly like a genuinely brand-less
-  // account. That sent a returning customer with real brands straight back
-  // through onboarding (and risked a duplicate brand) on nothing more than
-  // a transient fetch failure. `isSuccess`/`isError` below distinguish
-  // "confirmed zero" from "couldn't check" - see the render branches below.
+  // account. `isSuccess`/`isError` distinguish "confirmed zero" from
+  // "couldn't check".
   const existingBrands = useQuery<{ success: boolean; data: unknown[] }>({
     queryKey: ["/api/brands"],
     meta: { suppressErrorToast: true },
   });
   const brandCount = existingBrands.data?.data?.length ?? 0;
+
+  // Parsed with the same schema the route uses, so a shape change fails here
+  // loudly instead of reading as "nothing pending".
+  const pendingQuery = useQuery({
+    queryKey: ["/api/onboarding/pending"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/onboarding/pending");
+      return pendingResponseSchema.parse(await res.json());
+    },
+    meta: { suppressErrorToast: true },
+  });
+
+  const claimMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const res = await apiRequest("POST", "/api/onboarding/claim", { sessionId });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw { body: data, status: res.status };
+      return claimResponseSchema.parse(data);
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/brands"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/brands"] });
+      setNewBrandId(data.brandId);
+      setScene("activating");
+    },
+    onError: (err: unknown) => {
+      const body = (err as { body?: { error?: string; limitReached?: boolean } } | undefined)?.body;
+      if (body?.limitReached) {
+        void navigate({ to: "/pricing" });
+        return;
+      }
+      setClaimError(body?.error || "Could not finish setting up your brand.");
+      setScene("error");
+    },
+  });
+
+  // Drives the claim/redirect decision once both queries have settled.
   useEffect(() => {
-    if (scene === "input" && existingBrands.isSuccess && brandCount > 0) {
+    if (scene !== "checking") return;
+    if (existingBrands.isLoading || pendingQuery.isLoading) return;
+
+    // A confirmed existing brand means this is a returning customer, not a
+    // fresh claim - go straight to the app regardless of any pending session.
+    if (existingBrands.isSuccess && brandCount > 0) {
       void navigate({ to: "/dashboard" });
+      return;
     }
-  }, [scene, brandCount, existingBrands.isSuccess, navigate]);
 
-  const [newBrandId, setNewBrandId] = useState<string | null>(null);
+    // A failed pending check is not "nothing pending": redirecting would drop
+    // the user's claim. Show the retryable error instead.
+    if (pendingQuery.isError) {
+      setClaimError("We couldn't check for your saved setup. Try again.");
+      setScene("error");
+      return;
+    }
 
-  const abortRef = useRef<AbortController | null>(null);
+    const pendingSessionId = pendingQuery.data?.sessionId ?? null;
+    if (pendingSessionId) {
+      claimMutation.mutate(pendingSessionId);
+      return;
+    }
 
-  const debouncedDomain = useDebounced(domain, 300);
-  const validation = useMemo(
-    () => (debouncedDomain ? validateDomain(debouncedDomain) : null),
-    [debouncedDomain],
-  );
-  const liveValidation = useMemo(() => (domain ? validateDomain(domain) : null), [domain]);
-  const inlineError = debouncedDomain && validation && !validation.valid ? validation.reason : null;
-  const canSubmit = !!liveValidation && liveValidation.valid;
-
-  // Abort stream on unmount
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+    // No pending session and (as far as we can confirm) no brands: there is
+    // nothing pre-claim for this page to show. The anonymous flow lives at
+    // /start now.
+    if (existingBrands.isSuccess && brandCount === 0) {
+      void navigate({ to: "/start" });
+    }
+    // If existingBrands errored, fall through to the render below, which
+    // shows a distinct, retryable error rather than guessing either way.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    scene,
+    existingBrands.isLoading,
+    existingBrands.isSuccess,
+    brandCount,
+    pendingQuery.isLoading,
+    pendingQuery.isError,
+    pendingQuery.data,
+  ]);
 
   // ---- Activation status poll -------------------------------------------
   // Mirrors the monitor-overview pattern: poll every 3s while the pipeline
@@ -280,17 +245,8 @@ export default function Welcome() {
     enabled: scene === "activating" && !!newBrandId,
     refetchInterval: (q) => {
       const status = (q.state.data as { data?: AutopilotData | null } | undefined)?.data?.status;
-      // Keep polling through a transient error too. The old `status && ...`
-      // guard returned `false` (stop polling, forever) the instant `status`
-      // was undefined - which is exactly what happens on every single
-      // failed check, since a rejected fetch never produces an `autopilot`
-      // to read `.status` off of. Only a genuinely terminal status should
-      // stop the poll.
       return status === "completed" || status === "failed" ? false : 3000;
     },
-    // ActivationPanel renders its own inline state for a failing check
-    // (see `autopilotIsError` below) - a stacked global toast on top of
-    // that, once every 3 seconds, would just be noise.
     meta: { suppressErrorToast: true },
   });
   const autopilot = autopilotResp?.data ?? null;
@@ -306,236 +262,10 @@ export default function Welcome() {
     },
     onSuccess: () => {
       rqClient.invalidateQueries({ queryKey: ["autopilot-status", newBrandId] });
-      toast({ title: "Retrying", description: "Picking setup back up where it stopped." });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Couldn't retry", description: err.message, variant: "destructive" });
     },
   });
 
-  const markTouched = (field: string) =>
-    setTouchedFields((prev) => {
-      if (prev.has(field)) return prev;
-      const next = new Set(prev);
-      next.add(field);
-      return next;
-    });
-
-  const hydrateConfirm = (data: ScrapedData) => {
-    setEditName(data.brandName || "");
-    setEditIndustry(data.industry || "");
-    setEditDescription(data.description || "");
-    setEditTargetAudience(data.targetAudience || "");
-    setEditBrandVoice(data.brandVoice || "");
-    setEditProducts(Array.isArray(data.products) ? data.products : []);
-    setEditKeyValues(Array.isArray(data.keyValues) ? data.keyValues : []);
-    setEditUsps(Array.isArray(data.uniqueSellingPoints) ? data.uniqueSellingPoints : []);
-    setEditCompetitors(Array.isArray(data.competitors) ? data.competitors : []);
-    setTouchedFields(new Set());
-  };
-
-  const startScrape = useCallback(async () => {
-    const v = validateDomain(domain);
-    if (!v.valid) return;
-    const normalized = v.normalized;
-
-    setScene("scraping");
-    setLogs([]);
-    setScrapeError(null);
-    setScrapedData(null);
-
-    const controller = new AbortController();
-    abortRef.current?.abort();
-    abortRef.current = controller;
-
-    try {
-      const token = await getAccessToken();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-      };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch("/api/onboarding/scrape-stream", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ domain: normalized }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok || !res.body) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `Request failed: ${res.status}`);
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      // A stream can end without ever sending `result` or `error` - the
-      // server process is killed mid-scrape, the connection drops, a proxy
-      // times out. The loop below used to just `break` on that and return
-      // normally, so no error was shown and the user sat on the scanning
-      // screen forever, having seen the logs stop after "Detected brand
-      // logo." This tracks whether the stream actually resolved.
-      let sawTerminalEvent = false;
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        let sepIdx: number;
-        // SSE events are separated by a blank line
-        while ((sepIdx = buffer.indexOf("\n\n")) !== -1) {
-          const rawEvent = buffer.slice(0, sepIdx);
-          buffer = buffer.slice(sepIdx + 2);
-
-          // Each event may contain multiple `data:` lines; concatenate.
-          const dataLines: string[] = [];
-          for (const line of rawEvent.split("\n")) {
-            if (line.startsWith("data:")) {
-              dataLines.push(line.slice(5).trimStart());
-            }
-          }
-          if (!dataLines.length) continue;
-          const payload = dataLines.join("\n");
-          let evt: SseEvent;
-          try {
-            evt = JSON.parse(payload);
-          } catch {
-            continue;
-          }
-
-          if (evt.type === "result" || evt.type === "error") sawTerminalEvent = true;
-
-          if (evt.type === "log") {
-            setLogs((prev) => [
-              ...prev,
-              { icon: evt.icon, message: evt.message || "", ts: Date.now() },
-            ]);
-          } else if (evt.type === "result") {
-            const data = evt.data as ScrapedData;
-            setScrapedData(data);
-            setLogoBroken(false);
-            hydrateConfirm(data);
-            setScene("confirm");
-          } else if (evt.type === "error") {
-            setScrapeError(evt.reason || evt.message || "Something went wrong");
-          } else if (evt.type === "end") {
-            try {
-              await reader.cancel();
-            } catch {
-              /* noop */
-            }
-            if (!sawTerminalEvent) {
-              setScrapeError("The scan ended early. Please try again.");
-            }
-            return;
-          }
-        }
-      }
-
-      // Fell out of the read loop without an `end` event: the connection
-      // closed under us. Same treatment - say so, so the retry button is
-      // reachable instead of an animation that never finishes.
-      if (!sawTerminalEvent) {
-        setScrapeError("We lost the connection while reading your site. Please try again.");
-      }
-    } catch (err: any) {
-      if (err?.name === "AbortError") return;
-      setScrapeError(err?.message || "Failed to reach server");
-    }
-  }, [domain]);
-
-  const resetAll = () => {
-    abortRef.current?.abort();
-    setScene("input");
-    setLogs([]);
-    setScrapeError(null);
-    setScrapedData(null);
-    setTouchedFields(new Set());
-  };
-
-  const handleConfirm = async () => {
-    if (!editName.trim()) {
-      toast({
-        title: "Brand name required",
-        description: "Enter a brand name to continue.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const normalized = validateDomain(domain).valid
-        ? (validateDomain(domain) as { normalized: string }).normalized
-        : domain;
-      const website = /^https?:\/\//i.test(normalized) ? normalized : `https://${normalized}`;
-      const body = {
-        brandData: {
-          brandName: editName.trim(),
-          companyName: scrapedData?.companyName ?? "",
-          industry: editIndustry.trim(),
-          description: editDescription.trim(),
-          tone: scrapedData?.tone ?? "",
-          targetAudience: editTargetAudience.trim(),
-          brandVoice: editBrandVoice.trim(),
-          products: editProducts,
-          keyValues: editKeyValues,
-          uniqueSellingPoints: editUsps,
-          nameVariations: scrapedData?.nameVariations ?? [],
-          logoUrl: scrapedData?.logoUrl ?? null,
-          website,
-        },
-        competitors: editCompetitors,
-      };
-      const res = await apiRequest("POST", "/api/onboarding/confirm", body);
-      const json = (await res.json()) as { brandId: string };
-      // Invalidate brands cache so FirstRunGate on /dashboard sees the new
-      // brand. The server has already kicked off the ordered activation
-      // pipeline (fact sheet → prompts → citations); we just observe it.
-      await queryClient.invalidateQueries({ queryKey: ["/api/brands"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/brands"] });
-      setNewBrandId(json.brandId);
-      setScene("activating");
-    } catch (err: any) {
-      // The server sends a specific reason and, for a plan problem, a
-      // limitReached flag. err.message is the raw response text, so using it
-      // put a JSON blob in the toast - and for the commonest failure by far
-      // (no plan yet) it left the customer stuck on a form that can never
-      // succeed, after a scrape and an LLM call they had just waited for.
-      const body = err?.body as { error?: string; limitReached?: boolean } | undefined;
-      if (body?.limitReached) {
-        toast({
-          title: "Choose a plan to start measuring",
-          description: "Your free trial starts as soon as you pick one. Taking you to pricing…",
-        });
-        void navigate({ to: "/pricing" });
-        return;
-      }
-      toast({
-        title: "Could not confirm brand",
-        description: body?.error || "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   // Auto-advance into the Dashboard the moment the baseline is ready.
-  // The spine's global-welcome tour auto-fires at `/dashboard`, so the
-  // guided tour runs alongside whatever finishes in the background.
-  // Failures do NOT auto-redirect - the user chooses retry or proceed.
-  //
-  // Native-router note: this used to target bare "/" with a `?brandId=`
-  // query string. Post-migration, "/" is the public Landing route
-  // (src/routes/index.tsx) - for an authenticated visitor it hard-redirects
-  // to "/dashboard" via `window.location.href`, which drops the query
-  // string entirely. Targeting "/dashboard" directly (where FirstRunGate
-  // now mounts the Home/Dashboard component) is what actually
-  // preserves the old behavior: landing on the dashboard with the
-  // just-created brand selected.
   useEffect(() => {
     if (scene !== "activating" || !newBrandId) return;
     if (autopilot?.status === "completed") {
@@ -547,27 +277,27 @@ export default function Welcome() {
     }
   }, [autopilot?.status, scene, newBrandId, navigate]);
 
+  const checking =
+    scene === "checking" ||
+    existingBrands.isLoading ||
+    pendingQuery.isLoading ||
+    claimMutation.isPending;
+
   return (
     <PanelPage className="flex items-center justify-center p-6">
-      {/* A failed /api/brands check must render as a distinct, honest
-          state - not silently fall through to the same brand-creation form
-          a genuinely brand-less account sees (see the `existingBrands`
-          comment above for why that used to happen), and not a blank panel
-          during the brief initial load either. */}
-      {scene === "input" && existingBrands.isLoading && (
+      {checking && !existingBrands.isError && (
         <Reveal className="w-full max-w-[480px]">
           <PanelRow cols={1} last>
             <Panel width="wide" border="last">
               <div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
               <div className="mt-3 h-4 w-full animate-pulse rounded bg-muted" />
               <div className="mt-1 h-4 w-4/5 animate-pulse rounded bg-muted" />
-              <div className="mt-6 h-10 w-full animate-pulse rounded bg-muted" />
             </Panel>
           </PanelRow>
         </Reveal>
       )}
 
-      {scene === "input" && existingBrands.isError && (
+      {existingBrands.isError && scene !== "activating" && (
         <Reveal className="w-full max-w-[480px]">
           <PanelRow cols={1} last>
             <Panel width="wide" border="last">
@@ -593,375 +323,26 @@ export default function Welcome() {
         </Reveal>
       )}
 
-      {scene === "input" && existingBrands.isSuccess && (
+      {scene === "error" && (
         <Reveal className="w-full max-w-[480px]">
           <PanelRow cols={1} last>
             <Panel width="wide" border="last">
               <h1 className="text-page font-semibold tracking-tight text-foreground">
-                Let's establish your brand
+                Could not finish setting up your brand
               </h1>
-              <p className="mt-2 text-caption text-muted-foreground">
-                Enter your website. We read it and the public record to build the fact sheet
-                everything else is measured against.
-              </p>
-
-              <div className="mt-6 space-y-2">
-                <Label htmlFor="welcome-domain" className="sr-only">
-                  Your website
-                </Label>
-                <Input
-                  id="welcome-domain"
-                  autoFocus
-                  data-testid="input-website"
-                  placeholder="yourbrand.com"
-                  value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && canSubmit) startScrape();
-                  }}
-                  aria-invalid={!!inlineError}
-                />
-                {inlineError ? (
-                  <p className="text-caption text-destructive" role="alert">
-                    {inlineError}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="mt-6">
-                <Button
-                  className="w-full"
-                  disabled={!canSubmit}
-                  onClick={startScrape}
-                  data-testid="button-find-brand"
-                >
-                  Find my brand
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-                <p className="mt-3 text-caption text-muted-foreground text-center">
-                  Detection takes about 30 seconds. You'll review everything before it goes live.
-                </p>
-              </div>
-            </Panel>
-          </PanelRow>
-        </Reveal>
-      )}
-
-      {scene === "scraping" && (
-        <Reveal className="w-full max-w-[560px]">
-          <PanelRow cols={1} last>
-            <Panel width="wide" border="last">
-              <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-2 rounded-full border bg-muted/50 px-3 py-1 text-caption font-medium text-muted-foreground">
-                  <Lock className="h-3 w-3" />
-                  {validateDomain(domain).valid
-                    ? (validateDomain(domain) as { normalized: string }).normalized
-                    : domain}
-                </div>
-                {scrapeError ? null : (
-                  <span className="text-caption text-muted-foreground">Reading…</span>
-                )}
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {logs.map((log, idx) => {
-                  const Icon = pickIcon(log.icon);
-                  const isLatest = idx === logs.length - 1 && !scrapeError;
-                  return (
-                    <div key={idx} className="flex items-start gap-3">
-                      <div className="mt-0.5 flex w-3 items-center justify-center">
-                        {isLatest ? (
-                          <span className="relative flex h-2 w-2">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
-                            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-                          </span>
-                        ) : (
-                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
-                        )}
-                      </div>
-                      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-caption text-foreground">{log.message}</p>
-                      </div>
-                      <span className="text-label tabular-nums font-mono text-muted-foreground">
-                        {new Date(log.ts).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          second: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                  );
-                })}
-                {!logs.length && !scrapeError ? (
-                  <p className="text-caption text-muted-foreground">Connecting…</p>
-                ) : null}
-              </div>
-
-              {scrapeError ? (
-                <div className="mt-6 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-caption text-destructive">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <div className="flex-1">
-                      <p className="font-medium">We hit a snag</p>
-                      <p className="mt-1">{scrapeError}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setScrapeError(null);
-                        setScene("input");
-                      }}
-                    >
-                      Try again
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-            </Panel>
-          </PanelRow>
-        </Reveal>
-      )}
-
-      {scene === "confirm" && scrapedData && (
-        <Reveal className="w-full max-w-[720px] my-8">
-          <PanelRow cols={1} last>
-            <Panel width="wide" border="last">
-              <h2 className="text-page font-semibold tracking-tight">Confirm what we found</h2>
-              <p className="mt-1 text-caption text-muted-foreground">
-                Fields tagged{" "}
-                <Badge variant="secondary" className="text-label font-normal align-middle">
-                  auto-detected
-                </Badge>{" "}
-                came from your site. Correct anything that's off - accuracy here sets the baseline.
-              </p>
-
-              {/* Logo + Name */}
-              <div className="mt-6 flex items-center gap-4">
-                {scrapedData.logoUrl && !logoBroken ? (
-                  <img
-                    src={scrapedData.logoUrl}
-                    alt="Brand logo"
-                    className="h-16 w-16 rounded-full object-cover border bg-card"
-                    onError={() => setLogoBroken(true)}
-                  />
-                ) : (
-                  <div className="h-16 w-16 rounded-full border bg-muted flex items-center justify-center text-ui font-semibold text-muted-foreground">
-                    {initialsOf(editName || scrapedData.brandName || "?") || "?"}
-                  </div>
-                )}
-                <div className="flex-1">
-                  <FieldLabel
-                    label="Brand name"
-                    touched={touchedFields.has("name")}
-                    htmlFor="confirm-brand-name"
-                  />
-                  <Input
-                    id="confirm-brand-name"
-                    value={editName}
-                    onChange={(e) => {
-                      setEditName(e.target.value);
-                      markTouched("name");
-                    }}
-                    data-testid="input-brand-name"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <FieldLabel
-                    label="Industry"
-                    touched={touchedFields.has("industry")}
-                    htmlFor="confirm-industry"
-                  />
-                  <Input
-                    id="confirm-industry"
-                    value={editIndustry}
-                    onChange={(e) => {
-                      setEditIndustry(e.target.value);
-                      markTouched("industry");
-                    }}
-                  />
-                </div>
-                <div>
-                  <FieldLabel
-                    label="Target audience"
-                    touched={touchedFields.has("targetAudience")}
-                    htmlFor="confirm-target-audience"
-                  />
-                  <Input
-                    id="confirm-target-audience"
-                    value={editTargetAudience}
-                    onChange={(e) => {
-                      setEditTargetAudience(e.target.value);
-                      markTouched("targetAudience");
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <FieldLabel
-                  label="Description"
-                  touched={touchedFields.has("description")}
-                  htmlFor="confirm-description"
-                />
-                <Textarea
-                  id="confirm-description"
-                  rows={3}
-                  value={editDescription}
-                  onChange={(e) => {
-                    setEditDescription(e.target.value);
-                    markTouched("description");
-                  }}
-                />
-              </div>
-
-              <div className="mt-4">
-                <FieldLabel
-                  label="Brand voice"
-                  touched={touchedFields.has("brandVoice")}
-                  htmlFor="confirm-brand-voice"
-                />
-                <Textarea
-                  id="confirm-brand-voice"
-                  rows={2}
-                  value={editBrandVoice}
-                  onChange={(e) => {
-                    setEditBrandVoice(e.target.value);
-                    markTouched("brandVoice");
-                  }}
-                />
-              </div>
-
-              <TagField
-                label="Products"
-                htmlId="confirm-products"
-                values={editProducts}
-                touched={touchedFields.has("products")}
-                onChange={(v) => {
-                  setEditProducts(v);
-                  markTouched("products");
+              <p className="mt-2 text-caption text-muted-foreground">{claimError}</p>
+              <Button
+                className="mt-6 w-full"
+                variant="outline"
+                onClick={() => {
+                  setScene("checking");
+                  setClaimError(null);
+                  void pendingQuery.refetch();
                 }}
-              />
-              <TagField
-                label="Key values"
-                htmlId="confirm-key-values"
-                values={editKeyValues}
-                touched={touchedFields.has("keyValues")}
-                onChange={(v) => {
-                  setEditKeyValues(v);
-                  markTouched("keyValues");
-                }}
-              />
-              <TagField
-                label="Unique selling points"
-                htmlId="confirm-usps"
-                values={editUsps}
-                touched={touchedFields.has("usps")}
-                onChange={(v) => {
-                  setEditUsps(v);
-                  markTouched("usps");
-                }}
-              />
-
-              {/* Competitors */}
-              <div className="mt-6">
-                <h3 className="text-caption font-medium">Competitors</h3>
-                <div className="mt-3 space-y-2">
-                  {editCompetitors.map((c, idx) => (
-                    <div key={idx} className="flex items-start gap-3 rounded-md border p-3">
-                      {c.domain ? (
-                        <img
-                          src={`/api/logo-proxy?url=${encodeURIComponent(
-                            `https://www.google.com/s2/favicons?domain=${encodeURIComponent(c.domain)}&sz=32`,
-                          )}`}
-                          alt=""
-                          className="mt-0.5 h-8 w-8 rounded"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
-                          }}
-                        />
-                      ) : (
-                        <div className="mt-0.5 h-8 w-8 rounded bg-muted" />
-                      )}
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                          <Input
-                            value={c.name}
-                            placeholder="Name"
-                            onChange={(e) => {
-                              const next = [...editCompetitors];
-                              next[idx] = { ...next[idx], name: e.target.value };
-                              setEditCompetitors(next);
-                            }}
-                          />
-                          <Input
-                            value={c.domain}
-                            placeholder="domain.com"
-                            onChange={(e) => {
-                              const next = [...editCompetitors];
-                              next[idx] = { ...next[idx], domain: e.target.value };
-                              setEditCompetitors(next);
-                            }}
-                          />
-                        </div>
-                        <Input
-                          value={c.description || ""}
-                          placeholder="Short description"
-                          onChange={(e) => {
-                            const next = [...editCompetitors];
-                            next[idx] = { ...next[idx], description: e.target.value };
-                            setEditCompetitors(next);
-                          }}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        aria-label="Remove competitor"
-                        className="text-muted-foreground hover:text-foreground"
-                        onClick={() =>
-                          setEditCompetitors(editCompetitors.filter((_, i) => i !== idx))
-                        }
-                      >
-                        <XIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() =>
-                    setEditCompetitors([
-                      ...editCompetitors,
-                      { name: "", domain: "", description: "" },
-                    ])
-                  }
-                >
-                  <Plus className="mr-1 h-4 w-4" />
-                  Add competitor
-                </Button>
-              </div>
-
-              <div className="mt-8 flex items-center justify-between gap-3">
-                <Button variant="ghost" onClick={resetAll} disabled={submitting}>
-                  Start over
-                </Button>
-                <Button
-                  onClick={handleConfirm}
-                  disabled={submitting || !editName.trim()}
-                  data-testid="button-confirm-brand"
-                >
-                  {submitting ? "Confirming…" : "Confirm and start measuring"}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try again
+              </Button>
             </Panel>
           </PanelRow>
         </Reveal>
@@ -970,7 +351,7 @@ export default function Welcome() {
       {scene === "activating" && newBrandId && (
         <Reveal className="w-full max-w-[560px]">
           <ActivationPanel
-            brandName={editName || scrapedData?.brandName || "your brand"}
+            brandName={claimBrandName}
             autopilot={autopilot}
             autopilotIsError={autopilotIsError}
             onGoToDashboard={() => navigate({ to: "/dashboard", search: { brandId: newBrandId } })}
@@ -988,6 +369,11 @@ export default function Welcome() {
 // Activation panel - the ONE progress surface. Ordered phases, four-state
 // vocabulary (Done / Working / Queued), one editorial verdict line, honest
 // "this finishes without you" copy, and a non-blocking path forward.
+//
+// Unchanged from the pre-redesign confirm flow (docs/superpowers/specs/2026-09-18-onboarding-data-contract.md
+// keeps claim's server contract identical to the old confirm's), and its
+// polling logic and props stay verbatim - tests/unit/welcomeActivationPanelAndBrandCount.test.tsx
+// exercises this component directly.
 // ---------------------------------------------------------------------------
 
 export function ActivationPanel({
@@ -1010,13 +396,6 @@ export function ActivationPanel({
   const status: AutopilotStatus = autopilot?.status ?? "pending";
   const jobFailed = status === "failed";
   const done = status === "completed";
-  // The status *check* can fail independently of the pipeline job itself
-  // failing (network blip, a 500 on this one endpoint). Before this fix
-  // that was indistinguishable from "still working": `jobFailed` can only
-  // become true by reading `autopilot.status`, and a rejected fetch never
-  // produces an `autopilot` at all - so a persistently-erroring status
-  // check showed "Working" forever, with the Retry button (which only
-  // rendered on `jobFailed`) never appearing.
   const checkFailed = autopilotIsError && !done;
   const failed = jobFailed || checkFailed;
   const activeIndex = activeIndexFor(status);
@@ -1157,7 +536,7 @@ export function ActivationPanel({
               data-testid="button-skip-to-dashboard"
             >
               {done ? "Go to dashboard" : "Go to dashboard"}
-              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              <ArrowRightIcon />
             </Button>
           </div>
         </div>
@@ -1165,6 +544,29 @@ export function ActivationPanel({
     </PanelRow>
   );
 }
+
+function ArrowRightIcon() {
+  return (
+    <svg
+      className="ml-1.5 h-3.5 w-3.5"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 8h10M9 4l4 4-4 4" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FieldLabel / TagField - kept for tests/unit/welcomeAndManualPasteLabels.test.tsx
+// (an accessibility-labeling regression test) even though the confirm scene
+// that used to render them is deleted. Neither is referenced from this file's
+// own render path any more.
+// ---------------------------------------------------------------------------
 
 export function FieldLabel({
   label,
@@ -1181,12 +583,19 @@ export function FieldLabel({
         {label}
       </label>
       {!touched ? (
-        <Badge variant="secondary" className="text-label font-normal">
+        <span className="rounded-full bg-secondary px-2 py-0.5 text-label font-normal text-secondary-foreground">
           auto-detected
-        </Badge>
+        </span>
       ) : null}
     </div>
   );
+}
+
+function splitCsv(s: string): string[] {
+  return s
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
 }
 
 export function TagField({

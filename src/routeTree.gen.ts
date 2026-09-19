@@ -16,6 +16,7 @@ import { Route as HealthRouteImport } from './routes/health'
 import { Route as InternalPageRouteImport } from './routes/internal-page'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as StartRouteImport } from './routes/start'
 import { Route as AppSplatRouteImport } from './routes/_app/$'
 import { Route as AppActRouteImport } from './routes/_app/act'
 import { Route as AppAgentRouteImport } from './routes/_app/agent'
@@ -94,6 +95,11 @@ const PricingRoute = PricingRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StartRoute = StartRouteImport.update({
+  id: '/start',
+  path: '/start',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppSplatRoute = AppSplatRouteImport.update({
@@ -330,6 +336,7 @@ export interface FileRoutesByFullPath {
   '/internal-page': typeof InternalPageRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/start': typeof StartRoute
   '/$': typeof AppSplatRoute
   '/act': typeof AppActRoute
   '/agent': typeof AppAgentRoute
@@ -383,6 +390,7 @@ export interface FileRoutesByTo {
   '/internal-page': typeof InternalPageRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/start': typeof StartRoute
   '/$': typeof AppSplatRoute
   '/act': typeof AppActRoute
   '/agent': typeof AppAgentRoute
@@ -436,6 +444,7 @@ export interface FileRoutesById {
   '/internal-page': typeof InternalPageRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/start': typeof StartRoute
   '/_app/$': typeof AppSplatRoute
   '/_app/act': typeof AppActRoute
   '/_app/agent': typeof AppAgentRoute
@@ -491,6 +500,7 @@ export interface FileRouteTypes {
     | '/internal-page'
     | '/pricing'
     | '/privacy'
+    | '/start'
     | '/$'
     | '/act'
     | '/agent'
@@ -544,6 +554,7 @@ export interface FileRouteTypes {
     | '/internal-page'
     | '/pricing'
     | '/privacy'
+    | '/start'
     | '/$'
     | '/act'
     | '/agent'
@@ -596,6 +607,7 @@ export interface FileRouteTypes {
     | '/internal-page'
     | '/pricing'
     | '/privacy'
+    | '/start'
     | '/_app/$'
     | '/_app/act'
     | '/_app/agent'
@@ -651,6 +663,7 @@ export interface RootRouteChildren {
   InternalPageRoute: typeof InternalPageRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
+  StartRoute: typeof StartRoute
   ApiSplatRoute: typeof ApiSplatRoute
   WebhooksSplatRoute: typeof WebhooksSplatRoute
 }
@@ -704,6 +717,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/start': {
+      id: '/start'
+      path: '/start'
+      fullPath: '/start'
+      preLoaderRoute: typeof StartRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/$': {
@@ -1165,6 +1185,7 @@ const rootRouteChildren: RootRouteChildren = {
   InternalPageRoute: InternalPageRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
+  StartRoute: StartRoute,
   ApiSplatRoute: ApiSplatRoute,
   WebhooksSplatRoute: WebhooksSplatRoute,
 }

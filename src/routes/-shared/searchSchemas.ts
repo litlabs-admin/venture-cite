@@ -33,6 +33,14 @@ import { z } from "zod";
 //    those shared readers the moment a route below declared a schema at
 //    all; passthrough makes adding a schema additive-only.
 
+/** `/start` - `?domain=x` prefills and auto-starts the anonymous onboarding
+ *  flow (client/src/components/onboarding/OnboardingFlow.tsx). */
+export const startSearchSchema = z
+  .object({
+    domain: z.string().optional().catch(undefined),
+  })
+  .passthrough();
+
 /** `/articles` - `?edit=<articleId>` deep-links into ViewEditDialog for
  *  that article (client/src/pages/articles.tsx; also the "Open in
  *  Articles" link on the embedded Content editor, content.tsx). */

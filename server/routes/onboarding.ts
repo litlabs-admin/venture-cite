@@ -24,6 +24,13 @@ import {
   advanceOnboardingAutopilot,
   getOnboardingAutopilotStatus,
 } from "../services/onboardingActivation";
+import { claimOnboardingSession } from "../services/onboardingClaim";
+import {
+  claimBodySchema,
+  claimResponseSchema,
+  pendingResponseSchema,
+  PENDING_SESSION_KEY,
+} from "@shared/onboarding/session";
 
 import { captureAndFlush } from "../lib/sentryReport";
 
@@ -240,6 +247,58 @@ export function setupOnboardingRoutes(app: Express) {
         });
       } catch (err) {
         sendError(res, err, "Failed to advance activation");
+      }
+    }),
+  );
+
+  app.post(
+    "/api/onboarding/claim",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const parsed = claimBodySchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+          return res.status(400).json({ success: false, error: "sessionId must be a UUID" });
+        }
+
+        const result = await claimOnboardingSession(user.id, parsed.data.sessionId);
+
+        if (result.kind === "not_found") {
+          return res.status(404).json({ success: false, error: "Onboarding session not found" });
+        }
+        if (result.kind === "quota_exceeded") {
+          return res
+            .status(403)
+            .json({ success: false, error: result.message, limitReached: true });
+        }
+
+        res.json({ success: true, ...claimResponseSchema.parse({ brandId: result.brandId }) });
+      } catch (err) {
+        if (err instanceof OwnershipError) {
+          return res.status(err.status).json({ success: false, error: err.message });
+        }
+        sendError(res, err, "Failed to claim onboarding session");
+      }
+    }),
+  );
+
+  app.get(
+    "/api/onboarding/pending",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req) as { onboardingState?: unknown };
+        const state = (user.onboardingState ?? {}) as Record<string, unknown>;
+        const pending = state[PENDING_SESSION_KEY];
+        const parsed = pendingResponseSchema.safeParse({
+          sessionId: typeof pending === "string" ? pending : null,
+        });
+        // A malformed stored id is treated as nothing pending, never sent on.
+        res.json({ success: true, sessionId: parsed.success ? parsed.data.sessionId : null });
+      } catch (err) {
+        if (err instanceof OwnershipError) {
+          return res.status(err.status).json({ success: false, error: err.message });
+        }
+        sendError(res, err, "Failed to read pending onboarding session");
       }
     }),
   );

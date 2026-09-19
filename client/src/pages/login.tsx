@@ -160,7 +160,7 @@ export default function Login() {
             <p className="text-caption text-vc-tertiary">
               Don't have an account?{" "}
               <a
-                href="/register"
+                href="/start"
                 className="text-vc-accent hover:text-vc-accent/90 font-medium"
                 data-testid="link-register"
               >

@@ -468,10 +468,11 @@ export default function Pricing() {
                         setInquiryOpen(true);
                         return;
                       }
-                      // No account yet: the trial starts at registration, so
-                      // that is where this goes. Checkout would only 401.
+                      // No account yet: sign-up now happens inside the /start
+                      // onboarding flow, so that is where this goes. Checkout
+                      // would only 401.
                       if (!signedIn) {
-                        window.location.href = "/register";
+                        window.location.href = "/start";
                         return;
                       }
                       if (plan.priceId) {
